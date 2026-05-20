@@ -1,0 +1,148 @@
+LOCAL SERVICE MARKETPLACE – FULL SYSTEM SPECIFICATION (LARAVEL + REACT + MYSQL)
+
+1. PROJECT OVERVIEW
+Build a fully dynamic, scalable Local Service Marketplace Platform where users can discover, request, and book any local services.
+
+System must be:
+- Fully dynamic (no hardcoded services)
+- Mobile-first and responsive
+- Lightweight and fast
+- API-driven (Laravel backend + React frontend)
+- Scalable for future mobile app and AI features
+
+2. CORE GOAL
+Users can:
+- Search services using natural language
+- Find nearby service providers
+- Book instantly or request quotes
+- Chat with vendors
+- Track booking status
+
+3. USER ROLES
+Customer:
+- Search, book, request quotes, chat, review
+
+Vendor:
+- Manage profile
+- Create services dynamically
+- Accept/reject bookings
+- Respond to requests
+
+Admin:
+- Manage users/vendors
+- Monitor system
+
+4. CORE FEATURES
+
+4.1 Dynamic Service System
+- Services created dynamically
+- Fields:
+  name, description, category_id, pricing_type, price, images, service_area_radius, is_active, vendor_id, tags
+
+4.2 Search System
+- Global search
+- Location-based filtering
+- Tag-based search
+
+4.3 Vendor System
+- Vendor dashboard
+- Multiple services per vendor
+- Availability management
+
+4.4 Booking System
+- Instant booking (fixed price)
+- Quote request system
+- Status:
+  pending, accepted, in_progress, completed, cancelled
+
+4.5 Chat System
+- Customer-vendor chat linked to booking
+
+4.6 Reviews
+- Rating 1–5
+- Only after completed booking
+
+4.7 Location System
+- Nearby service discovery
+- Radius-based filtering
+
+4.8 Service Request System
+- Users can post requests
+- Vendors respond with offers
+
+5. MYSQL DATABASE STRUCTURE
+
+users:
+id, name, email, password, phone, role, lat, lng, created_at
+
+vendors:
+id, user_id, business_name, description, rating, service_area_radius
+
+categories:
+id, name, parent_id
+
+services:
+id, vendor_id, category_id, name, description, pricing_type, price, is_active, radius
+
+service_images:
+id, service_id, image_url
+
+bookings:
+id, customer_id, vendor_id, service_id, booking_type, status, price, scheduled_time, lat, lng
+
+booking_requests:
+id, customer_id, text, lat, lng, status
+
+messages:
+id, booking_id, sender_id, receiver_id, message
+
+reviews:
+id, booking_id, customer_id, vendor_id, rating, comment
+
+notifications:
+id, user_id, title, message, is_read
+
+6. BACKEND (LARAVEL)
+- REST API architecture
+- Sanctum authentication
+- Modular controllers:
+  Auth, Service, Booking, Vendor, Chat
+
+7. FRONTEND (REACT)
+- Mobile-first
+- React functional components
+- Axios API
+- TailwindCSS recommended
+
+Pages:
+- Home
+- Services
+- Service detail
+- Booking
+- Vendor dashboard
+- Chat
+
+8. UI/UX
+- Clean, minimal
+- Fast navigation
+- Card-based UI
+- Fully responsive
+
+9. PERFORMANCE
+- Fast API (<300ms target)
+- Pagination
+- Lazy loading images
+- Optimized queries
+
+10. SCALABILITY
+Future support:
+- Mobile app
+- AI matching
+- Payments
+- Multi-city expansion
+- Subscription system
+
+Services: Home Repair + Cleaning, Electrician, Plumber, Cleaning
+
+FINAL GOAL:
+Uber-like dynamic service marketplace with fully flexible service creation and instant booking system.
