@@ -1,0 +1,67 @@
+# ============================================================
+# Root .gitignore for ToleMate
+# ============================================================
+
+# ─── OS / Editor ────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ─── Environment / Secrets ──────────────────────────────────
+.env
+.env.*
+!.env.example
+*.key
+
+# ─── Backend (Laravel) ──────────────────────────────────────
+backend/vendor/
+backend/node_modules/
+backend/public/build/
+backend/public/hot/
+backend/public/storage
+backend/storage/*.key
+backend/storage/pail/
+backend/bootstrap/cache/*.php
+backend/.phpunit.result.cache
+backend/.phpunit.cache/
+backend/auth.json
+backend/Homestead.json
+backend/Homestead.yaml
+
+# ─── Frontend (React) ───────────────────────────────────────
+frontend/node_modules/
+frontend/build/
+frontend/coverage/
+frontend/.pnp
+frontend/.pnp.js
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+
+# ─── Mobile (React Native) ──────────────────────────────────
+mobile/node_modules/
+mobile/.gradle/
+mobile/android/.gradle/
+mobile/android/build/
+mobile/android/app/build/
+mobile/android/local.properties
+mobile/android/*.keystore
+!mobile/android/debug.keystore
+mobile/ios/build/
+mobile/ios/DerivedData/
+mobile/ios/Pods/
+mobile/ios/*.xcuserstate
+mobile/ios/.xcode.env.local
+mobile/*.hmap
+mobile/*.ipa
+mobile/xcuserdata/
+mobile/npm-debug.log*
+mobile/yarn-debug.log*
+mobile/yarn-error.log*
+
+# ─── Logs ───────────────────────────────────────────────────
+*.log
+backend/storage/logs/*.log
