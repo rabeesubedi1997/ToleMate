@@ -2,6 +2,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { API_BASE } from '../utils/config';
+import SeoHead from '../components/SeoHead';
 
 const UserEdit: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -43,6 +44,12 @@ const UserEdit: React.FC = () => {
   if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="spinner"></div></div>;
 
   return (
+    <>
+      <SeoHead
+        title="Edit User"
+        description="Admin: Edit user details on ToleMate."
+        noIndex={true}
+      />
     <div className="min-h-screen py-8 animate-fade-in">
       <div className="container-custom max-w-lg">
         <div className="flex items-center justify-between mb-6">
@@ -95,6 +102,7 @@ const UserEdit: React.FC = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 

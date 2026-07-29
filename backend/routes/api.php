@@ -11,10 +11,16 @@ use App\Http\Controllers\VendorController;
 use App\Http\Controllers\ReviewController;
 
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\SuperAdminController;
 use App\Http\Controllers\SettingController;
+use App\Http\Controllers\CommissionController;
+use App\Http\Controllers\DisputeController;
+use App\Http\Controllers\MenuController;
+use App\Http\Controllers\PageSeoController;
 use App\Http\Controllers\MediaController;
 use App\Http\Controllers\TranslationController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\KhaltiPaymentController;
 use App\Http\Controllers\PasswordResetController;
 
 Route::middleware('auth:sanctum')->group(function () {
@@ -24,7 +30,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/user/profile', [AuthController::class, 'updateProfile']);
     Route::post('/user/change-password', [AuthController::class, 'changePassword']);
 
-    // Admin routes
+    // ── Admin routes (role: admin, super_admin via middleware in controller) ──
     Route::get('/admin/stats', [AdminController::class, 'getDashboardStats']);
     Route::get('/admin/analytics', [AdminController::class, 'getAnalytics']);
     Route::get('/admin/users', [AdminController::class, 'getUsers']);
@@ -36,19 +42,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/admin/reviews', [AdminController::class, 'getReviews']);
     Route::delete('/admin/reviews/{id}', [AdminController::class, 'deleteReview']);
 
-    // Admin vendor management
+    // Admin vendor management (read-only for admin; writes are super_admin only)
     Route::get('/admin/vendors', [AdminController::class, 'getVendors']);
-    Route::delete('/admin/vendors/{id}', [AdminController::class, 'deleteVendor']);
-    Route::put('/admin/vendors/{id}/verify', [AdminController::class, 'verifyVendor']);
-    Route::put('/admin/vendors/{id}/feature', [AdminController::class, 'featureVendor']);
-    Route::post('/admin/vendors/bulk', [AdminController::class, 'bulkVendorAction']);
     Route::get('/admin/vendors/{id}/bookings', [AdminController::class, 'getVendorBookings']);
     Route::get('/admin/vendors/{id}/messages', [AdminController::class, 'getVendorMessages']);
     Route::get('/admin/vendors/{id}/services', [AdminController::class, 'getVendorServices']);
     Route::get('/admin/vendors/{id}/features', [AdminController::class, 'getVendorFeatures']);
-    Route::put('/admin/vendors/{id}/features', [AdminController::class, 'updateVendorFeatures']);
     Route::get('/admin/vendors/{id}/availability', [AdminController::class, 'getVendorAvailability']);
-    Route::put('/admin/vendors/{id}/availability', [AdminController::class, 'updateVendorAvailability']);
 
     // Admin bookings management
     Route::get('/admin/bookings', [AdminController::class, 'getAllBookings']);
@@ -63,23 +63,81 @@ Route::middleware('auth:sanctum')->group(function () {
     // Admin conversations
     Route::get('/admin/conversations', [AdminController::class, 'getAllConversations']);
 
-    // Admin password reset (generate new password or send reset email)
+    // Admin password reset
     Route::post('/admin/users/{id}/reset-password', [PasswordResetController::class, 'adminResetPassword']);
 
-    // Settings & Media routes (Admin)
-    Route::post('/admin/settings', [SettingController::class, 'updateBatch']);
-    Route::get('/admin/media', [MediaController::class, 'index']);
-    Route::post('/admin/media', [MediaController::class, 'store']);
-    Route::delete('/admin/media/{id}', [MediaController::class, 'destroy']);
+    // Settings & Media routes (admin/super_admin via middleware in controller)
+    Route::middleware('role:admin,super_admin')->group(function () {
+        Route::post('/admin/settings', [SettingController::class, 'updateBatch']);
+        Route::get('/admin/media', [MediaController::class, 'index']);
+        Route::post('/admin/media', [MediaController::class, 'store']);
+        Route::delete('/admin/media/{id}', [MediaController::class, 'destroy']);
 
-    // Coupon management (Admin)
-    Route::get('/admin/coupons', [\App\Http\Controllers\CouponController::class, 'index']);
-    Route::post('/admin/coupons', [\App\Http\Controllers\CouponController::class, 'store']);
-    Route::put('/admin/coupons/{id}', [\App\Http\Controllers\CouponController::class, 'update']);
-    Route::delete('/admin/coupons/{id}', [\App\Http\Controllers\CouponController::class, 'destroy']);
+        // Coupon management
+        Route::get('/admin/coupons', [\App\Http\Controllers\CouponController::class, 'index']);
+        Route::post('/admin/coupons', [\App\Http\Controllers\CouponController::class, 'store']);
+        Route::put('/admin/coupons/{id}', [\App\Http\Controllers\CouponController::class, 'update']);
+        Route::delete('/admin/coupons/{id}', [\App\Http\Controllers\CouponController::class, 'destroy']);
 
-    // Vendor subscription plan (Admin)
-    Route::put('/admin/vendors/{id}/plan', [AdminController::class, 'updateVendorPlan']);
+        // Translation management
+        Route::post('/translations', [TranslationController::class, 'store']);
+
+        // Menu management
+        Route::get('/admin/menus', [MenuController::class, 'all']);
+        Route::post('/admin/menus', [MenuController::class, 'store']);
+        Route::put('/admin/menus/{id}', [MenuController::class, 'update']);
+        Route::delete('/admin/menus/{id}', [MenuController::class, 'destroy']);
+
+        // Page SEO management
+        Route::get('/admin/page-seo', [PageSeoController::class, 'index']);
+        Route::post('/admin/page-seo', [PageSeoController::class, 'store']);
+        Route::put('/admin/page-seo/{id}', [PageSeoController::class, 'update']);
+        Route::delete('/admin/page-seo/{id}', [PageSeoController::class, 'destroy']);
+    });
+
+    // ── Super Admin only routes ──────────────────────────────────────────────
+    Route::middleware('role:super_admin')->prefix('super-admin')->group(function () {
+        // Dashboard
+        Route::get('/overview', [SuperAdminController::class, 'getPlatformOverview']);
+        Route::get('/activity-logs', [SuperAdminController::class, 'getActivityLogs']);
+
+        // Service moderation
+        Route::get('/services/pending', [SuperAdminController::class, 'getPendingServices']);
+        Route::get('/services/moderation', [SuperAdminController::class, 'getServiceModerationQueue']);
+        Route::post('/services/{id}/approve', [SuperAdminController::class, 'approveService']);
+        Route::post('/services/{id}/reject', [SuperAdminController::class, 'rejectService']);
+        Route::post('/services/bulk-approve', [SuperAdminController::class, 'bulkApproveServices']);
+        Route::post('/services/bulk-reject', [SuperAdminController::class, 'bulkRejectServices']);
+
+        // Admin management
+        Route::get('/admins', [SuperAdminController::class, 'getAdmins']);
+        Route::post('/admins', [SuperAdminController::class, 'createAdmin']);
+        Route::delete('/admins/{id}', [SuperAdminController::class, 'deleteAdmin']);
+        Route::put('/admins/{id}/suspend', [SuperAdminController::class, 'suspendAdmin']);
+
+        // User role management
+        Route::put('/users/{id}/role', [SuperAdminController::class, 'changeUserRole']);
+
+        // Commission management
+        Route::get('/commissions', [CommissionController::class, 'index']);
+        Route::get('/commissions/stats', [CommissionController::class, 'stats']);
+        Route::put('/commissions/{id}/pay', [CommissionController::class, 'markAsPaid']);
+        Route::post('/commissions/rate', [CommissionController::class, 'updateRate']);
+
+        // KYC / Document review
+        Route::get('/kyc/pending', [AdminController::class, 'getKycPending']);
+        Route::post('/kyc/documents/{id}/approve', [AdminController::class, 'approveKycDocument']);
+        Route::post('/kyc/documents/{id}/reject', [AdminController::class, 'rejectKycDocument']);
+
+        // Vendor management (write operations)
+        Route::delete('/vendors/{id}', [AdminController::class, 'deleteVendor']);
+        Route::put('/vendors/{id}/verify', [AdminController::class, 'verifyVendor']);
+        Route::put('/vendors/{id}/feature', [AdminController::class, 'featureVendor']);
+        Route::post('/vendors/bulk', [AdminController::class, 'bulkVendorAction']);
+        Route::put('/vendors/{id}/plan', [AdminController::class, 'updateVendorPlan']);
+        Route::put('/vendors/{id}/features', [AdminController::class, 'updateVendorFeatures']);
+        Route::put('/vendors/{id}/availability', [AdminController::class, 'updateVendorAvailability']);
+    });
 
     // Vendor profile
     Route::get('/vendor/profile', [VendorController::class, 'profile']);
@@ -88,6 +146,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/vendor/features', [VendorController::class, 'getFeatures']);
     Route::get('/vendor/availability', [VendorController::class, 'getAvailability']);
     Route::put('/vendor/availability', [VendorController::class, 'updateAvailability']);
+
+    // Vendor analytics
+    Route::get('/vendor/analytics', [VendorController::class, 'analytics']);
+
+    // Vendor KYC
+    Route::post('/vendor/documents', [VendorController::class, 'uploadDocument']);
+    Route::get('/vendor/documents', [VendorController::class, 'getDocuments']);
+    Route::delete('/vendor/documents/{id}', [VendorController::class, 'deleteDocument']);
+    Route::get('/vendor/kyc-status', [VendorController::class, 'getKycStatus']);
 
     // Review routes (authenticated)
     Route::post('/reviews', [ReviewController::class, 'store']);
@@ -101,6 +168,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Payments
     Route::post('/payments/mock', [PaymentController::class, 'processMockPayment']);
+    Route::post('/payments/khalti/verify', [KhaltiPaymentController::class, 'verify']);
 
     Route::get('/my-reviews', [ReviewController::class, 'myReviews']);
 
@@ -162,6 +230,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/notifications/{id}', [NotificationController::class, 'delete']);
     Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
 
+    // Disputes
+    Route::get('/disputes', [DisputeController::class, 'index']);
+    Route::post('/disputes', [DisputeController::class, 'store']);
+    Route::get('/disputes/{id}', [DisputeController::class, 'show']);
+    Route::post('/disputes/{id}/resolve', [DisputeController::class, 'resolve']);
+
     // Phase P — Portfolio (vendor-owned)
     Route::post('/vendor/portfolio', [\App\Http\Controllers\PortfolioController::class, 'store']);
     Route::delete('/vendor/portfolio/{id}', [\App\Http\Controllers\PortfolioController::class, 'destroy']);
@@ -173,9 +247,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/vendor/bundles/{id}/toggle', [\App\Http\Controllers\BundleController::class, 'toggle']);
 });
 
-// Public routes
-Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
+// Public routes (with rate limiting)
+Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:auth');
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:auth');
 
 // SSE stream — auth handled manually inside controller (EventSource can't send headers)
 Route::get('/messages/stream', [MessageController::class, 'streamMessages']);
@@ -185,9 +259,9 @@ Route::get('/messages/stream', [MessageController::class, 'streamMessages']);
 Route::get('/events', [\App\Http\Controllers\EventStreamController::class, 'stream'])
     ->middleware('auth.token_query', 'auth:sanctum');
 
-// Password reset (public — no auth required)
-Route::post('/forgot-password', [PasswordResetController::class, 'sendResetLink']);
-Route::post('/reset-password',  [PasswordResetController::class, 'resetPassword']);
+// Password reset (public — no auth required, rate limited)
+Route::post('/forgot-password', [PasswordResetController::class, 'sendResetLink'])->middleware('throttle:auth');
+Route::post('/reset-password',  [PasswordResetController::class, 'resetPassword'])->middleware('throttle:auth');
 
 // Category route (public — needed for service search filters)
 Route::get('/categories', function () {
@@ -214,8 +288,11 @@ Route::get('/vendors', [VendorController::class, 'index']);
 // Settings route (public)
 Route::get('/settings', [SettingController::class, 'index']);
 
+// Menus (public — returns active menus for current role)
+Route::get('/menus', [MenuController::class, 'index']);
+
+// Page SEO (public — single page lookup)
+Route::get('/page-seo/{page}', [PageSeoController::class, 'show']);
+
 Route::get('/translations', [TranslationController::class, 'index']);
 Route::post('/translations', [TranslationController::class, 'store'])->middleware('auth:sanctum');
-Route::get('/categories', function () {
-    return \App\Models\Category::all();
-});

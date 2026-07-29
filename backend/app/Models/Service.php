@@ -19,6 +19,10 @@ class Service extends Model
         'pricing_type',
         'tags',
         'is_active',
+        'status',
+        'rejection_reason',
+        'reviewed_by',
+        'reviewed_at',
         'radius',
         'cancellation_policy',
     ];
@@ -29,7 +33,10 @@ class Service extends Model
         'sale_ends_at' => 'datetime',
         'tags' => 'array',
         'is_active' => 'boolean',
+        'status' => 'string',
+        'reviewed_at' => 'datetime',
         'radius' => 'integer',
+        'cancellation_policy' => 'string',
     ];
 
     /** Returns sale_price if sale is currently active, otherwise price */

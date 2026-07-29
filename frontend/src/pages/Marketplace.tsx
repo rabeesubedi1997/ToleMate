@@ -2,6 +2,7 @@
 import { useTranslation } from 'react-i18next';
 import { Megaphone, Send, DollarSign, Calendar, Zap, Clock, AlarmClock, Filter } from 'lucide-react';
 import { API_BASE } from '../utils/config';
+import SeoHead from '../components/SeoHead';
 import { useToast } from '../context/ToastContext';
 
 interface BookingRequest {
@@ -84,7 +85,12 @@ const Marketplace: React.FC = () => {
 
   if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="spinner"></div></div>;
 
-  return (
+  return (<>
+      <SeoHead
+        title="Service Requests Marketplace"
+        description="Browse and respond to customer service requests on ToleMate."
+        noIndex={true}
+      />
     <div className="min-h-screen py-8">
       <div className="container-custom max-w-4xl">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -122,7 +128,7 @@ const Marketplace: React.FC = () => {
                   <div className="flex-shrink-0 text-right space-y-1">
                     {req.budget && (
                       <div className="flex items-center justify-end gap-1 text-sm font-semibold text-green-700">
-                        <DollarSign className="w-3.5 h-3.5" /> Budget: ${Number(req.budget).toLocaleString()}
+                        <DollarSign className="w-3.5 h-3.5" /> Budget: Rs. {Number(req.budget).toLocaleString()}
                       </div>
                     )}
                     {req.preferred_date && (
@@ -153,7 +159,7 @@ const Marketplace: React.FC = () => {
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Your price ($){req.budget ? ` · Budget: $${req.budget}` : ''}
+                          Your price (Rs.){req.budget ? ` · Budget: Rs. ${req.budget}` : ''}
                         </label>
                         <input type="number" className="input-field text-sm bg-white" placeholder="0.00"
                           value={quoteData.price} onChange={e => setQuoteData({ ...quoteData, price: e.target.value })} min="0" />
@@ -199,6 +205,7 @@ const Marketplace: React.FC = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 

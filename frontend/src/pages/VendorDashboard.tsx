@@ -1,16 +1,18 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { LayoutDashboard, Briefcase, Inbox, CalendarDays, ShoppingBag, Plus, DollarSign, Star, TrendingUp, Menu, X, Clock, MessageSquare, Lock, Camera } from 'lucide-react';
-import { API_BASE } from '../utils/config';
+import { LayoutDashboard, Briefcase, Inbox, CalendarDays, ShoppingBag, Plus, DollarSign, Star, TrendingUp, Menu, X, Clock, MessageSquare, Lock, Camera, BarChart3 } from 'lucide-react';
+import { API_BASE, FALLBACK_IMAGE, assetUrl } from '../utils/config';
 import { DashboardSkeleton } from '../components/Skeleton';
+import SeoHead from '../components/SeoHead';
+import VendorAnalytics from '../components/VendorAnalytics';
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0') + ':00');
 
 interface AvailSlot { day_of_week: number; start_time: string; end_time: string; is_available: boolean; }
 
-interface Service { id: number; name: string; description: string; pricing_type: 'fixed' | 'hourly' | 'quote'; price: number | null; is_active: boolean; category: { name: string; }; created_at: string; images?: { image_url: string }[]; }
+interface Service { id: number; name: string; description: string; pricing_type: 'fixed' | 'hourly' | 'quote'; price: number | null; is_active: boolean; status: string; rejection_reason?: string | null; category: { name: string; }; created_at: string; images?: { image_url: string }[]; }
 interface BookingRequest { id: number; text: string; status: string; created_at: string; customer: { name: string; email: string; phone: string; }; }
 interface Booking { id: number; status: string; price: number | null; scheduled_time: string | null; created_at: string; service: { name: string; price?: number | null; }; customer: { name: string; }; review?: { rating: number; comment: string | null; } | null; reschedule_status?: string | null; reschedule_to?: string | null; }
 interface Vendor { business_name: string; description: string; rating: number; service_area_radius: number; subscription_plan?: 'free' | 'basic' | 'pro'; id?: number; avatar?: string | null; location?: string | null; }
@@ -24,7 +26,7 @@ const VendorDashboard: React.FC = () => {
   const [bookingRequests, setBookingRequests] = useState<BookingRequest[]>([]);
   const [allBookings, setAllBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'services' | 'requests' | 'bookings' | 'availability' | 'bundles' | 'portfolio' | 'reviews'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'services' | 'requests' | 'bookings' | 'availability' | 'bundles' | 'portfolio' | 'reviews' | 'analytics'>('overview');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [bookingFilter, setBookingFilter] = useState<'all' | 'pending' | 'active' | 'completed' | 'cancelled'>('all');
 
@@ -207,9 +209,16 @@ const VendorDashboard: React.FC = () => {
     { key: 'availability', label: 'Availability', icon: Clock },
     { key: 'bundles', label: 'Bundles', icon: ShoppingBag },
     { key: 'portfolio', label: 'Portfolio', icon: Camera },
+    { key: 'analytics', label: 'Analytics', icon: BarChart3 },
   ] as const;
 
   return (
+    <>
+      <SeoHead
+        title="Vendor Dashboard"
+        description="Manage your services, bookings, and business profile on ToleMate."
+        noIndex={true}
+      />
     <div className="min-h-screen flex">
       {/* Mobile menu toggle */}
       <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -457,7 +466,7 @@ const VendorDashboard: React.FC = () => {
                     {/* Service image */}
                     <label htmlFor={`svc-img-${s.id}`} className="w-14 h-14 rounded-xl bg-gray-100 flex-shrink-0 overflow-hidden cursor-pointer hover:opacity-80 transition-opacity relative group" title="Click to upload cover image">
                       {s.images?.[0]?.image_url ? (
-                        <img src={`http://localhost:8001${s.images[0].image_url}`} alt={s.name} className="w-full h-full object-cover" />
+                        <img src={assetUrl(s.images[0].image_url)} alt={s.name} className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
                           <Camera className="w-5 h-5 text-gray-300 group-hover:text-gray-500 transition-colors" />
@@ -473,13 +482,22 @@ const VendorDashboard: React.FC = () => {
                       </div>
                       <p className="text-sm text-gray-500 line-clamp-1 mb-2">{s.description}</p>
                       <p className="font-semibold text-gray-900">{s.price ? `Rs. ${Number(s.price).toLocaleString()}` : 'Quote'}{s.pricing_type === 'hourly' ? '/hr' : ''}</p>
+                      {s.status === 'rejected' && s.rejection_reason && (
+                        <p className="text-xs text-red-500 mt-1">Reason: {s.rejection_reason}</p>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <button onClick={() => toggleServiceStatus(s.id, s.is_active)}
-                      className={`badge ${s.is_active ? 'badge-success' : 'badge-danger'} cursor-pointer`}>
-                      {s.is_active ? 'Active' : 'Paused'}
-                    </button>
+                    {s.status === 'pending' && <span className="badge badge-warning">Pending Approval</span>}
+                    {s.status === 'approved' && (
+                      <button onClick={() => toggleServiceStatus(s.id, s.is_active)}
+                        className={`badge ${s.is_active ? 'badge-success' : 'badge-danger'} cursor-pointer`}>
+                        {s.is_active ? 'Active' : 'Paused'}
+                      </button>
+                    )}
+                    {s.status === 'rejected' && (
+                      <span className="badge badge-danger" title={s.rejection_reason || ''}>Rejected</span>
+                    )}
                     <Link to={`/services/${s.id}/edit`} className="text-primary-600 text-sm font-medium hover:underline">Edit</Link>
                   </div>
                 </div>
@@ -811,9 +829,12 @@ const VendorDashboard: React.FC = () => {
               )}
             </div>
           )}
+
+          {activeTab === 'analytics' && <VendorAnalytics vendorId={vendor?.id} allBookings={allBookings} />}
         </div>
       </main>
     </div>
+    </>
   );
 };
 

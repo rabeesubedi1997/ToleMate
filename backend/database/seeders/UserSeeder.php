@@ -17,6 +17,15 @@ class UserSeeder extends Seeder
      */
     public function run(): void
     {
+        // Create super admin user
+        User::create([
+            'name' => 'Super Admin',
+            'email' => 'superadmin@tolemate.com',
+            'password' => Hash::make('password'),
+            'role' => 'super_admin',
+            'preferred_language' => 'en',
+        ]);
+
         // Create admin user
         User::create([
             'name' => 'Admin User',

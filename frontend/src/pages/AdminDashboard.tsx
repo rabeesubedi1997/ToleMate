@@ -1,18 +1,21 @@
 ﻿import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { API_BASE } from '../utils/config';
+import { API_BASE, FALLBACK_IMAGE } from '../utils/config';
 import { useToast } from '../context/ToastContext';
 import {
   LayoutDashboard, Users, Briefcase, Image, Star, Settings,
   ShoppingBag, RefreshCw, Plus, Trash2, Store, ChevronRight,
   Eye, X, Layers, Calendar, Tag, MessageSquare, ArrowUp,
   ArrowDown, ToggleLeft, ToggleRight, ExternalLink, Edit2, Check, CheckCircle2,
-  Ticket
+  Ticket, Globe, Search, List, FileText
 } from 'lucide-react';
+import SeoHead from '../components/SeoHead';
+import MenuManager from '../components/MenuManager';
+import PageSeoManager from '../components/PageSeoManager';
 
 type Tab = 'dashboard' | 'users' | 'vendors' | 'bookings' | 'services' |
-           'categories' | 'media' | 'slider' | 'messages' | 'reviews' | 'settings' | 'coupons';
+           'categories' | 'media' | 'slider' | 'messages' | 'reviews' | 'settings' | 'coupons' | 'seo' | 'menus' | 'page-seo';
 
 const API = `${API_BASE}/api`;
 
@@ -54,9 +57,19 @@ const AdminDashboard: React.FC = () => {
   const [contactEmail, setContactEmail] = useState('');
   const [heroTitle, setHeroTitle] = useState('');
   const [heroSubtitle, setHeroSubtitle] = useState('');
-  const [navLinks, setNavLinks] = useState('');
+
   const [sliderInterval, setSliderInterval] = useState('5000');
   const [savingSettings, setSavingSettings] = useState(false);
+
+  // SEO
+  const [seoHomeTitle, setSeoHomeTitle] = useState('');
+  const [seoHomeDesc, setSeoHomeDesc] = useState('');
+  const [seoHomeKeywords, setSeoHomeKeywords] = useState('');
+  const [seoOgImage, setSeoOgImage] = useState('');
+  const [seoGtmId, setSeoGtmId] = useState('');
+  const [seoSiteVerification, setSeoSiteVerification] = useState('');
+  const [seoSchemaOrg, setSeoSchemaOrg] = useState('');
+  const [savingSeo, setSavingSeo] = useState(false);
 
   // Slider
   const [sliderImages, setSliderImages] = useState<any[]>([]);
@@ -167,14 +180,33 @@ const AdminDashboard: React.FC = () => {
         const r = await fetch(`${API}/settings`);
         if (r.ok) {
           const data = await r.json();
-          // API returns a key-value object: { site_name: "", ... }
           const find = (k: string) => data?.[k] || '';
           setSiteName(find('site_name'));
           setContactEmail(find('contact_email'));
           setHeroTitle(find('hero_title'));
           setHeroSubtitle(find('hero_subtitle'));
-          setNavLinks(find('nav_links'));
+
           setSliderInterval(data?.slider_interval || '5000');
+          setSeoHomeTitle(find('seo_home_title'));
+          setSeoHomeDesc(find('seo_home_desc'));
+          setSeoHomeKeywords(find('seo_home_keywords'));
+          setSeoOgImage(find('seo_og_image'));
+          setSeoGtmId(find('seo_gtm_id'));
+          setSeoSiteVerification(find('seo_site_verification'));
+          setSeoSchemaOrg(find('seo_schema_org'));
+        }
+      } else if (activeTab === 'seo') {
+        const r = await fetch(`${API}/settings`);
+        if (r.ok) {
+          const data = await r.json();
+          const find = (k: string) => data?.[k] || '';
+          setSeoHomeTitle(find('seo_home_title'));
+          setSeoHomeDesc(find('seo_home_desc'));
+          setSeoHomeKeywords(find('seo_home_keywords'));
+          setSeoOgImage(find('seo_og_image'));
+          setSeoGtmId(find('seo_gtm_id'));
+          setSeoSiteVerification(find('seo_site_verification'));
+          setSeoSchemaOrg(find('seo_schema_org'));
         }
       }
     } catch (e) { console.error(e); } finally { setLoading(false); }
@@ -440,12 +472,31 @@ const AdminDashboard: React.FC = () => {
           { key: 'contact_email', value: contactEmail },
           { key: 'hero_title', value: heroTitle },
           { key: 'hero_subtitle', value: heroSubtitle },
-          { key: 'nav_links', value: navLinks },
           { key: 'slider_interval', value: sliderInterval },
         ]}),
       });
       if (r.ok) toast('Settings saved!');
     } catch (e) { console.error(e); } finally { setSavingSettings(false); }
+  };
+
+  // ─── SEO ───
+  const handleSaveSeo = async (e: React.FormEvent) => {
+    e.preventDefault(); setSavingSeo(true);
+    try {
+      const r = await fetch(`${API}/admin/settings`, {
+        method: 'POST', headers: { ...h(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings: [
+          { key: 'seo_home_title', value: seoHomeTitle },
+          { key: 'seo_home_desc', value: seoHomeDesc },
+          { key: 'seo_home_keywords', value: seoHomeKeywords },
+          { key: 'seo_og_image', value: seoOgImage },
+          { key: 'seo_gtm_id', value: seoGtmId },
+          { key: 'seo_site_verification', value: seoSiteVerification },
+          { key: 'seo_schema_org', value: seoSchemaOrg },
+        ]}),
+      });
+      if (r.ok) toast('SEO settings saved!');
+    } catch (e) { console.error(e); } finally { setSavingSeo(false); }
   };
 
   // ─── Slider ───
@@ -537,6 +588,7 @@ const AdminDashboard: React.FC = () => {
       { key: 'categories', label: 'Categories', icon: Tag },
       { key: 'reviews', label: 'Reviews', icon: Star },
       { key: 'messages', label: 'Messages', icon: MessageSquare },
+      { key: 'menus', label: 'Menus', icon: List },
     ]},
     { label: 'Media', items: [
       { key: 'media', label: 'Media Library', icon: Image },
@@ -545,9 +597,11 @@ const AdminDashboard: React.FC = () => {
     { label: 'Commerce', items: [
       { key: 'coupons', label: 'Coupons', icon: Ticket },
     ]},
-    { label: 'System', items: [
+    ...(user?.role === 'super_admin' ? [{ label: 'System', items: [
+      { key: 'seo', label: 'SEO', icon: Globe },
+      { key: 'page-seo', label: 'Page SEO', icon: FileText },
       { key: 'settings', label: 'Settings', icon: Settings },
-    ]},
+    ]}] : []),
   ] as const;
 
   const tabLabel = (t: Tab) => {
@@ -557,6 +611,11 @@ const AdminDashboard: React.FC = () => {
 
   return (
     <>
+      <SeoHead
+        title="Admin Dashboard"
+        description="ToleMate administration panel. Manage users, vendors, services, and platform settings."
+        noIndex={true}
+      />
     <div className="min-h-screen flex">
       {/* Mobile overlay */}
       {isSidebarOpen && <div className="fixed inset-0 bg-black/40 z-30 md:hidden" onClick={() => setIsSidebarOpen(false)} />}
@@ -733,7 +792,7 @@ const AdminDashboard: React.FC = () => {
                             <select className="input-field" value={newUser.role} onChange={e => setNewUser({...newUser, role: e.target.value})}>
                               <option value="customer">Customer</option>
                               <option value="vendor">Vendor</option>
-                              <option value="admin">Admin</option>
+                              {user?.role === 'super_admin' && <option value="admin">Admin</option>}
                             </select>
                           </div>
                         </div>
@@ -761,7 +820,7 @@ const AdminDashboard: React.FC = () => {
                                 <select value={u.role} onChange={e => handleChangeRole(u.id, e.target.value)} className="text-xs border border-gray-200 rounded px-2 py-1 bg-white cursor-pointer">
                                   <option value="customer">Customer</option>
                                   <option value="vendor">Vendor</option>
-                                  <option value="admin">Admin</option>
+                                  {user?.role === 'super_admin' && <option value="admin">Admin</option>}
                                 </select>
                                 <Link to={`/admin/users/${u.id}/edit`} className="text-primary-600 text-xs font-medium hover:underline">Edit</Link>
                                 <button onClick={() => { setResetTarget(u); setResetResult(null); setResetError(''); }} className="text-blue-600 text-xs font-medium hover:underline">Reset pwd</button>
@@ -817,7 +876,7 @@ const AdminDashboard: React.FC = () => {
 
                 <div className="card overflow-hidden">
                   {/* Bulk action bar */}
-                  {selectedVendorIds.size > 0 && (
+                  {selectedVendorIds.size > 0 && user?.role === 'super_admin' && (
                     <div className="flex items-center gap-3 p-3 bg-primary-50 border-b border-primary-100">
                       <span className="text-sm font-medium text-primary-700">{selectedVendorIds.size} selected</span>
                       <button onClick={() => handleBulkVendorAction('verify')} disabled={bulkLoading} className="text-xs px-2.5 py-1 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 font-medium">✓ Verify</button>
@@ -856,26 +915,36 @@ const AdminDashboard: React.FC = () => {
                             <td className="p-4 text-sm text-gray-700">⭐ {Number(v.rating || 0).toFixed(1)}</td>
                             <td className="p-4 text-sm text-gray-700">{v.services_count ?? 0}</td>
                             <td className="p-4 text-sm">
-                              <select
-                                value={v.subscription_plan || 'free'}
-                                onChange={async e => {
-                                  const plan = e.target.value;
-                                  const res = await fetch(`${API}/admin/vendors/${v.id}/plan`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }, body: JSON.stringify({ plan }) });
-                                  if (res.ok) { setVendors(prev => prev.map(x => x.id === v.id ? { ...x, subscription_plan: plan } : x)); toast(`Plan updated to ${plan}`, 'success'); }
-                                }}
-                                className={`text-xs font-semibold rounded-full px-2 py-0.5 border-0 cursor-pointer ${v.subscription_plan === 'pro' ? 'bg-purple-100 text-purple-700' : v.subscription_plan === 'basic' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}
-                              >
-                                <option value="free">Free</option>
-                                <option value="basic">Basic</option>
-                                <option value="pro">Pro</option>
-                              </select>
+                              {user?.role === 'super_admin' ? (
+                                <select
+                                  value={v.subscription_plan || 'free'}
+                                  onChange={async e => {
+                                    const plan = e.target.value;
+                                    const res = await fetch(`${API}/super-admin/vendors/${v.id}/plan`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }, body: JSON.stringify({ plan }) });
+                                    if (res.ok) { setVendors(prev => prev.map(x => x.id === v.id ? { ...x, subscription_plan: plan } : x)); toast(`Plan updated to ${plan}`, 'success'); }
+                                  }}
+                                  className={`text-xs font-semibold rounded-full px-2 py-0.5 border-0 cursor-pointer ${v.subscription_plan === 'pro' ? 'bg-purple-100 text-purple-700' : v.subscription_plan === 'basic' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}
+                                >
+                                  <option value="free">Free</option>
+                                  <option value="basic">Basic</option>
+                                  <option value="pro">Pro</option>
+                                </select>
+                              ) : (
+                                <span className={`text-xs font-semibold rounded-full px-2 py-0.5 ${v.subscription_plan === 'pro' ? 'bg-purple-100 text-purple-700' : v.subscription_plan === 'basic' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+                                  {v.subscription_plan || 'free'}
+                                </span>
+                              )}
                             </td>
                             <td className="p-4 text-right">
                               <div className="flex items-center justify-end gap-2">
                                 <button onClick={() => openVendorDetail(v)} className="text-primary-600 text-xs font-medium hover:underline flex items-center gap-1"><Eye className="w-3 h-3" /> View</button>
-                                <button onClick={() => handleVerifyVendor(v.id)} className={`text-xs font-medium hover:underline ${v.is_verified ? 'text-yellow-600' : 'text-green-600'}`}>{v.is_verified ? 'Unverify' : 'Verify'}</button>
-                                <button onClick={() => handleFeatureVendor(v.id)} className={`text-xs font-medium hover:underline ${v.is_featured ? 'text-orange-500' : 'text-gray-400'}`}>{v.is_featured ? '★ Unfeature' : '☆ Feature'}</button>
-                                <button onClick={() => handleDeleteVendor(v.id)} className="text-red-600 text-xs font-medium hover:underline">Delete</button>
+                                {user?.role === 'super_admin' && (
+                                  <>
+                                    <button onClick={() => handleVerifyVendor(v.id)} className={`text-xs font-medium hover:underline ${v.is_verified ? 'text-yellow-600' : 'text-green-600'}`}>{v.is_verified ? 'Unverify' : 'Verify'}</button>
+                                    <button onClick={() => handleFeatureVendor(v.id)} className={`text-xs font-medium hover:underline ${v.is_featured ? 'text-orange-500' : 'text-gray-400'}`}>{v.is_featured ? '★ Unfeature' : '☆ Feature'}</button>
+                                    <button onClick={() => handleDeleteVendor(v.id)} className="text-red-600 text-xs font-medium hover:underline">Delete</button>
+                                  </>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -913,12 +982,16 @@ const AdminDashboard: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <button onClick={() => handleVerifyVendor(selectedVendor.id)} className={`btn-secondary text-sm flex items-center gap-1.5 ${selectedVendor.is_verified ? 'text-yellow-600 border-yellow-200 hover:bg-yellow-50' : 'text-green-600 border-green-200 hover:bg-green-50'}`}>
-                        {selectedVendor.is_verified ? '✗ Unverify' : '✓ Verify'}
-                      </button>
-                      <button onClick={() => handleFeatureVendor(selectedVendor.id)} className={`btn-secondary text-sm flex items-center gap-1.5 ${selectedVendor.is_featured ? 'text-orange-500 border-orange-200 hover:bg-orange-50' : 'text-gray-500 border-gray-200 hover:bg-gray-50'}`}>
-                        {selectedVendor.is_featured ? '★ Unfeature' : '☆ Feature'}
-                      </button>
+                      {user?.role === 'super_admin' && (
+                        <>
+                          <button onClick={() => handleVerifyVendor(selectedVendor.id)} className={`btn-secondary text-sm flex items-center gap-1.5 ${selectedVendor.is_verified ? 'text-yellow-600 border-yellow-200 hover:bg-yellow-50' : 'text-green-600 border-green-200 hover:bg-green-50'}`}>
+                            {selectedVendor.is_verified ? '✗ Unverify' : '✓ Verify'}
+                          </button>
+                          <button onClick={() => handleFeatureVendor(selectedVendor.id)} className={`btn-secondary text-sm flex items-center gap-1.5 ${selectedVendor.is_featured ? 'text-orange-500 border-orange-200 hover:bg-orange-50' : 'text-gray-500 border-gray-200 hover:bg-gray-50'}`}>
+                            {selectedVendor.is_featured ? '★ Unfeature' : '☆ Feature'}
+                          </button>
+                        </>
+                      )}
                       <Link to={`/vendors/${selectedVendor.id}`} target="_blank" className="btn-secondary text-sm flex items-center gap-1.5"><ExternalLink className="w-4 h-4" /> View profile</Link>
                       <button onClick={() => handleDeleteVendor(selectedVendor.id)} className="btn-secondary text-sm text-red-600 border-red-200 hover:bg-red-50 flex items-center gap-1.5"><Trash2 className="w-4 h-4" /> Delete</button>
                     </div>
@@ -1001,8 +1074,10 @@ const AdminDashboard: React.FC = () => {
                         <h3 className="font-semibold text-gray-900">Vendor Feature Flags</h3>
                         <p className="text-xs text-gray-400 mt-0.5">Toggle which platform features this vendor can access</p>
                       </div>
-                      <button onClick={handleSaveFeatures} disabled={savingFeatures}
-                        className="btn-primary text-sm px-4 py-2">{savingFeatures ? 'Saving...' : 'Save changes'}</button>
+                      {user?.role === 'super_admin' && (
+                        <button onClick={handleSaveFeatures} disabled={savingFeatures}
+                          className="btn-primary text-sm px-4 py-2">{savingFeatures ? 'Saving...' : 'Save changes'}</button>
+                      )}
                     </div>
                     <div className="space-y-3">
                       {[
@@ -1020,8 +1095,8 @@ const AdminDashboard: React.FC = () => {
                           </div>
                           <button
                             type="button"
-                            onClick={() => setVendorFeatures(prev => ({ ...prev, [key]: !prev[key] }))}
-                            className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${vendorFeatures[key] !== false ? 'bg-green-500' : 'bg-gray-300'}`}
+                            onClick={() => user?.role === 'super_admin' && setVendorFeatures(prev => ({ ...prev, [key]: !prev[key] }))}
+                            className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${user?.role !== 'super_admin' ? 'cursor-default' : 'cursor-pointer'} ${vendorFeatures[key] !== false ? 'bg-green-500' : 'bg-gray-300'}`}
                           >
                             <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${vendorFeatures[key] !== false ? 'translate-x-5' : ''}`} />
                           </button>
@@ -1037,10 +1112,12 @@ const AdminDashboard: React.FC = () => {
                     <div className="flex items-center justify-between mb-5">
                       <div>
                         <h3 className="font-semibold text-gray-900">Working Hours</h3>
-                        <p className="text-xs text-gray-400 mt-0.5">Admin can edit all 7 days including weekends</p>
+                        <p className="text-xs text-gray-400 mt-0.5">Manage vendor working hours</p>
                       </div>
-                      <button onClick={handleSaveAdminAvailability} disabled={savingAdminAvail || vendorAvailability.length === 0}
-                        className="btn-primary text-sm px-4 py-2">{savingAdminAvail ? 'Saving...' : 'Save hours'}</button>
+                      {user?.role === 'super_admin' && (
+                        <button onClick={handleSaveAdminAvailability} disabled={savingAdminAvail || vendorAvailability.length === 0}
+                          className="btn-primary text-sm px-4 py-2">{savingAdminAvail ? 'Saving...' : 'Save hours'}</button>
+                      )}
                     </div>
                     {vendorAvailability.length === 0 ? (
                       <p className="text-sm text-gray-400 text-center py-4">Loading...</p>
@@ -1373,7 +1450,7 @@ const AdminDashboard: React.FC = () => {
                     <div className="flex gap-2 overflow-x-auto pb-1">
                       {sliderImages.filter(s => s.enabled !== false).map((s, i) => (
                         <div key={i} className="flex-shrink-0 relative w-40 h-24 rounded-lg overflow-hidden border border-gray-200">
-                          <img src={s.url} alt={s.title || `Slide ${i+1}`} className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1521791136064-7986c2920216?w=300&q=60'; }} />
+                          <img src={s.url} alt={s.title || `Slide ${i+1}`} className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).src = FALLBACK_IMAGE; }} />
                           {s.title && <div className="absolute bottom-0 inset-x-0 bg-black/40 px-2 py-1"><p className="text-white text-xs truncate">{s.title}</p></div>}
                         </div>
                       ))}
@@ -1387,7 +1464,7 @@ const AdminDashboard: React.FC = () => {
                     <div key={idx} className={`card p-4 ${slide.enabled === false ? 'opacity-60' : ''}`}>
                       <div className="flex gap-4 items-start">
                         {/* Thumbnail */}
-                        <img src={slide.url} alt={`Slide ${idx+1}`} className="w-24 h-16 object-cover rounded-lg border border-gray-200 flex-shrink-0" onError={e => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1521791136064-7986c2920216?w=200&q=60'; }} />
+                        <img src={slide.url} alt={`Slide ${idx+1}`} className="w-24 h-16 object-cover rounded-lg border border-gray-200 flex-shrink-0" onError={e => { (e.target as HTMLImageElement).src = FALLBACK_IMAGE; }} />
 
                         {/* Fields */}
                         <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
@@ -1515,6 +1592,65 @@ const AdminDashboard: React.FC = () => {
               </div>
             )}
 
+            {/* ═══ MENUS ═══ */}
+            {activeTab === 'menus' && <MenuManager />}
+
+            {/* ═══ PAGE SEO ═══ */}
+            {activeTab === 'page-seo' && <PageSeoManager />}
+
+            {/* ═══ SEO ═══ */}
+            {activeTab === 'seo' && (
+              <div className="max-w-3xl space-y-5">
+                <form onSubmit={handleSaveSeo} className="card p-6 md:p-8 space-y-6">
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-1">Home Page SEO</h3>
+                    <p className="text-xs text-gray-500 mb-4">Control how your site appears in Google search results.</p>
+                    <div className="grid grid-cols-1 gap-4">
+                      <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Meta Title</label><input type="text" className="input-field" value={seoHomeTitle} onChange={e => setSeoHomeTitle(e.target.value)} placeholder="ToleMate – Find Trusted Local Services in Nepal" /></div>
+                      <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Meta Description</label><textarea rows={3} className="input-field resize-none" value={seoHomeDesc} onChange={e => setSeoHomeDesc(e.target.value)} placeholder="Book verified professionals for home repair, cleaning, plumbing, and more in Nepal." /></div>
+                      <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Keywords (comma separated)</label><input type="text" className="input-field" value={seoHomeKeywords} onChange={e => setSeoHomeKeywords(e.target.value)} placeholder="local services, home repair, plumber, electrician, Nepal" /></div>
+                    </div>
+                  </div>
+
+                  <hr className="border-gray-200" />
+
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-1">Open Graph / Social Sharing</h3>
+                    <p className="text-xs text-gray-500 mb-4">Image and content shown when your site is shared on Facebook, Twitter, etc.</p>
+                    <div className="grid grid-cols-1 gap-4">
+                      <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Default OG Image URL</label><input type="url" className="input-field" value={seoOgImage} onChange={e => setSeoOgImage(e.target.value)} placeholder="https://example.com/og-image.jpg" /></div>
+                      {seoOgImage && (
+                        <div className="w-full max-w-sm aspect-video rounded-lg overflow-hidden border border-gray-200">
+                          <img src={seoOgImage} alt="OG preview" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <hr className="border-gray-200" />
+
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-1">Google Search Console</h3>
+                    <p className="text-xs text-gray-500 mb-4">Verify your site ownership with Google.</p>
+                    <div className="grid grid-cols-1 gap-4">
+                      <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Site Verification Meta Tag Content</label><input type="text" className="input-field" value={seoSiteVerification} onChange={e => setSeoSiteVerification(e.target.value)} placeholder="e.g. google-site-verification=xyz..." /></div>
+                      <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Google Tag Manager ID</label><input type="text" className="input-field" value={seoGtmId} onChange={e => setSeoGtmId(e.target.value)} placeholder="GTM-XXXXXXX" /></div>
+                    </div>
+                  </div>
+
+                  <hr className="border-gray-200" />
+
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-1">Schema.org JSON-LD</h3>
+                    <p className="text-xs text-gray-500 mb-4">Custom structured data for rich search results.</p>
+                    <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Custom JSON-LD (optional)</label><textarea rows={5} className="input-field resize-none font-mono text-xs" value={seoSchemaOrg} onChange={e => setSeoSchemaOrg(e.target.value)} placeholder='{"@context":"https://schema.org","@type":"Organization","name":"ToleMate"}' /></div>
+                  </div>
+
+                  <button type="submit" disabled={savingSeo} className="btn-primary w-full py-2.5">{savingSeo ? 'Saving...' : 'Save SEO Settings'}</button>
+                </form>
+              </div>
+            )}
+
             {/* ═══ SETTINGS ═══ */}
             {activeTab === 'settings' && (
               <div className="card p-6 md:p-8 max-w-2xl">
@@ -1524,7 +1660,7 @@ const AdminDashboard: React.FC = () => {
                     <div><label className="block text-sm font-medium text-gray-700 mb-1.5">Contact email</label><input type="email" className="input-field" value={contactEmail} onChange={e => setContactEmail(e.target.value)} /></div>
                     <div className="md:col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1.5">Hero title</label><input type="text" className="input-field" value={heroTitle} onChange={e => setHeroTitle(e.target.value)} /></div>
                     <div className="md:col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1.5">Hero subtitle</label><textarea rows={3} className="input-field resize-none" value={heroSubtitle} onChange={e => setHeroSubtitle(e.target.value)} /></div>
-                    <div className="md:col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1.5">Nav links (JSON)</label><textarea rows={3} className="input-field resize-none font-mono text-xs" value={navLinks} onChange={e => setNavLinks(e.target.value)} placeholder='[{"label":"Services","path":"/services"}]' /></div>
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1.5">Slider auto-advance interval</label>
                       <select className="input-field" value={sliderInterval} onChange={e => setSliderInterval(e.target.value)}>

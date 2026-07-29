@@ -4,6 +4,7 @@ import { CalendarDays, Search, MessageCircle, CreditCard, Star, Plus, RefreshCw,
 import { DashboardSkeleton } from '../components/Skeleton';
 import { useToast } from '../context/ToastContext';
 import { API_BASE } from '../utils/config';
+import SeoHead from '../components/SeoHead';
 
 interface Booking {
   id: number;
@@ -195,6 +196,12 @@ const Dashboard: React.FC = () => {
   const tabs = ['all', 'pending', 'accepted', 'in_progress', 'completed'] as const;
 
   return (
+    <>
+      <SeoHead
+        title="My Dashboard"
+        description="Manage your bookings, reviews, and account settings on ToleMate."
+        noIndex={true}
+      />
     <div className="min-h-screen py-8 animate-fade-in">
       <div className="container-custom">
         {message && (
@@ -448,6 +455,7 @@ const Dashboard: React.FC = () => {
         </div>
       )}
     </div>
+    </>
   );
 };
 

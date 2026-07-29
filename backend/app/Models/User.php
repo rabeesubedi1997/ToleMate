@@ -30,6 +30,7 @@ class User extends Authenticatable
         'referred_by',
         'loyalty_points',
         'role',
+        'is_active',
         'lat',
         'lng',
         'preferred_language',
@@ -58,6 +59,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_active' => 'boolean',
         ];
     }
 

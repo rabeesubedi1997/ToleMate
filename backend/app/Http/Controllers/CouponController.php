@@ -33,6 +33,8 @@ class CouponController extends Controller
 
         $discount = $coupon->computeDiscount((float) $request->amount);
 
+        $coupon->increment('used_count');
+
         return response()->json([
             'coupon'    => $coupon,
             'discount'  => $discount,

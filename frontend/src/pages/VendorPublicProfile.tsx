@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
+import SeoHead, { localBusinessJsonLd } from '../components/SeoHead';
 import { Star, MapPin, MessageCircle, ArrowLeft, Calendar, CheckCircle, Share2, Globe, AtSign, Link2, ExternalLink, Phone, Heart } from 'lucide-react';
-import { API_BASE } from '../utils/config';
+import { API_BASE, FALLBACK_IMAGE, assetUrl } from '../utils/config';
 
 const WhatsAppIcon = () => (
   <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current" xmlns="http://www.w3.org/2000/svg">
@@ -207,13 +207,22 @@ const VendorPublicProfile: React.FC = () => {
 
   return (
     <div className="min-h-screen py-8 animate-fade-in">
-      <Helmet>
-        <title>{vendor.business_name} – ToleMate</title>
-        <meta name="description" content={`Book services from ${vendor.business_name}. ${vendor.description?.slice(0, 120) || 'Verified professional on ToleMate.'}`} />
-        <meta property="og:title" content={`${vendor.business_name} on ToleMate`} />
-        <meta property="og:description" content={vendor.description?.slice(0, 160) || 'Verified professional on ToleMate.'} />
-        <link rel="canonical" href={window.location.href} />
-      </Helmet>
+      <SeoHead
+        title={`${vendor.business_name} – Service Provider`}
+        description={`Book services from ${vendor.business_name}. ${vendor.description?.slice(0, 120) || 'Verified professional on ToleMate.'}`}
+        keywords={`${vendor.business_name}, services, ${vendor.description?.split(' ').slice(0, 5).join(' ') || 'local services'}`}
+        ogTitle={`${vendor.business_name} on ToleMate`}
+        ogDescription={vendor.description?.slice(0, 160) || 'Verified professional on ToleMate.'}
+        ogImage={vendor.avatar || undefined}
+        canonicalUrl={window.location.href}
+        jsonLd={localBusinessJsonLd({
+          name: vendor.business_name,
+          description: vendor.description || 'Service provider',
+          image: vendor.avatar || undefined,
+          url: window.location.href,
+          rating: vendor.rating ? Number(vendor.rating) : undefined,
+        })}
+      />
       <div className="container-custom max-w-5xl">
 
         {/* Back */}
@@ -234,7 +243,7 @@ const VendorPublicProfile: React.FC = () => {
             {/* Avatar */}
             <div className="w-20 h-20 rounded-2xl bg-primary-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
               {vendor.avatar ? (
-                <img src={`http://localhost:8001${vendor.avatar}`} alt={vendor.business_name} className="w-full h-full object-cover" />
+                <img src={assetUrl(vendor.avatar)} alt={vendor.business_name} className="w-full h-full object-cover" />
               ) : (
                 <span className="text-3xl font-bold text-primary-600">
                   {vendor.business_name.charAt(0).toUpperCase()}

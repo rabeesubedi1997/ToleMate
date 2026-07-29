@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
+import SeoHead, { organizationJsonLd, websiteJsonLd } from '../components/SeoHead';
 import { useSettings } from '../context/SettingsContext';
 import { useTranslation } from 'react-i18next';
 import {
@@ -10,7 +10,7 @@ import {
   PartyPopper, Scissors, Car, Package
 } from 'lucide-react';
 import { getServiceImage } from '../utils/serviceImage';
-import { API_BASE } from '../utils/config';
+import { API_BASE, FALLBACK_IMAGE, assetUrl } from '../utils/config';
 
 const HERO_BG = 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=1600&q=80';
 
@@ -144,14 +144,15 @@ const Home: React.FC = () => {
 
   return (
     <>
-      <Helmet>
-        <title>{siteName} – Find Trusted Local Services in Nepal</title>
-        <meta name="description" content={`${siteName} connects you with verified professionals for home repair, cleaning, plumbing, electrical work, and more. Book instantly, pay securely.`} />
-        <meta property="og:title" content={`${siteName} – Trusted Local Services`} />
-        <meta property="og:description" content="Book verified local professionals near you – from plumbing to cleaning, IT to beauty." />
-        <meta property="og:type" content="website" />
-        <link rel="canonical" href={window.location.href} />
-      </Helmet>
+      <SeoHead
+        title={siteName}
+        description={`${siteName} connects you with verified professionals for home repair, cleaning, plumbing, electrical work, and more. Book instantly, pay securely.`}
+        keywords="local services, home repair, plumber, electrician, cleaning, Nepal, ToleMate"
+        ogTitle={`${siteName} – Trusted Local Services`}
+        ogDescription="Book verified local professionals near you – from plumbing to cleaning, IT to beauty."
+        canonicalUrl={window.location.href}
+        jsonLd={{ ...organizationJsonLd(siteName), ...websiteJsonLd(siteName) }}
+      />
     <div className="flex flex-col">
 
       {/* ═══════════════════════════════════════════
@@ -303,7 +304,7 @@ const Home: React.FC = () => {
                       alt={service.name}
                       loading="lazy"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      onError={e => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1521791136064-7986c2920216?w=400&q=70'; }}
+                      onError={e => { (e.target as HTMLImageElement).src = FALLBACK_IMAGE; }}
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
                     <span className="absolute top-2 left-2 text-xs bg-white/90 text-gray-700 px-2 py-0.5 rounded-full font-medium shadow-sm">
@@ -360,7 +361,7 @@ const Home: React.FC = () => {
                       src={getServiceImage(service)}
                       alt={service.name}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      onError={e => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1521791136064-7986c2920216?w=400&q=70'; }}
+                      onError={e => { (e.target as HTMLImageElement).src = FALLBACK_IMAGE; }}
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
                   </div>
@@ -404,7 +405,7 @@ const Home: React.FC = () => {
                   className="card p-5 flex items-start gap-4 hover:shadow-lg transition-all group">
                   <div className="w-14 h-14 rounded-2xl bg-primary-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
                     {v.avatar ? (
-                      <img src={`http://localhost:8001${v.avatar}`} alt={v.business_name} className="w-full h-full object-cover" />
+                      <img src={assetUrl(v.avatar)} alt={v.business_name} className="w-full h-full object-cover" />
                     ) : (
                       <span className="text-xl font-bold text-primary-600">{v.business_name?.charAt(0)}</span>
                     )}

@@ -42,6 +42,11 @@ class BundleController extends Controller
         $vendor = Vendor::where('user_id', $request->user()->id)->first();
         if (!$vendor) return response()->json(['message' => 'Vendor not found'], 404);
 
+        if (!$vendor->canCreateBundle()) {
+            $max = $vendor->getPlanLimit('max_bundles');
+            return response()->json(['message' => "Your {$vendor->subscription_plan} plan allows a maximum of {$max} bundles."], 403);
+        }
+
         $validator = Validator::make($request->all(), [
             'name'             => 'required|string|max:255',
             'description'      => 'nullable|string|max:1000',

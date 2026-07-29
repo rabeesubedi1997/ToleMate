@@ -26,6 +26,11 @@ class PortfolioController extends Controller
         $vendor = Vendor::where('user_id', $user->id)->first();
         if (!$vendor) return response()->json(['message' => 'Vendor not found'], 404);
 
+        if (!$vendor->canAddPortfolioItem()) {
+            $max = $vendor->getPlanLimit('max_portfolio_items');
+            return response()->json(['message' => "Your {$vendor->subscription_plan} plan allows a maximum of {$max} portfolio items."], 403);
+        }
+
         $request->validate([
             'image'        => 'required|image|max:4096',
             'before_image' => 'nullable|image|max:4096',

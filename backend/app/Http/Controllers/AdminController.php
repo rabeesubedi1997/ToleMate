@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Validator;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Models\VendorFeature;
+use App\Models\VendorDocument;
 use App\Models\VendorAvailability;
 use App\Models\Service;
 use App\Models\Booking;
@@ -15,16 +16,13 @@ use App\Models\Category;
 
 class AdminController extends Controller
 {
-    /**
-     * Get overall system statistics for the admin dashboard
-     */
+    public function __construct()
+    {
+        $this->middleware('role:admin,super_admin');
+    }
+
     public function getDashboardStats(Request $request)
     {
-        if ($request->user()->role !== 'admin') {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
-        // Monthly bookings for the last 6 months
         $monthly = \App\Models\Booking::selectRaw("DATE_FORMAT(created_at, '%Y-%m') as month, COUNT(*) as bookings, SUM(price) as revenue")
             ->where('created_at', '>=', now()->subMonths(6)->startOfMonth())
             ->groupBy('month')
@@ -58,28 +56,15 @@ class AdminController extends Controller
         return response()->json($stats);
     }
 
-    /**
-     * List all users with pagination
-     */
     public function getUsers(Request $request)
     {
-        if ($request->user()->role !== 'admin') {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
-        $users = User::orderBy('created_at', 'desc')->paginate(15);
+        $users = User::where('role', '!=', 'super_admin')
+            ->orderBy('created_at', 'desc')->paginate(15);
         return response()->json($users);
     }
 
-    /**
-     * Get single user for editing
-     */
     public function getUser(Request $request, $id)
     {
-        if ($request->user()->role !== 'admin') {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
         $user = User::find($id);
         if (!$user) {
             return response()->json(['message' => 'User not found'], 404);
@@ -88,24 +73,23 @@ class AdminController extends Controller
         return response()->json($user);
     }
 
-    /**
-     * Update user profile (Admin only)
-     */
     public function updateUser(Request $request, $id)
     {
-        if ($request->user()->role !== 'admin') {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
         $user = User::find($id);
         if (!$user) {
             return response()->json(['message' => 'User not found'], 404);
         }
 
+        if ($user->role === 'super_admin' && $request->user()->role !== 'super_admin') {
+            return response()->json(['message' => 'Cannot modify super admin accounts'], 403);
+        }
+
+        $validRoles = $request->user()->role === 'super_admin' ? 'customer,vendor,admin,super_admin' : 'customer,vendor,admin';
+
         $request->validate([
             'name' => 'sometimes|string|max:255',
             'email' => 'sometimes|email|unique:users,email,' . $id,
-            'role' => 'sometimes|in:customer,vendor,admin',
+            'role' => 'sometimes|in:' . $validRoles,
         ]);
 
         $user->update($request->only(['name', 'email', 'role']));
@@ -116,15 +100,8 @@ class AdminController extends Controller
         ]);
     }
 
-    /**
-     * Delete or Ban user
-     */
     public function deleteUser(Request $request, $id)
     {
-        if ($request->user()->role !== 'admin') {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
         $user = User::find($id);
         if (!$user) {
             return response()->json(['message' => 'User not found'], 404);
@@ -134,32 +111,22 @@ class AdminController extends Controller
             return response()->json(['message' => 'Cannot delete your own account'], 400);
         }
 
+        if (in_array($user->role, ['admin', 'super_admin']) && $request->user()->role !== 'super_admin') {
+            return response()->json(['message' => 'Cannot delete admin accounts'], 403);
+        }
+
         $user->delete();
         return response()->json(['message' => 'User deleted successfully']);
     }
 
-    /**
-     * List all services for admin moderation
-     */
     public function getServices(Request $request)
     {
-        if ($request->user()->role !== 'admin') {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
         $services = Service::with(['category', 'vendor'])->orderBy('created_at', 'desc')->paginate(15);
         return response()->json($services);
     }
 
-    /**
-     * Get all reviews for moderation
-     */
     public function getReviews(Request $request)
     {
-        if ($request->user()->role !== 'admin') {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
         $reviews = \App\Models\Review::with(['customer', 'vendor', 'booking.service'])
             ->orderBy('created_at', 'desc')
             ->paginate(15);
@@ -167,15 +134,8 @@ class AdminController extends Controller
         return response()->json($reviews);
     }
 
-    /**
-     * Delete a review (Admin only)
-     */
     public function deleteReview(Request $request, $id)
     {
-        if ($request->user()->role !== 'admin') {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
         $review = \App\Models\Review::find($id);
         if (!$review) {
             return response()->json(['message' => 'Review not found'], 404);
@@ -186,15 +146,8 @@ class AdminController extends Controller
         return response()->json(['message' => 'Review deleted successfully']);
     }
 
-    /**
-     * List all vendors with user info and services count
-     */
     public function getVendors(Request $request)
     {
-        if ($request->user()->role !== 'admin') {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
         $vendors = Vendor::with('user')
             ->withCount('services')
             ->orderBy('created_at', 'desc')
@@ -203,56 +156,305 @@ class AdminController extends Controller
         return response()->json($vendors);
     }
 
-    /**
-     * Delete a vendor and their services
-     */
-    public function deleteVendor(Request $request, $id)
+    public function getVendorBookings(Request $request, $id)
     {
-        if ($request->user()->role !== 'admin') {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
         $vendor = Vendor::find($id);
         if (!$vendor) {
             return response()->json(['message' => 'Vendor not found'], 404);
         }
 
-        // Delete all services belonging to this vendor
+        $bookings = Booking::with(['service', 'customer'])
+            ->where('vendor_id', $vendor->id)
+            ->orderBy('created_at', 'desc')
+            ->paginate(20);
+
+        return response()->json($bookings);
+    }
+
+    public function getVendorMessages(Request $request, $id)
+    {
+        $vendor = Vendor::find($id);
+        if (!$vendor) {
+            return response()->json(['message' => 'Vendor not found'], 404);
+        }
+
+        $messages = \App\Models\Message::with('sender')
+            ->where(function ($q) use ($vendor) {
+                $q->where('sender_id', $vendor->user_id)
+                    ->orWhere('receiver_id', $vendor->user_id);
+            })
+            ->orderBy('created_at', 'desc')
+            ->paginate(50);
+
+        return response()->json($messages);
+    }
+
+    public function storeReview(Request $request)
+    {
+        $request->validate([
+            'vendor_id'  => 'required|exists:vendors,id',
+            'booking_id' => 'required|exists:bookings,id',
+            'rating'     => 'required|integer|between:1,5',
+            'comment'    => 'nullable|string|max:1000',
+        ]);
+
+        $review = \App\Models\Review::create([
+            'customer_id' => $request->user()->id,
+            'vendor_id'   => $request->vendor_id,
+            'booking_id'  => $request->booking_id,
+            'rating'      => $request->rating,
+            'comment'     => $request->comment,
+        ]);
+
+        return response()->json(['message' => 'Review submitted', 'review' => $review], 201);
+    }
+
+    public function createUser(Request $request)
+    {
+        $allowedRoles = $request->user()->role === 'super_admin' ? 'customer,vendor,admin,super_admin' : 'customer,vendor';
+
+        $request->validate([
+            'name'          => 'required|string|max:255',
+            'email'         => 'required|email|unique:users,email',
+            'password'      => 'required|string|min:6',
+            'role'          => 'required|in:' . $allowedRoles,
+            'phone'         => 'nullable|string|max:20',
+            'business_name' => 'nullable|string|max:255',
+            'description'   => 'nullable|string',
+        ]);
+
+        $user = User::create([
+            'name'     => $request->name,
+            'email'    => $request->email,
+            'password' => Hash::make($request->password),
+            'role'     => $request->role,
+            'phone'    => $request->phone,
+        ]);
+
+        if ($user->role === 'vendor') {
+            Vendor::create([
+                'user_id'             => $user->id,
+                'business_name'       => $request->business_name ?: $user->name . "'s Business",
+                'description'         => $request->description ?: 'New vendor on ToleMate',
+                'rating'              => 0.0,
+                'service_area_radius' => 10,
+            ]);
+        }
+
+        return response()->json(['message' => 'User created', 'user' => $user], 201);
+    }
+
+    public function getAllBookings(Request $request)
+    {
+        $query = Booking::with(['service.category', 'customer', 'vendor.user']);
+
+        if ($request->status) {
+            $query->where('status', $request->status);
+        }
+
+        $bookings = $query->orderBy('created_at', 'desc')->paginate(20);
+        return response()->json($bookings);
+    }
+
+    public function updateBookingStatus(Request $request, $id)
+    {
+        $request->validate(['status' => 'required|in:pending,accepted,in_progress,completed,cancelled']);
+
+        $booking = Booking::find($id);
+        if (!$booking) {
+            return response()->json(['message' => 'Booking not found'], 404);
+        }
+
+        $booking->update(['status' => $request->status]);
+        return response()->json(['message' => 'Status updated', 'booking' => $booking]);
+    }
+
+    public function getCategories(Request $request)
+    {
+        return response()->json(Category::withCount('services')->orderBy('name')->get());
+    }
+
+    public function createCategory(Request $request)
+    {
+        $request->validate(['name' => 'required|string|max:255|unique:categories,name']);
+        $cat = Category::create(['name' => $request->name, 'parent_id' => $request->parent_id]);
+        return response()->json(['message' => 'Category created', 'category' => $cat], 201);
+    }
+
+    public function updateCategory(Request $request, $id)
+    {
+        $cat = Category::find($id);
+        if (!$cat) return response()->json(['message' => 'Category not found'], 404);
+
+        $request->validate(['name' => 'required|string|max:255|unique:categories,name,' . $id]);
+        $cat->update(['name' => $request->name]);
+        return response()->json(['message' => 'Category updated', 'category' => $cat]);
+    }
+
+    public function deleteCategory(Request $request, $id)
+    {
+        $cat = Category::find($id);
+        if (!$cat) return response()->json(['message' => 'Category not found'], 404);
+
+        $cat->delete();
+        return response()->json(['message' => 'Category deleted']);
+    }
+
+    public function getAllConversations(Request $request)
+    {
+        $conversations = \App\Models\Message::with(['sender', 'receiver'])
+            ->orderBy('created_at', 'desc')
+            ->paginate(50);
+
+        return response()->json($conversations);
+    }
+
+    public function getVendorServices(Request $request, $id)
+    {
+        $vendor = Vendor::find($id);
+        if (!$vendor) return response()->json(['message' => 'Vendor not found'], 404);
+
+        $services = Service::with('category')
+            ->where('vendor_id', $id)
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json($services);
+    }
+
+    public function getVendorFeatures(Request $request, $id)
+    {
+        $vendor = Vendor::find($id);
+        if (!$vendor) return response()->json(['message' => 'Vendor not found'], 404);
+
+        $rows = VendorFeature::where('vendor_id', $id)->pluck('is_enabled', 'feature');
+        $features = [];
+        foreach (Vendor::ALL_FEATURES as $feature) {
+            $features[$feature] = $rows->has($feature) ? (bool) $rows->get($feature) : true;
+        }
+        return response()->json(['features' => $features]);
+    }
+
+    public function getVendorAvailability(Request $request, $id)
+    {
+        $vendor = Vendor::find($id);
+        if (!$vendor) return response()->json(['message' => 'Vendor not found'], 404);
+
+        $rows = VendorAvailability::where('vendor_id', $id)->get()->keyBy('day_of_week');
+        $days = [];
+        for ($d = 0; $d <= 6; $d++) {
+            $row = $rows->get($d);
+            $days[] = [
+                'day_of_week'  => $d,
+                'start_time'   => $row ? substr($row->start_time, 0, 5) : '09:00',
+                'end_time'     => $row ? substr($row->end_time, 0, 5)   : '17:00',
+                'is_available' => $row?->is_available ?? ($d >= 1 && $d <= 5),
+            ];
+        }
+        return response()->json(['availability' => $days]);
+    }
+
+    // ── Super Admin only — Vendor Write Operations ──────────────────────────
+
+    public function deleteVendor(Request $request, $id)
+    {
+        $vendor = Vendor::find($id);
+        if (!$vendor) {
+            return response()->json(['message' => 'Vendor not found'], 404);
+        }
         Service::where('vendor_id', $id)->delete();
-
         $vendor->delete();
-
         return response()->json(['message' => 'Vendor deleted successfully']);
     }
 
-    /**
-     * Toggle vendor verified status
-     */
     public function verifyVendor(Request $request, $id)
     {
-        if ($request->user()->role !== 'admin') {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
         $vendor = Vendor::find($id);
         if (!$vendor) {
             return response()->json(['message' => 'Vendor not found'], 404);
         }
-
         $vendor->is_verified = !$vendor->is_verified;
         $vendor->save();
-
         return response()->json([
             'vendor' => $vendor,
             'message' => $vendor->is_verified ? 'Vendor verified' : 'Vendor verification removed',
         ]);
     }
 
+    // ── KYC / Document Review ─────────────────────────────────────────────────
+
+    public function getKycPending(Request $request)
+    {
+        $vendors = Vendor::with(['user:id,name,email', 'documents' => fn($q) => $q->where('status', 'pending')])
+            ->where('kyc_status', 'pending')
+            ->get();
+
+        return response()->json($vendors);
+    }
+
+    public function approveKycDocument(Request $request, $id)
+    {
+        $doc = VendorDocument::with('vendor')->find($id);
+        if (!$doc) return response()->json(['message' => 'Document not found'], 404);
+
+        $doc->update([
+            'status'      => 'approved',
+            'reviewed_by' => $request->user()->id,
+            'reviewed_at' => now(),
+        ]);
+
+        // Check if all documents are approved
+        $pending = VendorDocument::where('vendor_id', $doc->vendor_id)
+            ->where('status', '!=', 'approved')
+            ->count();
+
+        if ($pending === 0) {
+            $doc->vendor->update([
+                'kyc_status'  => 'verified',
+                'is_verified' => true,
+            ]);
+
+            NotificationController::sendNotification(
+                $doc->vendor->user_id,
+                'system',
+                'KYC Approved',
+                'Your KYC documents have been approved. You are now a verified vendor!',
+                ['type' => 'kyc_approved']
+            );
+        }
+
+        return response()->json(['message' => 'Document approved', 'document' => $doc->fresh()]);
+    }
+
+    public function rejectKycDocument(Request $request, $id)
+    {
+        $request->validate(['reason' => 'required|string|max:1000']);
+
+        $doc = VendorDocument::with('vendor')->find($id);
+        if (!$doc) return response()->json(['message' => 'Document not found'], 404);
+
+        $doc->update([
+            'status'           => 'rejected',
+            'rejection_reason' => $request->reason,
+            'reviewed_by'      => $request->user()->id,
+            'reviewed_at'      => now(),
+        ]);
+
+        $doc->vendor->update(['kyc_status' => 'rejected']);
+
+        NotificationController::sendNotification(
+            $doc->vendor->user_id,
+            'system',
+            'KYC Document Rejected',
+            "Your {$doc->type} was rejected. Reason: {$request->reason}",
+            ['type' => 'kyc_rejected']
+        );
+
+        return response()->json(['message' => 'Document rejected', 'document' => $doc->fresh()]);
+    }
+
     public function featureVendor(Request $request, $id)
     {
-        if ($request->user()->role !== 'admin') {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
         $vendor = Vendor::find($id);
         if (!$vendor) return response()->json(['message' => 'Vendor not found'], 404);
         $vendor->is_featured = !$vendor->is_featured;
@@ -260,12 +462,8 @@ class AdminController extends Controller
         return response()->json(['vendor' => $vendor, 'message' => $vendor->is_featured ? 'Vendor featured' : 'Vendor unfeatured']);
     }
 
-    /** POST /api/admin/vendors/bulk — perform bulk action on multiple vendors */
     public function bulkVendorAction(Request $request)
     {
-        if ($request->user()->role !== 'admin') {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
         $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
             'ids'    => 'required|array|min:1',
             'ids.*'  => 'integer',
@@ -293,7 +491,7 @@ class AdminController extends Controller
             case 'delete':
                 $vendors = Vendor::whereIn('id', $ids)->with('user')->get();
                 foreach ($vendors as $v) {
-                    \App\Models\Service::where('vendor_id', $v->id)->delete();
+                    Service::where('vendor_id', $v->id)->delete();
                     if ($v->user) $v->user->delete();
                     $v->delete();
                 }
@@ -305,7 +503,7 @@ class AdminController extends Controller
 
     public function updateVendorPlan(Request $request, $id)
     {
-        $vendor = \App\Models\Vendor::findOrFail($id);
+        $vendor = Vendor::findOrFail($id);
         $plan = $request->input('plan');
         if (!in_array($plan, ['free', 'basic', 'pro'])) {
             return response()->json(['message' => 'Invalid plan'], 422);
@@ -314,255 +512,8 @@ class AdminController extends Controller
         return response()->json(['message' => "Plan updated to $plan", 'vendor' => $vendor]);
     }
 
-    /**
-     * Get all bookings for a specific vendor
-     */
-    public function getVendorBookings(Request $request, $id)
-    {
-        if ($request->user()->role !== 'admin') {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
-        $vendor = Vendor::find($id);
-        if (!$vendor) {
-            return response()->json(['message' => 'Vendor not found'], 404);
-        }
-
-        $bookings = Booking::with(['service', 'customer'])
-            ->where('vendor_id', $vendor->id)
-            ->orderBy('created_at', 'desc')
-            ->paginate(20);
-
-        return response()->json($bookings);
-    }
-
-    /**
-     * Get all messages (chats) involving a specific vendor
-     */
-    public function getVendorMessages(Request $request, $id)
-    {
-        if ($request->user()->role !== 'admin') {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
-        $vendor = Vendor::find($id);
-        if (!$vendor) {
-            return response()->json(['message' => 'Vendor not found'], 404);
-        }
-
-        $messages = \App\Models\Message::with('sender')
-            ->where(function ($q) use ($vendor) {
-                $q->where('sender_id', $vendor->user_id)
-                    ->orWhere('receiver_id', $vendor->user_id);
-            })
-            ->orderBy('created_at', 'desc')
-            ->paginate(50);
-
-        return response()->json($messages);
-    }
-
-    /**
-     * Store a review (used by customers post-booking)
-     */
-    public function storeReview(Request $request)
-    {
-        $request->validate([
-            'vendor_id'  => 'required|exists:vendors,id',
-            'booking_id' => 'required|exists:bookings,id',
-            'rating'     => 'required|integer|between:1,5',
-            'comment'    => 'nullable|string|max:1000',
-        ]);
-
-        $review = \App\Models\Review::create([
-            'customer_id' => $request->user()->id,
-            'vendor_id'   => $request->vendor_id,
-            'booking_id'  => $request->booking_id,
-            'rating'      => $request->rating,
-            'comment'     => $request->comment,
-        ]);
-
-        return response()->json(['message' => 'Review submitted', 'review' => $review], 201);
-    }
-
-    /** Create a new user (Admin) */
-    public function createUser(Request $request)
-    {
-        if ($request->user()->role !== 'admin') {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
-        $request->validate([
-            'name'          => 'required|string|max:255',
-            'email'         => 'required|email|unique:users,email',
-            'password'      => 'required|string|min:6',
-            'role'          => 'required|in:customer,vendor,admin',
-            'phone'         => 'nullable|string|max:20',
-            'business_name' => 'nullable|string|max:255',
-            'description'   => 'nullable|string',
-        ]);
-
-        $user = User::create([
-            'name'     => $request->name,
-            'email'    => $request->email,
-            'password' => Hash::make($request->password),
-            'role'     => $request->role,
-            'phone'    => $request->phone,
-        ]);
-
-        if ($user->role === 'vendor') {
-            Vendor::create([
-                'user_id'             => $user->id,
-                'business_name'       => $request->business_name ?: $user->name . "'s Business",
-                'description'         => $request->description ?: 'New vendor on ToleMate',
-                'rating'              => 0.0,
-                'service_area_radius' => 10,
-            ]);
-        }
-
-        return response()->json(['message' => 'User created', 'user' => $user], 201);
-    }
-
-    /** Get all bookings (Admin) */
-    public function getAllBookings(Request $request)
-    {
-        if ($request->user()->role !== 'admin') {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
-        $query = Booking::with(['service.category', 'customer', 'vendor.user']);
-
-        if ($request->status) {
-            $query->where('status', $request->status);
-        }
-
-        $bookings = $query->orderBy('created_at', 'desc')->paginate(20);
-        return response()->json($bookings);
-    }
-
-    /** Update booking status (Admin) */
-    public function updateBookingStatus(Request $request, $id)
-    {
-        if ($request->user()->role !== 'admin') {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
-        $request->validate(['status' => 'required|in:pending,accepted,in_progress,completed,cancelled']);
-
-        $booking = Booking::find($id);
-        if (!$booking) {
-            return response()->json(['message' => 'Booking not found'], 404);
-        }
-
-        $booking->update(['status' => $request->status]);
-        return response()->json(['message' => 'Status updated', 'booking' => $booking]);
-    }
-
-    /** List all categories (Admin) */
-    public function getCategories(Request $request)
-    {
-        if ($request->user()->role !== 'admin') {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
-        return response()->json(Category::withCount('services')->orderBy('name')->get());
-    }
-
-    /** Create category (Admin) */
-    public function createCategory(Request $request)
-    {
-        if ($request->user()->role !== 'admin') {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
-        $request->validate(['name' => 'required|string|max:255|unique:categories,name']);
-        $cat = Category::create(['name' => $request->name, 'parent_id' => $request->parent_id]);
-        return response()->json(['message' => 'Category created', 'category' => $cat], 201);
-    }
-
-    /** Update category (Admin) */
-    public function updateCategory(Request $request, $id)
-    {
-        if ($request->user()->role !== 'admin') {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
-        $cat = Category::find($id);
-        if (!$cat) return response()->json(['message' => 'Category not found'], 404);
-
-        $request->validate(['name' => 'required|string|max:255|unique:categories,name,' . $id]);
-        $cat->update(['name' => $request->name]);
-        return response()->json(['message' => 'Category updated', 'category' => $cat]);
-    }
-
-    /** Delete category (Admin) */
-    public function deleteCategory(Request $request, $id)
-    {
-        if ($request->user()->role !== 'admin') {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
-        $cat = Category::find($id);
-        if (!$cat) return response()->json(['message' => 'Category not found'], 404);
-
-        $cat->delete();
-        return response()->json(['message' => 'Category deleted']);
-    }
-
-    /** Get all platform conversations (Admin) */
-    public function getAllConversations(Request $request)
-    {
-        if ($request->user()->role !== 'admin') {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
-        $conversations = \App\Models\Message::with(['sender', 'receiver'])
-            ->orderBy('created_at', 'desc')
-            ->paginate(50);
-
-        return response()->json($conversations);
-    }
-
-    /** Get all services for a specific vendor (Admin) */
-    public function getVendorServices(Request $request, $id)
-    {
-        if ($request->user()->role !== 'admin') {
-            return response()->json(['message' => 'Unauthorized'], 403);
-        }
-
-        $vendor = Vendor::find($id);
-        if (!$vendor) return response()->json(['message' => 'Vendor not found'], 404);
-
-        $services = Service::with('category')
-            ->where('vendor_id', $id)
-            ->orderBy('created_at', 'desc')
-            ->get();
-
-        return response()->json($services);
-    }
-
-    // ── Vendor Feature Flags ──────────────────────────────────────────────────
-
-    /** GET /api/admin/vendors/{id}/features */
-    public function getVendorFeatures(Request $request, $id)
-    {
-        if ($request->user()->role !== 'admin') return response()->json(['message' => 'Unauthorized'], 403);
-
-        $vendor = Vendor::find($id);
-        if (!$vendor) return response()->json(['message' => 'Vendor not found'], 404);
-
-        $rows = VendorFeature::where('vendor_id', $id)->pluck('is_enabled', 'feature');
-        $features = [];
-        foreach (Vendor::ALL_FEATURES as $feature) {
-            $features[$feature] = $rows->has($feature) ? (bool) $rows->get($feature) : true;
-        }
-        return response()->json(['features' => $features]);
-    }
-
-    /** PUT /api/admin/vendors/{id}/features — { features: { bookings: true, messaging: false, ... } } */
     public function updateVendorFeatures(Request $request, $id)
     {
-        if ($request->user()->role !== 'admin') return response()->json(['message' => 'Unauthorized'], 403);
-
         $vendor = Vendor::find($id);
         if (!$vendor) return response()->json(['message' => 'Vendor not found'], 404);
 
@@ -573,7 +524,6 @@ class AdminController extends Controller
         if ($validator->fails()) return response()->json(['errors' => $validator->errors()], 422);
 
         foreach ($request->features as $feature => $isEnabled) {
-            // Only accept known feature names
             if (!in_array($feature, Vendor::ALL_FEATURES)) continue;
             VendorFeature::updateOrCreate(
                 ['vendor_id' => $id, 'feature' => $feature],
@@ -583,35 +533,8 @@ class AdminController extends Controller
         return response()->json(['message' => 'Features updated successfully']);
     }
 
-    // ── Vendor Availability (Admin — all 7 days) ──────────────────────────────
-
-    /** GET /api/admin/vendors/{id}/availability */
-    public function getVendorAvailability(Request $request, $id)
-    {
-        if ($request->user()->role !== 'admin') return response()->json(['message' => 'Unauthorized'], 403);
-
-        $vendor = Vendor::find($id);
-        if (!$vendor) return response()->json(['message' => 'Vendor not found'], 404);
-
-        $rows = VendorAvailability::where('vendor_id', $id)->get()->keyBy('day_of_week');
-        $days = [];
-        for ($d = 0; $d <= 6; $d++) {
-            $row = $rows->get($d);
-            $days[] = [
-                'day_of_week'  => $d,
-                'start_time'   => $row ? substr($row->start_time, 0, 5) : '09:00',
-                'end_time'     => $row ? substr($row->end_time, 0, 5)   : '17:00',
-                'is_available' => $row?->is_available ?? ($d >= 1 && $d <= 5),
-            ];
-        }
-        return response()->json(['availability' => $days]);
-    }
-
-    /** PUT /api/admin/vendors/{id}/availability — admin can edit all 7 days */
     public function updateVendorAvailability(Request $request, $id)
     {
-        if ($request->user()->role !== 'admin') return response()->json(['message' => 'Unauthorized'], 403);
-
         $vendor = Vendor::find($id);
         if (!$vendor) return response()->json(['message' => 'Vendor not found'], 404);
 

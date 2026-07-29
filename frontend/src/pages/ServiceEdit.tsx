@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Upload, ImagePlus, X, ArrowLeft, Lightbulb, Plus, Trash2, CheckCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE } from '../utils/config';
+import SeoHead from '../components/SeoHead';
 
 const API = `${API_BASE}/api`;
 
@@ -167,6 +168,12 @@ const ServiceEdit: React.FC = () => {
   if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="spinner"></div></div>;
 
   return (
+    <>
+      <SeoHead
+        title={id ? 'Edit Service' : 'Create Service'}
+        description={id ? 'Edit your service listing on ToleMate.' : 'Create a new service listing on ToleMate.'}
+        noIndex={true}
+      />
     <div className="min-h-screen py-8">
       <div className="container-custom max-w-4xl">
         <div className="flex items-center justify-between mb-6">
@@ -226,7 +233,7 @@ const ServiceEdit: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Price ($)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Price (Rs.)</label>
                     <input type="number" className="input-field" placeholder="0.00" disabled={formData.pricing_type === 'quote'} value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} />
                   </div>
                   <div className="flex items-center gap-3 pb-1">
@@ -311,7 +318,7 @@ const ServiceEdit: React.FC = () => {
                         <input className="input-field text-sm bg-white" value={pkgForm.name} onChange={e => setPkgForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Basic" />
                       </div>
                       <div>
-                        <label className="text-xs font-medium text-gray-600 mb-1 block">Price ($)</label>
+                        <label className="text-xs font-medium text-gray-600 mb-1 block">Price (Rs.)</label>
                         <input type="number" className="input-field text-sm bg-white" value={pkgForm.price} onChange={e => setPkgForm(p => ({ ...p, price: e.target.value }))} placeholder="0.00" min="0" />
                       </div>
                       <div>
@@ -399,6 +406,7 @@ const ServiceEdit: React.FC = () => {
         </div>
       )}
     </div>
+    </>
   );
 };
 

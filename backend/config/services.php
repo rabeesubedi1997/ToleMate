@@ -35,4 +35,9 @@ return [
         ],
     ],
 
+    'khalti' => [
+        'secret_key' => env('KHALTI_SECRET_KEY'),
+        'public_key' => env('KHALTI_PUBLIC_KEY'),
+    ],
+
 ];

@@ -1,6 +1,7 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Bell, Calendar, MessageCircle, CreditCard, Star, Settings, Trash2, ChevronDown } from 'lucide-react';
+import SeoHead from '../components/SeoHead';
 import { API_BASE } from '../utils/config';
 
 interface Notification { id: number; type: 'booking' | 'message' | 'payment' | 'review' | 'system'; title: string; message: string; data: any; is_read: boolean; created_at: string; }
@@ -114,7 +115,12 @@ const Notifications: React.FC = () => {
     </div>
   );
 
-  return (
+  return (<>
+      <SeoHead
+        title="Notifications"
+        description="View your ToleMate notifications for booking updates and messages."
+        noIndex={true}
+      />
     <div className="min-h-screen py-8">
       <div className="container-custom max-w-3xl">
         <div className="flex items-center justify-between mb-6">
@@ -214,6 +220,7 @@ const Notifications: React.FC = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 

@@ -21,9 +21,9 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->alias([
-            'verified' => \App\Http\Middleware\EnsureEmailIsVerified::class,
             'auth.api' => \App\Http\Middleware\ApiTokenAuth::class,
             'auth.token_query' => \App\Http\Middleware\TokenFromQueryString::class,
+            'role' => \App\Http\Middleware\CheckRole::class,
         ]);
 
         $middleware->group('api', [

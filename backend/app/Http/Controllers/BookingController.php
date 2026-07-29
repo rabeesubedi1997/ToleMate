@@ -150,7 +150,8 @@ class BookingController extends Controller
                     actionUrl: config('app.url') . '/vendor-dashboard',
                     actionLabel: 'View Booking',
                 ));
-            } catch (\Exception) {
+            } catch (\Exception $e) {
+                \Log::error('Booking email notification failed: ' . $e->getMessage());
             }
         }
 
@@ -212,6 +213,28 @@ class BookingController extends Controller
             $price = $booking->price ?? $booking->service?->price ?? 0;
             $points = max(1, (int) floor($price / 10));
             \App\Models\User::where('id', $booking->customer_id)->increment('loyalty_points', $points);
+
+            // Release escrow: mark payment as released to vendor
+            if ($booking->payment_status === 'paid') {
+                $booking->update([
+                    'payment_status' => 'released',
+                    'released_at'    => now(),
+                ]);
+
+                // Mark commission as eligible for payout
+                \App\Models\Commission::where('booking_id', $booking->id)
+                    ->where('status', 'pending')
+                    ->update(['status' => 'paid', 'paid_at' => now()]);
+            }
+        }
+
+        // Refund if cancelled after payment
+        if ($booking->status === 'cancelled' && in_array($booking->payment_status, ['paid', 'released'])) {
+            $booking->update(['payment_status' => 'refunded']);
+
+            \App\Models\Commission::where('booking_id', $booking->id)
+                ->where('status', 'pending')
+                ->update(['status' => 'refunded']);
         }
 
         // Send notification to the other party
@@ -244,7 +267,8 @@ class BookingController extends Controller
                         actionUrl: config('app.url') . '/dashboard',
                         actionLabel: 'View My Bookings',
                     ));
-                } catch (\Exception) {
+                } catch (\Exception $e) {
+                    \Log::error('Booking status email notification failed: ' . $e->getMessage());
                 }
             }
         }

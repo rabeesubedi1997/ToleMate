@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { FALLBACK_IMAGE } from '../utils/config';
 
 interface Slide {
   url: string;
@@ -41,7 +42,7 @@ const HeroSlider: React.FC<HeroSliderProps> = ({ slides, interval = 5000 }) => {
         src={slide.url}
         alt={slide.title || `Slide ${current + 1}`}
         className="w-full h-full object-contain"
-        onError={e => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1521791136064-7986c2920216?w=1400&q=80'; }}
+        onError={e => { (e.target as HTMLImageElement).src = FALLBACK_IMAGE; }}
       />
       {/* Dark gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent pointer-events-none" />

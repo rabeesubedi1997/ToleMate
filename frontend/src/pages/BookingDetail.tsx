@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Calendar, CheckCircle, Clock, XCircle, CreditCard, MessageCircle, Star, Download, RefreshCw } from 'lucide-react';
 import { API_BASE } from '../utils/config';
+import SeoHead from '../components/SeoHead';
 import { useToast } from '../context/ToastContext';
 
 interface Booking {
@@ -109,9 +110,15 @@ const BookingDetail: React.FC = () => {
   const status = STATUS_CONFIG[booking.status] || STATUS_CONFIG['pending'];
 
   return (
+    <>
+      <SeoHead
+        title="Booking Details"
+        description="View the details of your booking on ToleMate."
+        noIndex={true}
+      />
     <div className="min-h-screen py-8 bg-gray-50">
       <div className="container-custom max-w-2xl">
-
+        
         <button onClick={() => navigate(-1)} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 mb-6 transition-colors">
           <ArrowLeft className="w-4 h-4" /> Back
         </button>
@@ -278,6 +285,7 @@ const BookingDetail: React.FC = () => {
 
       </div>
     </div>
+    </>
   );
 };
 

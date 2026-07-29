@@ -39,12 +39,14 @@ class PaymentController extends Controller
             'transaction_id' => 'TXN_' . uniqid(),
         ]);
 
+        \App\Http\Controllers\CommissionController::createForBooking($booking);
+
         // Notify Vendor
         NotificationController::sendNotification(
             $booking->service->vendor->user_id,
             'payment',
             'Payment Received',
-            "Payment of ${$booking->price} received for booking #{$booking->id}.",
+            'Payment of ' . $booking->price . ' received for booking #' . $booking->id . '.',
             ['booking_id' => $booking->id]
         );
 

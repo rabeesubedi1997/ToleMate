@@ -1,9 +1,9 @@
 ﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
+import SeoHead from '../components/SeoHead';
 import { Search, SlidersHorizontal, MapPin, Star, X, ChevronDown, ArrowUpDown, LayoutGrid, List, Map, Heart, LocateFixed, Clock } from 'lucide-react';
 import { getServiceImage } from '../utils/serviceImage';
-import { API_BASE } from '../utils/config';
+import { API_BASE, FALLBACK_IMAGE } from '../utils/config';
 import ServiceMapView from '../components/ServiceMapView';
 import { ServicesGridSkeleton } from '../components/Skeleton';
 
@@ -273,10 +273,12 @@ const Services: React.FC = () => {
 
   return (
     <>
-      <Helmet>
-        <title>Browse Services{search ? ` – "${search}"` : ''} | ToleMate</title>
-        <meta name="description" content="Find and book trusted local professionals near you. Filter by category, price, rating, and distance." />
-      </Helmet>
+      <SeoHead
+        title={`Browse Services${search ? ` – "${search}"` : ''}`}
+        description="Find and book trusted local professionals near you. Filter by category, price, rating, and distance."
+        keywords="services, local professionals, booking, Nepal"
+        canonicalUrl={window.location.href}
+      />
     <div className="min-h-screen py-8">
       <div className="container-custom">
 
@@ -603,7 +605,7 @@ const Services: React.FC = () => {
                   <img src={getServiceImage(service)} alt={service.name}
                     loading="lazy"
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    onError={e => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1521791136064-7986c2920216?w=200&q=70'; }} />
+                    onError={e => { (e.target as HTMLImageElement).src = FALLBACK_IMAGE; }} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2">
@@ -649,7 +651,7 @@ const Services: React.FC = () => {
                     alt={service.name}
                     loading="lazy"
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    onError={e => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1521791136064-7986c2920216?w=600&q=80'; }}
+                    onError={e => { (e.target as HTMLImageElement).src = FALLBACK_IMAGE; }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
                   <span className="absolute top-3 left-3 text-xs bg-white/90 text-gray-700 px-2.5 py-1 rounded-full font-medium shadow-sm">

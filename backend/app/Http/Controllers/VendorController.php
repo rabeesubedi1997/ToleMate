@@ -10,6 +10,7 @@ use App\Models\Review;
 use App\Models\Booking;
 use App\Models\VendorAvailability;
 use App\Models\VendorFeature;
+use App\Models\VendorDocument;
 
 class VendorController extends Controller
 {
@@ -271,5 +272,161 @@ class VendorController extends Controller
 
         $vendors = $query->orderByDesc('rating')->paginate($request->get('per_page', 15));
         return response()->json($vendors);
+    }
+
+    // ── Analytics ─────────────────────────────────────────────────────────────
+
+    public function analytics(Request $request)
+    {
+        $user = $request->user();
+        $vendor = $user->vendor;
+        if (!$vendor) return response()->json(['message' => 'Vendor profile not found'], 404);
+
+        $vendorId = $vendor->id;
+
+        $bookings = Booking::where('vendor_id', $vendorId);
+
+        $total = (clone $bookings)->count();
+        $completed = (clone $bookings)->where('status', 'completed')->count();
+        $cancelled = (clone $bookings)->where('status', 'cancelled')->count();
+        $inProgress = (clone $bookings)->whereIn('status', ['accepted', 'in_progress'])->count();
+
+        $totalRevenue = (clone $bookings)->where('status', 'completed')->sum('price');
+        // Commission: total deducted
+        $totalCommission = \App\Models\Commission::where('vendor_id', $vendorId)->sum('commission_amount');
+        // Net earnings (after commission)
+        $netEarnings = $totalRevenue - $totalCommission;
+
+        // Average response time (hours from booking creation to first acceptance)
+        $avgResponseHours = (clone $bookings)
+            ->where('status', '!=', 'pending')
+            ->whereNotNull('updated_at')
+            ->selectRaw('AVG(TIMESTAMPDIFF(HOUR, created_at, updated_at)) as avg_hours')
+            ->value('avg_hours');
+
+        // Completion rate
+        $completionRate = $total > 0 ? round(($completed / $total) * 100, 1) : 0;
+
+        // Monthly breakdown (last 12 months)
+        $monthly = (clone $bookings)
+            ->selectRaw("DATE_FORMAT(created_at, '%Y-%m') as month, COUNT(*) as bookings, SUM(CASE WHEN status = 'completed' THEN price ELSE 0 END) as revenue")
+            ->where('created_at', '>=', now()->subMonths(12)->startOfMonth())
+            ->groupBy('month')
+            ->orderBy('month')
+            ->get()
+            ->keyBy('month');
+
+        // Top services by booking count
+        $topServices = \App\Models\Service::where('vendor_id', $vendorId)
+            ->withCount(['bookings' => fn($q) => $q->where('status', 'completed')])
+            ->orderByDesc('bookings_count')
+            ->take(5)
+            ->get(['id', 'name', 'price']);
+
+        // Review stats
+        $avgRating = \App\Models\Review::where('vendor_id', $vendorId)->avg('rating');
+        $reviewCount = \App\Models\Review::where('vendor_id', $vendorId)->count();
+
+        return response()->json([
+            'total_bookings'     => $total,
+            'completed_bookings' => $completed,
+            'cancelled_bookings' => $cancelled,
+            'active_bookings'    => $inProgress,
+            'total_revenue'      => round($totalRevenue, 2),
+            'total_commission'   => round($totalCommission, 2),
+            'net_earnings'       => round($netEarnings, 2),
+            'avg_response_hours' => round((float) ($avgResponseHours ?? 0), 1),
+            'completion_rate'    => $completionRate,
+            'avg_rating'         => $avgRating ? round($avgRating, 1) : 0,
+            'review_count'       => $reviewCount,
+            'monthly'            => $monthly,
+            'top_services'       => $topServices,
+        ]);
+    }
+
+    // ── KYC / Document Upload ─────────────────────────────────────────────────
+
+    public function uploadDocument(Request $request)
+    {
+        $user = $request->user();
+        $vendor = $user->vendor;
+
+        if (!$vendor) return response()->json(['message' => 'Vendor profile not found'], 404);
+
+        $request->validate([
+            'type' => 'required|in:' . implode(',', VendorDocument::types()),
+            'file' => 'required|file|mimes:jpg,jpeg,png,pdf|max:5120',
+        ]);
+
+        $path = $request->file('file')->store('vendor_documents/' . $vendor->id, 'public');
+
+        $doc = VendorDocument::create([
+            'vendor_id' => $vendor->id,
+            'type'       => $request->type,
+            'file_path'  => $path,
+            'status'     => 'pending',
+        ]);
+
+        // Update vendor KYC status to pending if not already
+        if ($vendor->kyc_status === 'not_submitted') {
+            $vendor->update(['kyc_status' => 'pending']);
+        }
+
+        NotificationController::sendNotification(
+            $user->id,
+            'system',
+            'Document Uploaded',
+            "Your {$request->type} has been submitted for review.",
+            ['type' => 'kyc_upload']
+        );
+
+        return response()->json(['message' => 'Document uploaded', 'document' => $doc], 201);
+    }
+
+    public function getDocuments(Request $request)
+    {
+        $user = $request->user();
+        $vendor = $user->vendor;
+        if (!$vendor) return response()->json(['message' => 'Vendor profile not found'], 404);
+
+        $docs = VendorDocument::where('vendor_id', $vendor->id)->orderByDesc('created_at')->get();
+        return response()->json($docs);
+    }
+
+    public function deleteDocument(Request $request, $id)
+    {
+        $user = $request->user();
+        $vendor = $user->vendor;
+        if (!$vendor) return response()->json(['message' => 'Vendor profile not found'], 404);
+
+        $doc = VendorDocument::where('id', $id)->where('vendor_id', $vendor->id)->first();
+        if (!$doc) return response()->json(['message' => 'Document not found'], 404);
+        if ($doc->status === 'approved') return response()->json(['message' => 'Cannot delete approved document'], 400);
+
+        Storage::disk('public')->delete($doc->file_path);
+        $doc->delete();
+
+        return response()->json(['message' => 'Document deleted']);
+    }
+
+    public function getKycStatus(Request $request)
+    {
+        $user = $request->user();
+        $vendor = $user->vendor;
+        if (!$vendor) return response()->json(['message' => 'Vendor profile not found'], 404);
+
+        $docs = VendorDocument::where('vendor_id', $vendor->id)->get();
+
+        return response()->json([
+            'kyc_status' => $vendor->kyc_status,
+            'documents'  => $docs->map(fn($d) => [
+                'id'               => $d->id,
+                'type'             => $d->type,
+                'status'           => $d->status,
+                'rejection_reason' => $d->rejection_reason,
+                'url'              => $d->status === 'approved' ? asset('storage/' . $d->file_path) : null,
+                'created_at'       => $d->created_at,
+            ]),
+        ]);
     }
 }

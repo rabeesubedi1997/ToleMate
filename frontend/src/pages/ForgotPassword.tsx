@@ -1,6 +1,7 @@
 ﻿import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Mail, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Mail, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import SeoHead from '../components/SeoHead';
 import { API_BASE } from '../utils/config';
 
 const ForgotPassword: React.FC = () => {
@@ -33,6 +34,12 @@ const ForgotPassword: React.FC = () => {
   };
 
   return (
+    <>
+      <SeoHead
+        title="Forgot Password"
+        description="Reset your ToleMate account password. Enter your email to receive a reset link."
+        noIndex={true}
+      />
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-12">
       <div className="w-full max-w-md">
         {/* Logo */}
@@ -114,6 +121,7 @@ const ForgotPassword: React.FC = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 

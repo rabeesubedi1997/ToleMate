@@ -1,7 +1,8 @@
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { HelmetProvider } from 'react-helmet-async';
+import { HelmetProvider, Helmet } from 'react-helmet-async';
 import { SettingsProvider } from './context/SettingsContext';
+import { useSettings } from './context/SettingsContext';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -22,6 +23,7 @@ const Dashboard          = lazy(() => import('./pages/Dashboard'));
 const Messages           = lazy(() => import('./pages/Messages'));
 const VendorDashboard    = lazy(() => import('./pages/VendorDashboard'));
 const AdminDashboard     = lazy(() => import('./pages/AdminDashboard'));
+const SuperAdminDashboard= lazy(() => import('./pages/SuperAdminDashboard'));
 const ServiceEdit        = lazy(() => import('./pages/ServiceEdit'));
 const UserEdit           = lazy(() => import('./pages/UserEdit'));
 const Notifications      = lazy(() => import('./pages/Notifications'));
@@ -35,74 +37,94 @@ const BookingDetail      = lazy(() => import('./pages/BookingDetail'));
 const CustomerProfile    = lazy(() => import('./pages/CustomerProfile'));
 const CategoryPage       = lazy(() => import('./pages/CategoryPage'));
 
+const DefaultSeo: React.FC = () => {
+  const { getSetting } = useSettings();
+  const siteName = getSetting('site_name', 'ToleMate');
+  const desc = getSetting('home_meta_description', 'Find trusted local service providers for home repairs, professional consulting, and more.');
+  return (
+    <Helmet titleTemplate={`%s | ${siteName}`} defaultTitle={siteName}>
+      <meta name="description" content={desc} />
+      <meta property="og:site_name" content={siteName} />
+      <meta name="robots" content="index, follow" />
+    </Helmet>
+  );
+};
+
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center">
     <div className="spinner" />
   </div>
 );
 
+function AppContent() {
+  return (
+    <SettingsProvider>
+      <Router>
+        <DefaultSeo />
+        <div className="min-h-screen flex flex-col bg-gray-50">
+          <Header />
+          <main className="flex-grow pb-16 md:pb-0">
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
+                {/* Public routes */}
+                <Route path="/" element={<Home />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/services" element={<Services />} />
+                <Route path="/services/:id" element={<ServicesDetail />} />
+                <Route path="/categories/:id" element={<CategoryPage />} />
+                <Route path="/vendors/:id" element={<VendorPublicProfile />} />
+
+                {/* Customer routes */}
+                <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['customer']}><Dashboard /></ProtectedRoute>} />
+                <Route path="/customer/profile" element={<ProtectedRoute allowedRoles={['customer']}><CustomerProfile /></ProtectedRoute>} />
+                <Route path="/bookings/:id" element={<ProtectedRoute><BookingDetail /></ProtectedRoute>} />
+                <Route path="/book/:id" element={<ProtectedRoute allowedRoles={['customer', 'admin', 'vendor']}><BookService /></ProtectedRoute>} />
+                <Route path="/checkout/:id" element={<ProtectedRoute allowedRoles={['customer', 'admin', 'vendor']}><Checkout /></ProtectedRoute>} />
+                <Route path="/post-request" element={<ProtectedRoute allowedRoles={['customer']}><PostRequest /></ProtectedRoute>} />
+                <Route path="/favorites" element={<ProtectedRoute allowedRoles={['customer']}><Favorites /></ProtectedRoute>} />
+
+                {/* Vendor routes */}
+                <Route path="/vendor-dashboard" element={<ProtectedRoute allowedRoles={['vendor']}><VendorDashboard /></ProtectedRoute>} />
+                <Route path="/profile" element={<ProtectedRoute allowedRoles={['vendor']}><VendorProfile /></ProtectedRoute>} />
+                <Route path="/services/create" element={<ProtectedRoute allowedRoles={['vendor', 'admin']}><ServiceEdit /></ProtectedRoute>} />
+                <Route path="/services/:id/edit" element={<ProtectedRoute allowedRoles={['vendor', 'admin']}><ServiceEdit /></ProtectedRoute>} />
+
+                {/* Admin routes */}
+                <Route path="/admin-dashboard" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminDashboard /></ProtectedRoute>} />
+                <Route path="/super-admin" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminDashboard /></ProtectedRoute>} />
+                <Route path="/admin/users/:id/edit" element={<ProtectedRoute allowedRoles={['admin']}><UserEdit /></ProtectedRoute>} />
+
+                {/* Shared authenticated routes */}
+                <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
+                <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
+                <Route path="/marketplace" element={<ProtectedRoute><Marketplace /></ProtectedRoute>} />
+
+                {/* Fallback */}
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </Suspense>
+          </main>
+          <Footer />
+          <MobileBottomNav />
+        </div>
+      </Router>
+    </SettingsProvider>
+  );
+}
+
 function App() {
   return (
     <HelmetProvider>
       <ToastProvider>
       <AuthProvider>
-        <SettingsProvider>
-          <Router>
-            <div className="min-h-screen flex flex-col bg-gray-50">
-              <Header />
-              <main className="flex-grow pb-16 md:pb-0">
-                <Suspense fallback={<PageLoader />}>
-                  <Routes>
-                    {/* Public routes */}
-                    <Route path="/" element={<Home />} />
-                    <Route path="/login" element={<Login />} />
-                    <Route path="/register" element={<Register />} />
-                    <Route path="/forgot-password" element={<ForgotPassword />} />
-                    <Route path="/reset-password" element={<ResetPassword />} />
-                    <Route path="/services" element={<Services />} />
-                    <Route path="/services/:id" element={<ServicesDetail />} />
-                    <Route path="/categories/:id" element={<CategoryPage />} />
-                    <Route path="/vendors/:id" element={<VendorPublicProfile />} />
-
-                    {/* Customer routes */}
-                    <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['customer']}><Dashboard /></ProtectedRoute>} />
-                    <Route path="/customer/profile" element={<ProtectedRoute allowedRoles={['customer']}><CustomerProfile /></ProtectedRoute>} />
-                    <Route path="/bookings/:id" element={<ProtectedRoute><BookingDetail /></ProtectedRoute>} />
-                    <Route path="/book/:id" element={<ProtectedRoute allowedRoles={['customer', 'admin', 'vendor']}><BookService /></ProtectedRoute>} />
-                    <Route path="/checkout/:id" element={<ProtectedRoute allowedRoles={['customer', 'admin', 'vendor']}><Checkout /></ProtectedRoute>} />
-                    <Route path="/post-request" element={<ProtectedRoute allowedRoles={['customer']}><PostRequest /></ProtectedRoute>} />
-                    <Route path="/favorites" element={<ProtectedRoute allowedRoles={['customer']}><Favorites /></ProtectedRoute>} />
-
-                    {/* Vendor routes */}
-                    <Route path="/vendor-dashboard" element={<ProtectedRoute allowedRoles={['vendor']}><VendorDashboard /></ProtectedRoute>} />
-                    <Route path="/profile" element={<ProtectedRoute allowedRoles={['vendor']}><VendorProfile /></ProtectedRoute>} />
-                    <Route path="/services/create" element={<ProtectedRoute allowedRoles={['vendor', 'admin']}><ServiceEdit /></ProtectedRoute>} />
-                    <Route path="/services/:id/edit" element={<ProtectedRoute allowedRoles={['vendor', 'admin']}><ServiceEdit /></ProtectedRoute>} />
-
-                    {/* Admin routes */}
-                    <Route path="/admin-dashboard" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard /></ProtectedRoute>} />
-                    <Route path="/admin/users/:id/edit" element={<ProtectedRoute allowedRoles={['admin']}><UserEdit /></ProtectedRoute>} />
-
-                    {/* Shared authenticated routes */}
-                    <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
-                    <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
-                    <Route path="/marketplace" element={<ProtectedRoute><Marketplace /></ProtectedRoute>} />
-
-                    {/* Fallback */}
-                    <Route path="*" element={<Navigate to="/" replace />} />
-                  </Routes>
-                </Suspense>
-              </main>
-              <Footer />
-              <MobileBottomNav />
-            </div>
-          </Router>
-        </SettingsProvider>
+        <AppContent />
       </AuthProvider>
       </ToastProvider>
     </HelmetProvider>
   );
 }
-
 export default App;
 

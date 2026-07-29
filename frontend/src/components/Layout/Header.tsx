@@ -6,6 +6,8 @@ import { useTranslation } from 'react-i18next';
 import { Menu, X, Globe, Heart, Bell, MessageCircle } from 'lucide-react';
 import { API_BASE } from '../../utils/config';
 
+interface MenuItem { id: number; label: string; path: string; icon?: string; children?: MenuItem[]; }
+
 const Header: React.FC = () => {
   const { t, i18n } = useTranslation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -16,6 +18,20 @@ const Header: React.FC = () => {
   const { user, isAuthenticated, logout } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const [navLinks, setNavLinks] = useState<MenuItem[]>([]);
+
+  useEffect(() => {
+    const fetchMenu = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const r = await fetch(`${API_BASE}/api/menus`, { headers });
+        if (r.ok) setNavLinks(await r.json());
+      } catch { }
+    };
+    fetchMenu();
+  }, [user]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -42,22 +58,6 @@ const Header: React.FC = () => {
   }, [isAuthenticated]);
 
   const siteName = getSetting('site_name', 'ToleMate');
-  const rawNavLinks = getSetting('nav_links', '[{"label": "Services", "path": "/services"}]');
-  
-  let navLinks: any[] = [];
-  try {
-    navLinks = JSON.parse(rawNavLinks);
-  } catch (e) {
-    navLinks = [{ label: "Services", path: "/services" }];
-  }
-
-  // Add Dynamic Links for Admin
-  if (user?.role === 'admin') {
-    const hasMarketplace = navLinks.some((l: any) => l.path === '/marketplace');
-    if (!hasMarketplace) {
-      navLinks.push({ label: "Marketplace", path: "/marketplace" });
-    }
-  }
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 10);
@@ -78,6 +78,7 @@ const Header: React.FC = () => {
 
   const getDashboardPath = () => {
     if (!user) return '/dashboard';
+    if (user.role === 'super_admin') return '/super-admin';
     if (user.role === 'admin') return '/admin-dashboard';
     if (user.role === 'vendor') return '/vendor-dashboard';
     return '/dashboard';

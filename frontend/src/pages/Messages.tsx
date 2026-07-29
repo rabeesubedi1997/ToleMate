@@ -2,6 +2,7 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Send, MessageCircle, Plus, ArrowLeft, CheckCheck } from 'lucide-react';
+import SeoHead from '../components/SeoHead';
 
 import { API_BASE } from '../utils/config';
 
@@ -437,7 +438,12 @@ const Messages: React.FC = () => {
     );
   };
 
-  return (
+  return (<>
+      <SeoHead
+        title="Messages"
+        description="Your conversations with service providers on ToleMate."
+        noIndex={true}
+      />
     <div className="h-[calc(100vh-4rem)] flex bg-white overflow-hidden">
 
       {/* â”€â”€ Sidebar â”€â”€ */}
@@ -625,6 +631,7 @@ const Messages: React.FC = () => {
         )}
       </div>
     </div>
+    </>
   );
 };
 

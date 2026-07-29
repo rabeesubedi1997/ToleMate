@@ -1,10 +1,10 @@
 ﻿import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
+import SeoHead, { breadcrumbJsonLd } from '../components/SeoHead';
 import { Star, Shield, MessageCircle, CheckCircle, ChevronRight, Clock, Heart, ChevronLeft, ChevronRight as ChevronRightIcon, Share2 } from 'lucide-react';
 import { getServiceImage } from '../utils/serviceImage';
 import { useSettings } from '../context/SettingsContext';
-import { API_BASE } from '../utils/config';
+import { API_BASE, FALLBACK_IMAGE } from '../utils/config';
 import { ServiceDetailSkeleton } from '../components/Skeleton';
 
 const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -109,13 +109,20 @@ const ServicesDetail: React.FC = () => {
 
   return (
     <>
-      <Helmet>
-        <title>{service.name} – {service.vendor?.business_name} | {siteName}</title>
-        <meta name="description" content={`${service.description?.slice(0, 155)}...`} />
-        <meta property="og:title" content={service.name} />
-        <meta property="og:description" content={service.description?.slice(0, 200)} />
-        <meta property="og:type" content="website" />
-      </Helmet>
+      <SeoHead
+        title={`${service.name} – ${service.vendor?.business_name || ''}`}
+        description={`${service.description?.slice(0, 155)}...`}
+        keywords={`${service.name}, ${service.category?.name || 'services'}, ${service.vendor?.business_name || ''}`}
+        ogTitle={service.name}
+        ogDescription={service.description?.slice(0, 200)}
+        ogImage={getServiceImage(service)}
+        ogType="product"
+        canonicalUrl={window.location.href}
+        jsonLd={breadcrumbJsonLd([
+          { name: 'Services', url: window.location.origin + '/services' },
+          { name: service.name, url: window.location.href },
+        ])}
+      />
     <div className="min-h-screen py-8 animate-fade-in">
       <div className="container-custom max-w-5xl">
         {/* Breadcrumb + favorite */}
@@ -155,7 +162,7 @@ const ServicesDetail: React.FC = () => {
                       alt={`${service.name} ${clampedIdx + 1}`}
                       loading="lazy"
                       className="w-full h-full object-cover transition-opacity duration-300"
-                      onError={e => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1521791136064-7986c2920216?w=600&q=80'; }}
+                      onError={e => { (e.target as HTMLImageElement).src = FALLBACK_IMAGE; }}
                     />
                     {images.length > 1 && (
                       <>
@@ -396,7 +403,7 @@ const ServicesDetail: React.FC = () => {
                       <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0">
                         <img src={getServiceImage(s)} alt={s.name} loading="lazy"
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          onError={e => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1521791136064-7986c2920216?w=200&q=70'; }} />
+                          onError={e => { (e.target as HTMLImageElement).src = FALLBACK_IMAGE; }} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 line-clamp-1 group-hover:text-primary-600 transition-colors">{s.name}</p>

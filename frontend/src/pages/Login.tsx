@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
 import { Mail, Lock } from 'lucide-react';
+import SeoHead from '../components/SeoHead';
 import { API_BASE } from '../utils/config';
 
 const Login: React.FC = () => {
@@ -41,6 +42,8 @@ const Login: React.FC = () => {
       const from = (location.state as any)?.from?.pathname;
       if (from && from !== '/login') {
         navigate(from, { replace: true });
+      } else if (data.user.role === 'super_admin') {
+        navigate('/super-admin');
       } else if (data.user.role === 'admin') {
         navigate('/admin-dashboard');
       } else if (data.user.role === 'vendor') {
@@ -56,6 +59,12 @@ const Login: React.FC = () => {
   };
 
   return (
+    <>
+      <SeoHead
+        title="Login"
+        description="Sign in to your ToleMate account to book services or manage your listings."
+        canonicalUrl={window.location.href}
+      />
     <div className="min-h-[80vh] flex items-center justify-center py-12 px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
@@ -138,7 +147,9 @@ const Login: React.FC = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
+
 
 export default Login;

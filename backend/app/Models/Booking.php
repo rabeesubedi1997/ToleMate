@@ -20,6 +20,13 @@ class Booking extends Model
         'scheduled_time',
         'lat',
         'lng',
+        'payment_status',
+        'payment_method',
+        'transaction_id',
+        'khalti_idx',
+        'payment_data',
+        'paid_at',
+        'released_at',
     ];
 
     protected $casts = [

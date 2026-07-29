@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Search, Star, ChevronRight } from 'lucide-react';
-import { API_BASE } from '../utils/config';
+import { API_BASE, FALLBACK_IMAGE, assetUrl } from '../utils/config';
+import SeoHead from '../components/SeoHead';
 
 const CategoryPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -54,6 +55,12 @@ const CategoryPage: React.FC = () => {
   });
 
   return (
+    <>
+      <SeoHead
+        title={`${category?.name || 'Category'} Services`}
+        description={`Browse and book ${category?.name || 'local'} services on ToleMate. Find verified professionals near you.`}
+        canonicalUrl={window.location.href}
+      />
     <div className="min-h-screen py-8 bg-gray-50">
       <div className="container-custom">
 
@@ -111,7 +118,7 @@ const CategoryPage: React.FC = () => {
                     className="card overflow-hidden hover:shadow-lg transition-shadow group block">
                     <div className="relative h-44 bg-gradient-to-br from-primary-100 to-primary-200 overflow-hidden">
                       {img ? (
-                        <img src={`http://localhost:8001${img}`} alt={service.name}
+                        <img src={assetUrl(img)} alt={service.name}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
@@ -161,6 +168,7 @@ const CategoryPage: React.FC = () => {
 
       </div>
     </div>
+    </>
   );
 };
 

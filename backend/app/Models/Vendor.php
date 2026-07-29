@@ -5,11 +5,19 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class Vendor extends Model
 {
     /** All features that can be enabled/disabled per vendor */
     public const ALL_FEATURES = ['bookings', 'messaging', 'services', 'availability_edit', 'social_links', 'reviews'];
+
+    /** Per-plan limits */
+    public const PLAN_LIMITS = [
+        'free' => ['max_services' => 3, 'max_images_per_service' => 3, 'max_bundles' => 0, 'max_portfolio_items' => 5],
+        'basic' => ['max_services' => 10, 'max_images_per_service' => 6, 'max_bundles' => 3, 'max_portfolio_items' => 15],
+        'pro' => ['max_services' => 50, 'max_images_per_service' => 10, 'max_bundles' => 10, 'max_portfolio_items' => 50],
+    ];
 
     protected $fillable = [
         'user_id',
@@ -19,6 +27,7 @@ class Vendor extends Model
         'service_area_radius',
         'service_radius_km',
         'is_verified',
+        'kyc_status',
         'is_featured',
         'subscription_plan',
         'website',
@@ -59,6 +68,16 @@ class Vendor extends Model
         return $this->hasMany(VendorFeature::class);
     }
 
+    public function bundles(): HasMany
+    {
+        return $this->hasMany(ServiceBundle::class);
+    }
+
+    public function portfolios(): HasMany
+    {
+        return $this->hasMany(VendorPortfolio::class);
+    }
+
     /**
      * Check if a feature is enabled for this vendor.
      * Defaults to true (all features on) if no DB record exists.
@@ -66,6 +85,33 @@ class Vendor extends Model
     public function hasFeature(string $feature): bool
     {
         $row = $this->vendorFeatures()->where('feature', $feature)->first();
-        return $row ? $row->is_enabled : true;
+        return $row ? $row->is_enabled : true;  // defaults to TRUE
+    }
+
+    public function getPlanLimit(string $key): int
+    {
+        $plan = $this->subscription_plan ?? 'free';
+        return self::PLAN_LIMITS[$plan][$key] ?? self::PLAN_LIMITS['free'][$key] ?? 0;
+    }
+
+    public function canCreateService(): bool
+    {
+        $max = $this->getPlanLimit('max_services');
+        $current = $this->services()->count();
+        return $current < $max;
+    }
+
+    public function canCreateBundle(): bool
+    {
+        $max = $this->getPlanLimit('max_bundles');
+        $current = $this->bundles()->count();
+        return $current < $max;
+    }
+
+    public function canAddPortfolioItem(): bool
+    {
+        $max = $this->getPlanLimit('max_portfolio_items');
+        $current = $this->portfolios()->count();
+        return $current < $max;
     }
 }

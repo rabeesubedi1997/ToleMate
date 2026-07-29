@@ -3,7 +3,8 @@ import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Calendar, Clock, MessageSquare, Star, Package, CheckCircle, ArrowRight, MapPin } from 'lucide-react';
 import { getServiceImage } from '../utils/serviceImage';
-import { API_BASE } from '../utils/config';
+import { API_BASE, FALLBACK_IMAGE } from '../utils/config';
+import SeoHead from '../components/SeoHead';
 
 const WhatsAppIcon = () => (
   <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current" xmlns="http://www.w3.org/2000/svg">
@@ -231,6 +232,12 @@ const BookService: React.FC = () => {
   );
 
   return (
+    <>
+      <SeoHead
+        title="Book a Service"
+        description="Schedule and book a service with a verified professional on ToleMate."
+        noIndex={true}
+      />
     <div className="min-h-screen py-8 bg-gray-50 animate-fade-in">
       <div className="container-custom max-w-3xl px-4">
 
@@ -256,7 +263,7 @@ const BookService: React.FC = () => {
                   src={getServiceImage(service)}
                   alt={service.name}
                   className="w-full h-full object-cover"
-                  onError={e => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1521791136064-7986c2920216?w=400&q=70'; }}
+                  onError={e => { (e.target as HTMLImageElement).src = FALLBACK_IMAGE; }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
                 <span className="absolute bottom-2 left-3 text-xs text-white font-medium bg-black/30 px-2 py-0.5 rounded-full">
@@ -444,6 +451,7 @@ const BookService: React.FC = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 

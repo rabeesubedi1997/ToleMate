@@ -1,7 +1,8 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Globe, AtSign, Share2, Camera, Upload, Lock, Clock, Save } from 'lucide-react';
-import { API_BASE } from '../utils/config';
+import { API_BASE, assetUrl } from '../utils/config';
+import SeoHead from '../components/SeoHead';
 import { useToast } from '../context/ToastContext';
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -109,6 +110,12 @@ const VendorProfile: React.FC = () => {
   if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="spinner"></div></div>;
 
   return (
+    <>
+      <SeoHead
+        title="Vendor Profile Settings"
+        description="Manage your business profile, availability, and services on ToleMate."
+        noIndex={true}
+      />
     <div className="min-h-screen py-8">
       <div className="container-custom max-w-2xl">
         <div className="flex items-center justify-between mb-6">
@@ -126,7 +133,7 @@ const VendorProfile: React.FC = () => {
           <div className="flex items-center gap-4 mb-6 pb-6 border-b border-gray-100">
             <div className="relative">
               {profile.avatar ? (
-                <img src={`http://localhost:8001${profile.avatar}`} alt="Avatar" className="w-20 h-20 rounded-2xl object-cover" />
+                <img src={assetUrl(profile.avatar)} alt="Avatar" className="w-20 h-20 rounded-2xl object-cover" />
               ) : (
                 <div className="w-20 h-20 rounded-2xl bg-primary-100 flex items-center justify-center">
                   <span className="text-3xl font-bold text-primary-600">{profile.business_name?.charAt(0) || 'V'}</span>
@@ -276,6 +283,7 @@ const VendorProfile: React.FC = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 

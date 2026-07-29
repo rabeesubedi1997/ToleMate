@@ -2,6 +2,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useSettings } from '../context/SettingsContext';
 import { User, Briefcase } from 'lucide-react';
+import SeoHead from '../components/SeoHead';
 import { API_BASE } from '../utils/config';
 
 const Register: React.FC = () => {
@@ -63,6 +64,12 @@ const Register: React.FC = () => {
   };
 
   return (
+    <>
+      <SeoHead
+        title="Create an Account"
+        description="Join ToleMate as a customer or vendor. Start booking or offering services today."
+        canonicalUrl={window.location.href}
+      />
     <div className="min-h-[80vh] flex items-center justify-center py-12 px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
@@ -162,6 +169,7 @@ const Register: React.FC = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 

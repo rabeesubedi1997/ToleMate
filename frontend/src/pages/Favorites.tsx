@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Heart, Star, Trash2, Search, MapPin, CheckCircle } from 'lucide-react';
 import { getServiceImage } from '../utils/serviceImage';
-import { API_BASE } from '../utils/config';
+import { API_BASE, FALLBACK_IMAGE } from '../utils/config';
+import SeoHead from '../components/SeoHead';
 import { ServiceCardSkeleton } from '../components/Skeleton';
 
 const Favorites: React.FC = () => {
@@ -81,6 +82,12 @@ const Favorites: React.FC = () => {
   };
 
   return (
+    <>
+      <SeoHead
+        title="Favorites"
+        description="Your saved services and vendors on ToleMate."
+        noIndex={true}
+      />
     <div className="min-h-screen py-8">
       <div className="container-custom max-w-4xl">
         {/* Header */}
@@ -148,7 +155,7 @@ const Favorites: React.FC = () => {
                       alt={service.name}
                       loading="lazy"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      onError={e => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1521791136064-7986c2920216?w=600&q=80'; }}
+                      onError={e => { (e.target as HTMLImageElement).src = FALLBACK_IMAGE; }}
                     />
                     <span className="absolute top-3 left-3 text-xs bg-white/90 text-gray-700 px-2.5 py-1 rounded-full font-medium shadow-sm">
                       {service.category?.name}
@@ -231,6 +238,7 @@ const Favorites: React.FC = () => {
         )}
       </div>
     </div>
+    </>
   );
 };
 

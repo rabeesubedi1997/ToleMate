@@ -1,6 +1,7 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Lock, Eye, EyeOff, CheckCircle2, ArrowLeft } from 'lucide-react';
+import { Lock, Eye, EyeOff, CheckCircle2, ArrowLeft } from 'lucide-react';
+import SeoHead from '../components/SeoHead';
 import { API_BASE } from '../utils/config';
 
 const ResetPassword: React.FC = () => {
@@ -93,6 +94,12 @@ const ResetPassword: React.FC = () => {
   };
 
   return (
+    <>
+      <SeoHead
+        title="Reset Password"
+        description="Set a new password for your ToleMate account."
+        noIndex={true}
+      />
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-12">
       <div className="w-full max-w-md">
         {/* Logo */}
@@ -228,6 +235,7 @@ const ResetPassword: React.FC = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 

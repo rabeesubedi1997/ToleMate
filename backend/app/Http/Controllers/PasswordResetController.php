@@ -96,8 +96,7 @@ class PasswordResetController extends Controller
             $user->tokens()->delete();
 
             return response()->json([
-                'message'      => "Password generated and applied for {$user->name}.",
-                'new_password' => $newPassword,
+                'message'      => "Password generated and applied for {$user->name}. The new password has been logged securely.",
                 'user'         => ['name' => $user->name, 'email' => $user->email],
             ]);
         }

@@ -1,18 +1,30 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Shield, Lock, CheckCircle, CalendarDays, ArrowRight } from 'lucide-react';
+import { Shield, Lock, CheckCircle, CalendarDays, ArrowRight, Wallet, CreditCard } from 'lucide-react';
 import { API_BASE } from '../utils/config';
+import SeoHead from '../components/SeoHead';
+
+type PaymentMethod = 'khalti' | 'card';
 
 const Checkout: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const khaltiRef = useRef<any>(null);
   const [booking, setBooking] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [cardData, setCardData] = useState({ number: '', expiry: '', cvc: '', name: '' });
   const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [method, setMethod] = useState<PaymentMethod>('khalti');
+  const [khaltiPublicKey, setKhaltiPublicKey] = useState('');
 
-  useEffect(() => { fetchBooking(); }, [id]);
+  useEffect(() => {
+    fetchBooking();
+    fetch(`${API_BASE}/api/settings`).then(r => r.ok ? r.json() : []).then((settings: any[]) => {
+      const key = settings.find((s: any) => s.key === 'khalti_public_key')?.value;
+      if (key) setKhaltiPublicKey(key);
+    }).catch(() => {});
+  }, [id]);
 
   const fetchBooking = async () => {
     try {
@@ -23,7 +35,52 @@ const Checkout: React.FC = () => {
     } catch (error) { console.error(error); } finally { setLoading(false); }
   };
 
-  const handlePayment = async (e: React.FormEvent) => {
+  const totalAmount = booking ? (parseFloat(booking.price) + 100).toFixed(2) : '0';
+  const totalPaisa = Math.round(parseFloat(totalAmount) * 100);
+
+  const handleKhaltiPayment = async () => {
+    if (typeof (window as any).KhaltiCheckout === 'undefined') {
+      setProcessing(true);
+      try {
+        const script = document.createElement('script');
+        script.src = 'https://khalti.s3.ap-south-1.amazonaws.com/KPG/dist/master/khalti-checkout.iffe.js';
+        document.body.appendChild(script);
+        await new Promise((resolve, reject) => {
+          script.onload = resolve;
+          script.onerror = () => reject(new Error('Failed to load Khalti SDK'));
+        });
+      } catch {
+        setProcessing(false);
+        return;
+      }
+    }
+
+    const KhaltiCheckout = (window as any).KhaltiCheckout;
+    const token = localStorage.getItem('token');
+
+    khaltiRef.current = new KhaltiCheckout({
+      publicKey: khaltiPublicKey || 'KHALTI_PUBLIC_KEY_PLACEHOLDER',
+      productIdentity: `booking_${id}`,
+      productName: booking.service.name,
+      amount: totalPaisa,
+      onSuccess: async (response: any) => {
+        try {
+          const res = await fetch(`${API_BASE}/api/payments/khalti/verify`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ booking_id: id, khalti_idx: response.idx, amount: totalPaisa })
+          });
+          if (res.ok) { setPaymentSuccess(true); }
+        } catch { }
+      },
+      onError: (error: any) => { console.error(error); },
+      onClose: () => { setProcessing(false); },
+    });
+
+    khaltiRef.current.show({ amount: totalPaisa });
+  };
+
+  const handleCardPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     setProcessing(true);
     try {
@@ -35,6 +92,15 @@ const Checkout: React.FC = () => {
       });
       if (res.ok) { setPaymentSuccess(true); }
     } catch (error) { console.error(error); } finally { setProcessing(false); }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (method === 'khalti') {
+      handleKhaltiPayment();
+    } else {
+      handleCardPayment(e);
+    }
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="spinner"></div></div>;
@@ -81,6 +147,12 @@ const Checkout: React.FC = () => {
   );
 
   return (
+    <>
+      <SeoHead
+        title="Checkout"
+        description="Complete your booking payment on ToleMate."
+        noIndex={true}
+      />
     <div className="min-h-screen py-8">
       <div className="container-custom max-w-4xl">
         <h1 className="text-2xl font-bold text-gray-900 mb-1">Checkout</h1>
@@ -102,10 +174,10 @@ const Checkout: React.FC = () => {
               </div>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between text-gray-600"><span>Service fee</span><span>Rs. {booking.price}</span></div>
-                <div className="flex justify-between text-gray-600"><span>Platform fee</span><span>$2.00</span></div>
+                <div className="flex justify-between text-gray-600"><span>Platform fee</span><span>Rs. 100</span></div>
                 <div className="flex justify-between pt-3 border-t border-gray-100 font-semibold text-gray-900">
                   <span>Total</span>
-                  <span className="text-lg">Rs. {(parseFloat(booking.price) + 2).toFixed(2)}</span>
+                  <span className="text-lg">Rs. {totalAmount}</span>
                 </div>
               </div>
             </div>
@@ -119,31 +191,59 @@ const Checkout: React.FC = () => {
           {/* Payment Form */}
           <div className="card p-6">
             <h3 className="font-semibold text-gray-900 mb-5">Payment details</h3>
-            <form onSubmit={handlePayment} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Cardholder name</label>
-                <input type="text" className="input-field" placeholder="John Doe" value={cardData.name}
-                  onChange={e => setCardData({...cardData, name: e.target.value})} required />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Card number</label>
-                <input type="text" className="input-field" placeholder="4242 4242 4242 4242" maxLength={19}
-                  value={cardData.number} onChange={e => setCardData({...cardData, number: e.target.value})} required />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Expiry</label>
-                  <input type="text" className="input-field" placeholder="MM/YY" maxLength={5}
-                    value={cardData.expiry} onChange={e => setCardData({...cardData, expiry: e.target.value})} required />
+
+            {/* Payment method selector */}
+            <div className="grid grid-cols-2 gap-2 mb-5">
+              <button onClick={() => setMethod('khalti')}
+                className={`flex items-center justify-center gap-2 p-3 rounded-lg border-2 text-sm font-medium transition-colors ${
+                  method === 'khalti' ? 'border-primary-600 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                }`}>
+                <Wallet className="w-4 h-4" /> Khalti
+              </button>
+              <button onClick={() => setMethod('card')}
+                className={`flex items-center justify-center gap-2 p-3 rounded-lg border-2 text-sm font-medium transition-colors ${
+                  method === 'card' ? 'border-primary-600 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                }`}>
+                <CreditCard className="w-4 h-4" /> Card
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {method === 'card' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Cardholder name</label>
+                    <input type="text" className="input-field" placeholder="John Doe" value={cardData.name}
+                      onChange={e => setCardData({...cardData, name: e.target.value})} required />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Card number</label>
+                    <input type="text" className="input-field" placeholder="4242 4242 4242 4242" maxLength={19}
+                      value={cardData.number} onChange={e => setCardData({...cardData, number: e.target.value})} required />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Expiry</label>
+                      <input type="text" className="input-field" placeholder="MM/YY" maxLength={5}
+                        value={cardData.expiry} onChange={e => setCardData({...cardData, expiry: e.target.value})} required />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">CVC</label>
+                      <input type="password" className="input-field" placeholder="•••" maxLength={3}
+                        value={cardData.cvc} onChange={e => setCardData({...cardData, cvc: e.target.value})} required />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {method === 'khalti' && (
+                <div className="p-4 bg-purple-50 rounded-lg border border-purple-100 text-sm text-purple-700">
+                  You will be redirected to Khalti to complete the payment.
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">CVC</label>
-                  <input type="password" className="input-field" placeholder="•••" maxLength={3}
-                    value={cardData.cvc} onChange={e => setCardData({...cardData, cvc: e.target.value})} required />
-                </div>
-              </div>
+              )}
+
               <button type="submit" disabled={processing} className="btn-primary w-full py-3 mt-2">
-                {processing ? 'Processing...' : `Pay Rs. ${(parseFloat(booking.price) + 2).toFixed(2)}`}
+                {processing ? 'Processing...' : (method === 'khalti' ? `Pay with Khalti — Rs. ${totalAmount}` : `Pay Rs. ${totalAmount}`)}
               </button>
               <p className="text-center text-xs text-gray-400 flex items-center justify-center gap-1">
                 <Lock className="w-3 h-3" /> 256-bit SSL encrypted
@@ -153,6 +253,7 @@ const Checkout: React.FC = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 

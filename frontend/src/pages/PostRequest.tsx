@@ -2,6 +2,7 @@
 import { useNavigate, Link } from 'react-router-dom';
 import { FileText, Inbox, Handshake, Zap, Clock, Calendar, AlarmClock, CheckCircle, ArrowRight } from 'lucide-react';
 import { API_BASE } from '../utils/config';
+import SeoHead from '../components/SeoHead';
 
 interface Category { id: number; name: string; }
 
@@ -92,7 +93,12 @@ const PostRequest: React.FC = () => {
     </div>
   );
 
-  return (
+  return (<>
+      <SeoHead
+        title="Post a Service Request"
+        description="Tell us what service you need and get quotes from verified professionals on ToleMate."
+        noIndex={true}
+      />
     <div className="min-h-screen py-8">
       <div className="container-custom max-w-2xl">
         <div className="text-center mb-8">
@@ -186,7 +192,7 @@ const PostRequest: React.FC = () => {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Max budget ($)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Max budget (Rs.)</label>
                     <input type="number" className="input-field" placeholder="Leave blank if unsure"
                       value={form.budget} onChange={e => set('budget', e.target.value)} min="0" step="0.01" />
                   </div>
@@ -233,6 +239,7 @@ const PostRequest: React.FC = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 

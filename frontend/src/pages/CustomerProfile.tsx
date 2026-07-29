@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, User, Mail, Phone, MapPin, CalendarDays, Star, DollarSign } from 'lucide-react';
 import { API_BASE } from '../utils/config';
 import { useToast } from '../context/ToastContext';
+import SeoHead from '../components/SeoHead';
 
 const CustomerProfile: React.FC = () => {
   const navigate = useNavigate();
@@ -68,6 +69,12 @@ const CustomerProfile: React.FC = () => {
   );
 
   return (
+    <>
+      <SeoHead
+        title="My Profile"
+        description="Manage your ToleMate customer profile and preferences."
+        noIndex={true}
+      />
     <div className="min-h-screen py-8 bg-gray-50">
       <div className="container-custom max-w-2xl">
 
@@ -154,6 +161,7 @@ const CustomerProfile: React.FC = () => {
 
       </div>
     </div>
+    </>
   );
 };
 

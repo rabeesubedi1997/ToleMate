@@ -19,15 +19,15 @@ class ServiceController extends Controller
         $query = Service::with(['category', 'vendor', 'images']);
 
         if ($user) {
-            if ($user->role === 'admin') {
-                // Admin sees all
+            if (in_array($user->role, ['admin', 'super_admin'])) {
+                // Admin/super_admin sees all
             } elseif ($user->role === 'vendor') {
                 $query->where('vendor_id', $user->vendor->id);
             } else {
-                $query->where('is_active', true);
+                $query->where('status', 'approved')->where('is_active', true);
             }
         } else {
-            $query->where('is_active', true);
+            $query->where('status', 'approved')->where('is_active', true);
         }
 
         if ($request->category_id) {
@@ -51,11 +51,10 @@ class ServiceController extends Controller
 
         if ($request->lat && $request->lng && $request->radius) {
             $query->whereHas('vendor', function ($q) use ($request) {
-                $q->selectRaw(
-                    '(6371 * acos(cos(radians(?)) * cos(radians(lat)) * cos(radians(lng) - radians(?)) + sin(radians(?)) * sin(radians(lat)))) AS distance',
-                    [$request->lat, $request->lng, $request->lat]
-                )
-                    ->having('distance', '<=', $request->radius);
+                $q->whereRaw(
+                    '(6371 * acos(cos(radians(?)) * cos(radians(lat)) * cos(radians(lng) - radians(?)) + sin(radians(?)) * sin(radians(lat)))) <= ?',
+                    [$request->lat, $request->lng, $request->lat, $request->radius]
+                );
             });
         }
 
@@ -64,12 +63,24 @@ class ServiceController extends Controller
         return response()->json($services);
     }
 
-    public function show($id)
+    public function show(Request $request, $id)
     {
-        $service = Service::with(['category', 'vendor.user:id,phone', 'images', 'packages'])
-            ->where('id', $id)
-            ->where('is_active', true)
-            ->first();
+        $user = $request->user('sanctum');
+        $query = Service::with(['category', 'vendor.user:id,phone', 'images', 'packages'])
+            ->where('id', $id);
+
+        if ($user && in_array($user->role, ['admin', 'super_admin'])) {
+            // Admin/super_admin sees any service
+        } elseif ($user && $user->role === 'vendor') {
+            $query->where(function ($q) use ($user) {
+                $q->where('is_active', true)
+                  ->orWhere('vendor_id', $user->vendor->id);
+            });
+        } else {
+            $query->where('status', 'approved')->where('is_active', true);
+        }
+
+        $service = $query->first();
 
         if (!$service) {
             return response()->json(['message' => 'Service not found'], 404);
@@ -82,7 +93,7 @@ class ServiceController extends Controller
     {
         $user = $request->user();
 
-        if ($user->role !== 'vendor' && $user->role !== 'admin') {
+        if (!in_array($user->role, ['vendor', 'admin', 'super_admin'])) {
             return response()->json(['message' => 'Only vendors and admins can create services'], 403);
         }
 
@@ -105,8 +116,7 @@ class ServiceController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        if ($user->role === 'admin') {
-            // Admin can create a service for any vendor by providing vendor_id
+        if (in_array($user->role, ['admin', 'super_admin'])) {
             $vendorId = $request->vendor_id;
             $vendor = $vendorId ? Vendor::find($vendorId) : null;
             if (!$vendor) {
@@ -117,7 +127,13 @@ class ServiceController extends Controller
             if (!$vendor) {
                 return response()->json(['message' => 'Vendor profile not found'], 404);
             }
+            if (!$vendor->canCreateService()) {
+                $max = $vendor->getPlanLimit('max_services');
+                return response()->json(['message' => "Your {$vendor->subscription_plan} plan allows a maximum of {$max} services."], 403);
+            }
         }
+
+        $isAdminCreate = in_array($user->role, ['admin', 'super_admin']);
 
         $service = Service::create([
             'vendor_id' => $vendor->id,
@@ -128,6 +144,8 @@ class ServiceController extends Controller
             'price' => $request->price,
             'sale_price' => $request->sale_price,
             'sale_ends_at' => $request->sale_ends_at,
+            'status' => $isAdminCreate ? 'approved' : 'pending',
+            'is_active' => $isAdminCreate,
             'radius' => $request->radius ?? $vendor->service_area_radius,
             'tags' => $request->tags,
             'cancellation_policy' => $request->cancellation_policy,
@@ -152,7 +170,7 @@ class ServiceController extends Controller
     {
         $user = $request->user();
 
-        if ($user->role !== 'vendor' && $user->role !== 'admin') {
+        if (!in_array($user->role, ['vendor', 'admin', 'super_admin'])) {
             return response()->json(['message' => 'Only vendors and admins can update services'], 403);
         }
 
@@ -162,7 +180,7 @@ class ServiceController extends Controller
             return response()->json(['message' => 'Service not found'], 404);
         }
 
-        if ($user->role === 'vendor' && $service->vendor->user_id !== $user->id) {
+        if (in_array($user->role, ['vendor']) && $service->vendor->user_id !== $user->id) {
             return response()->json(['message' => 'Unauthorized. This is not your service.'], 403);
         }
 
@@ -186,9 +204,16 @@ class ServiceController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        // Admin can reassign a service to a different vendor
-        if ($user->role === 'admin' && $request->has('vendor_id')) {
+        // Admin/super_admin can reassign a service to a different vendor
+        if (in_array($user->role, ['admin', 'super_admin']) && $request->has('vendor_id')) {
             $service->vendor_id = $request->vendor_id;
+        }
+
+        // When a vendor edits, reset to pending for re-approval
+        if ($user->role === 'vendor' && $service->status === 'approved') {
+            $service->status = 'pending';
+            $service->is_active = false;
+            $service->rejection_reason = null;
         }
 
         $service->update($request->only([
@@ -228,7 +253,7 @@ class ServiceController extends Controller
     {
         $user = $request->user();
 
-        if ($user->role !== 'vendor' && $user->role !== 'admin') {
+        if (!in_array($user->role, ['vendor', 'admin', 'super_admin'])) {
             return response()->json(['message' => 'Only vendors and admins can delete services'], 403);
         }
 
