@@ -3,7 +3,8 @@ import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Calendar, Clock, MessageSquare, Star, Package, CheckCircle, ArrowRight, MapPin } from 'lucide-react';
 import { getServiceImage } from '../utils/serviceImage';
-import { API_BASE, FALLBACK_IMAGE } from '../utils/config';
+import api from '../utils/api';
+import { FALLBACK_IMAGE } from '../utils/config';
 import SeoHead from '../components/SeoHead';
 
 const WhatsAppIcon = () => (
@@ -59,24 +60,21 @@ const BookService: React.FC = () => {
   // Prefill address from user profile
   useEffect(() => {
     if (!token) return;
-    fetch(`${API_BASE}/api/user`, { headers: { 'Authorization': `Bearer ${token}` } })
-      .then(r => r.ok ? r.json() : null)
-      .then(u => { if (u?.address) setAddress(u.address); })
+    api.get('/user')
+      .then(({ data }) => { if (data?.address) setAddress(data.address); })
       .catch(() => {});
   }, [token]);
 
   useEffect(() => {
     if (!id) { setError('No service ID provided'); return; }
-    fetch(`${API_BASE}/api/services/${id}`)
-      .then(r => r.ok ? r.json() : Promise.reject(r.status))
-      .then(data => {
+    api.get(`/services/${id}`)
+      .then(({ data }) => {
         const svc = data.service || data;
         setService(svc);
         // Fetch vendor availability
         if (svc.vendor_id) {
-          fetch(`${API_BASE}/api/vendors/${svc.vendor_id}/availability`)
-            .then(r => r.ok ? r.json() : null)
-            .then(d => { if (d?.availability) setAvailability(d.availability); })
+          api.get(`/vendors/${svc.vendor_id}/availability`)
+            .then(({ data: d }) => { if (d?.availability) setAvailability(d.availability); })
             .catch(() => {});
         }
       })
@@ -107,16 +105,10 @@ const BookService: React.FC = () => {
     setCouponData(null);
     try {
       const price = service?.price ? Number(service.price) : 0;
-      const res = await fetch(`${API_BASE}/api/coupons/apply`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
-        body: JSON.stringify({ code: couponCode.trim(), amount: price }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setCouponError(data.message || 'Invalid coupon.'); return; }
-      setCouponData(data);
-    } catch {
-      setCouponError('Failed to apply coupon.');
+      const res = await api.post('/coupons/apply', { code: couponCode.trim(), amount: price });
+      setCouponData(res.data);
+    } catch (err: any) {
+      setCouponError(err.response?.data?.message || 'Failed to apply coupon.');
     } finally {
       setCouponLoading(false);
     }
@@ -132,43 +124,30 @@ const BookService: React.FC = () => {
     try {
       const scheduledTime = selectedSlot ? `${date} ${selectedSlot}:00` : `${date} 09:00:00`;
 
-      const response = await fetch(`${API_BASE}/api/bookings`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({
-          service_id: id,
-          booking_type: 'instant',
-          message,
-          address: address || undefined,
-          scheduled_time: scheduledTime,
-          ...(packageId ? { package_id: Number(packageId) } : {}),
-        }),
+      const response = await api.post('/bookings', {
+        service_id: id,
+        booking_type: 'instant',
+        message,
+        address: address || undefined,
+        scheduled_time: scheduledTime,
+        ...(packageId ? { package_id: Number(packageId) } : {}),
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        setBookingSuccess({
-          service: service?.name,
-          vendor: service?.vendor?.business_name,
-          date: date,
-          slot: selectedSlot || '09:00',
-          price: packagePrice || service?.price,
-          packageName,
-          bookingId: data.booking?.id || data.id,
-        });
-      } else {
-        const err = await response.json();
-        const msg = err.message
-          || (err.errors ? Object.values(err.errors as Record<string, string[]>).flat().join(' ') : null)
-          || 'Booking failed. Please try again.';
-        setError(msg);
-      }
-    } catch {
-      setError('Could not connect to the server. Please try again.');
+      setBookingSuccess({
+        service: service?.name,
+        vendor: service?.vendor?.business_name,
+        date: date,
+        slot: selectedSlot || '09:00',
+        price: packagePrice || service?.price,
+        packageName,
+        bookingId: response.data.booking?.id || response.data.id,
+      });
+    } catch (err: any) {
+      const errData = err.response?.data;
+      const msg = errData?.message
+        || (errData?.errors ? Object.values(errData.errors as Record<string, string[]>).flat().join(' ') : null)
+        || 'Could not connect to the server. Please try again.';
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -299,9 +278,9 @@ const BookService: React.FC = () => {
                     <p className="text-xs text-gray-400">Service Provider</p>
                   </div>
                 </div>
-                {service.vendor?.user?.phone && (
+                {service.vendor?.whatsapp_enabled && (service.vendor?.whatsapp_number || service.vendor?.user?.phone) && (
                   <a
-                    href={`https://wa.me/${fmtWA(service.vendor.user.phone)}?text=${encodeURIComponent(`Hi! I'd like to book: ${service.name}`)}`}
+                    href={`https://wa.me/${fmtWA(service.vendor.whatsapp_number || service.vendor?.user?.phone)}?text=${encodeURIComponent(`Hi! I'd like to book: ${service.name}`)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="mt-3 flex items-center justify-center gap-1.5 w-full py-2 bg-[#25D366] hover:bg-[#1ebe5c] text-white rounded-lg text-xs font-medium transition-colors"

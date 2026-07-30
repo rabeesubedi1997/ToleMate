@@ -3,8 +3,10 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import SeoHead from '../components/SeoHead';
 import { Search, SlidersHorizontal, MapPin, Star, X, ChevronDown, ArrowUpDown, LayoutGrid, List, Map, Heart, LocateFixed, Clock } from 'lucide-react';
 import { getServiceImage } from '../utils/serviceImage';
-import { API_BASE, FALLBACK_IMAGE } from '../utils/config';
+import { FALLBACK_IMAGE } from '../utils/config';
+import api from '../utils/api';
 import ServiceMapView from '../components/ServiceMapView';
+import { serviceUrl } from '../utils/slug';
 import { ServicesGridSkeleton } from '../components/Skeleton';
 
 interface Service {
@@ -88,9 +90,8 @@ const Services: React.FC = () => {
     if (cached) {
       try { setCategories(JSON.parse(cached)); return; } catch {}
     }
-    fetch(`${API_BASE}/api/categories`)
-      .then(r => r.ok ? r.json() : [])
-      .then((data: Category[]) => {
+    api.get('/categories')
+      .then(({ data }: any) => {
         setCategories(data);
         sessionStorage.setItem(cacheKey, JSON.stringify(data));
       })
@@ -129,7 +130,7 @@ const Services: React.FC = () => {
   const fetchServices = async (params: URLSearchParams, pg = 1, append = false) => {
     if (append) setLoadingMore(true); else setLoading(true);
     try {
-      const url = new URL(`${API_BASE}/api/services/search`);
+      const searchParams: Record<string, string> = {};
       const q   = params.get('search') || '';
       const cat = params.get('category') || '';
       const srt = params.get('sort')     || 'newest';
@@ -138,31 +139,27 @@ const Services: React.FC = () => {
       const mr  = params.get('min_rating') || '';
       const rad = params.get('radius') || '50';
 
-      if (q)   url.searchParams.set('query',       q);
-      if (cat) url.searchParams.set('category_id', cat);
-      if (srt) url.searchParams.set('sort_by',     srt);
-      if (mn)  url.searchParams.set('min_price',   mn);
-      if (mx)  url.searchParams.set('max_price',   mx);
-      if (mr)  url.searchParams.set('min_rating',  mr);
+      if (q)   searchParams.query = q;
+      if (cat) searchParams.category_id = cat;
+      if (srt) searchParams.sort_by = srt;
+      if (mn)  searchParams.min_price = mn;
+      if (mx)  searchParams.max_price = mx;
+      if (mr)  searchParams.min_rating = mr;
 
       const c = coordsRef.current;
       if (c) {
-        url.searchParams.set('lat',    String(c.lat));
-        url.searchParams.set('lng',    String(c.lng));
-        url.searchParams.set('radius', rad);
+        searchParams.lat = String(c.lat);
+        searchParams.lng = String(c.lng);
+        searchParams.radius = rad;
       }
 
-      // Map mode: fetch all without pagination to populate all pins
-      if (viewMode === 'map') { url.searchParams.set('map', '1'); }
-      else { url.searchParams.set('page', String(pg)); url.searchParams.set('per_page', '12'); }
+      if (viewMode === 'map') { searchParams.map = '1'; }
+      else { searchParams.page = String(pg); searchParams.per_page = '12'; }
 
-      const res = await fetch(url.toString());
-      if (res.ok) {
-        const data = await res.json();
-        const items = data.data || data;
-        setServices(prev => append ? [...prev, ...items] : items);
-        setTotal(data.total ?? items.length);
-      }
+      const { data } = await api.get('/services/search', { params: searchParams });
+      const items = data.data || data;
+      setServices(prev => append ? [...prev, ...items] : items);
+      setTotal(data.total ?? items.length);
     } catch {}
     finally { if (append) setLoadingMore(false); else setLoading(false); }
   };
@@ -200,13 +197,10 @@ const Services: React.FC = () => {
     if (!search || search.length < 2) { setSuggestions([]); setShowSuggestions(false); return; }
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/services/search?query=${encodeURIComponent(search)}&per_page=5`);
-        if (res.ok) {
-          const data = await res.json();
-          const results = (data.data || data).slice(0, 5);
-          setSuggestions(results);
-          setShowSuggestions(results.length > 0);
-        }
+        const { data } = await api.get('/services/search', { params: { query: search, per_page: 5 } });
+        const results = (data.data || data).slice(0, 5);
+        setSuggestions(results);
+        setShowSuggestions(results.length > 0);
       } catch {}
     }, 300);
     return () => clearTimeout(timer);
@@ -289,9 +283,9 @@ const Services: React.FC = () => {
         </div>
 
         {/* ── Top search bar ── */}
-        <div className="card p-4 mb-4">
-          <form onSubmit={handleSearchSubmit} className="flex gap-2">
-            <div className="flex-1 relative" ref={autocompleteRef}>
+        <div className="card p-3 sm:p-4 mb-4">
+          <form onSubmit={handleSearchSubmit} className="flex gap-1.5 sm:gap-2 flex-wrap">
+            <div className="flex-1 relative min-w-[140px]" ref={autocompleteRef}>
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
@@ -329,7 +323,7 @@ const Services: React.FC = () => {
                     <button
                       key={s.id}
                       type="button"
-                      onMouseDown={() => { navigate(`/services/${s.id}`); setShowSuggestions(false); }}
+                      onMouseDown={() => { navigate(serviceUrl(s)); setShowSuggestions(false); }}
                       className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors text-left"
                     >
                       <div className="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0">
@@ -347,7 +341,10 @@ const Services: React.FC = () => {
                 </div>
               )}
             </div>
-            <button type="submit" className="btn-primary px-5">Search</button>
+            <button type="submit" className="btn-primary px-3 sm:px-5">
+              <span className="hidden sm:inline">Search</span>
+              <Search className="w-4 h-4 sm:hidden" />
+            </button>
             <button
               type="button"
               onClick={handleNearMe}
@@ -599,7 +596,7 @@ const Services: React.FC = () => {
         ) : viewMode === 'list' ? (
           <div className="space-y-3">
             {services.map(service => (
-              <Link key={service.id} to={`/services/${service.id}`}
+              <Link key={service.id} to={serviceUrl(service)}
                 className="card flex gap-4 p-4 hover:shadow-md transition-all duration-200 group">
                 <div className="w-24 h-24 flex-shrink-0 rounded-xl overflow-hidden">
                   <img src={getServiceImage(service)} alt={service.name}
@@ -641,7 +638,7 @@ const Services: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {services.map(service => (
               <Link
-                to={`/services/${service.id}`}
+                to={serviceUrl(service)}
                 key={service.id}
                 className="card group overflow-hidden flex flex-col hover:shadow-lg transition-all duration-200"
               >

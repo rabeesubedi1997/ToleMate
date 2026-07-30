@@ -16,6 +16,11 @@ class CheckRole
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 
+        // Super admin bypasses all role checks
+        if ($user->role === 'super_admin') {
+            return $next($request);
+        }
+
         foreach ($roles as $role) {
             if ($user->role === $role) {
                 return $next($request);

@@ -1,7 +1,7 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { FileText, Inbox, Handshake, Zap, Clock, Calendar, AlarmClock, CheckCircle, ArrowRight } from 'lucide-react';
-import { API_BASE } from '../utils/config';
+import api from '../utils/api';
 import SeoHead from '../components/SeoHead';
 
 interface Category { id: number; name: string; }
@@ -30,9 +30,8 @@ const PostRequest: React.FC = () => {
   const [posted, setPosted] = useState(false);
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/categories`)
-      .then(r => r.json())
-      .then(setCategories)
+    api.get('/categories')
+      .then(({ data }) => setCategories(data))
       .catch(console.error);
   }, []);
 
@@ -52,19 +51,11 @@ const PostRequest: React.FC = () => {
       if (form.budget) body.budget = parseFloat(form.budget);
       if (form.preferred_date) body.preferred_date = form.preferred_date;
 
-      const res = await fetch(`${API_BASE}/api/booking-requests`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-        body: JSON.stringify(body),
-      });
-      if (res.ok) {
-        setPosted(true);
-      } else {
-        const data = await res.json();
-        setError(data.message || Object.values(data.errors || {}).flat().join(', ') || 'Failed to post request');
-      }
-    } catch {
-      setError('Connection error. Please try again.');
+      await api.post('/booking-requests', body);
+      setPosted(true);
+    } catch (err: any) {
+      const data = err.response?.data;
+      setError(data?.message || Object.values(data?.errors || {}).flat().join(', ') || 'Connection error. Please try again.');
     } finally {
       setSubmitting(false);
     }

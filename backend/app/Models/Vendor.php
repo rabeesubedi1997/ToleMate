@@ -6,11 +6,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Vendor extends Model
 {
+    use SoftDeletes;
     /** All features that can be enabled/disabled per vendor */
-    public const ALL_FEATURES = ['bookings', 'messaging', 'services', 'availability_edit', 'social_links', 'reviews'];
+    public const ALL_FEATURES = ['bookings', 'messaging', 'services', 'availability_edit', 'social_links', 'reviews', 'whatsapp'];
 
     /** Per-plan limits */
     public const PLAN_LIMITS = [
@@ -33,6 +35,7 @@ class Vendor extends Model
         'website',
         'instagram',
         'facebook',
+        'whatsapp_number',
         'avatar',
     ];
 
@@ -44,13 +47,18 @@ class Vendor extends Model
         'is_featured' => 'boolean',
     ];
 
-    protected $appends = ['available_today'];
+    protected $appends = ['available_today', 'whatsapp_enabled'];
 
     public function getAvailableTodayAttribute(): bool
     {
         $today = (int) now()->dayOfWeek; // 0=Sun … 6=Sat
         $row = $this->hasMany(VendorAvailability::class)->where('day_of_week', $today)->first();
         return $row ? (bool) $row->is_available : ($today >= 1 && $today <= 5);
+    }
+
+    public function getWhatsappEnabledAttribute(): bool
+    {
+        return $this->hasFeature('whatsapp');
     }
 
     public function user(): BelongsTo
@@ -81,9 +89,11 @@ class Vendor extends Model
     /**
      * Check if a feature is enabled for this vendor.
      * Defaults to true (all features on) if no DB record exists.
+     * Returns false if vendor is soft-deleted.
      */
     public function hasFeature(string $feature): bool
     {
+        if ($this->trashed()) return false;
         $row = $this->vendorFeatures()->where('feature', $feature)->first();
         return $row ? $row->is_enabled : true;  // defaults to TRUE
     }

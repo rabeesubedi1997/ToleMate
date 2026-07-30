@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, RefreshCw, ChevronDown, ChevronUp, GripVertical } from 'lucide-react';
-import { API_BASE } from '../utils/config';
+import api from '../utils/api';
 import { useToast } from '../context/ToastContext';
 
 interface MenuItem {
@@ -17,14 +17,11 @@ const MenuManager: React.FC = () => {
   const [editing, setEditing] = useState<MenuItem | null>(null);
   const [form, setForm] = useState({ label: '', path: '', icon: '', parent_id: '', is_active: true, role: '' });
 
-  const headers = { Authorization: `Bearer ${localStorage.getItem('token')}`, 'Content-Type': 'application/json' };
-
   const fetchMenus = async () => {
-    const r = await fetch(`${API_BASE}/api/admin/menus`, { headers });
-    if (r.ok) {
-      const d = await r.json();
-      setMenus(d.filter((m: MenuItem) => !m.parent_id).sort((a: MenuItem, b: MenuItem) => a.order - b.order));
-    }
+    try {
+      const { data } = await api.get('/admin/menus');
+      setMenus(data.filter((m: MenuItem) => !m.parent_id).sort((a: MenuItem, b: MenuItem) => a.order - b.order));
+    } catch { }
     setLoading(false);
   };
 
@@ -39,26 +36,26 @@ const MenuManager: React.FC = () => {
       role: form.role || null,
     };
 
-    const url = editing
-      ? `${API_BASE}/api/admin/menus/${editing.id}`
-      : `${API_BASE}/api/admin/menus`;
-    const method = editing ? 'PUT' : 'POST';
-
-    const r = await fetch(url, { method, headers, body: JSON.stringify(body) });
-    if (r.ok) {
+    try {
+      if (editing) {
+        await api.put(`/admin/menus/${editing.id}`, body);
+      } else {
+        await api.post('/admin/menus', body);
+      }
       toast(editing ? 'Menu updated' : 'Menu created', 'success');
       resetForm();
       fetchMenus();
-    } else {
-      const d = await r.json();
-      toast(d.message || 'Failed to save', 'error');
+    } catch (err: any) {
+      toast(err.response?.data?.message || 'Failed to save', 'error');
     }
   };
 
   const handleDelete = async (id: number) => {
     if (!window.confirm('Delete this menu item? Children will be orphaned.')) return;
-    const r = await fetch(`${API_BASE}/api/admin/menus/${id}`, { method: 'DELETE', headers });
-    if (r.ok) { toast('Menu deleted', 'success'); fetchMenus(); }
+    try {
+      await api.delete(`/admin/menus/${id}`);
+      toast('Menu deleted', 'success'); fetchMenus();
+    } catch { }
   };
 
   const resetForm = () => {

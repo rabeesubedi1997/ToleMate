@@ -2,7 +2,7 @@
 import { Link } from 'react-router-dom';
 import { Mail, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import SeoHead from '../components/SeoHead';
-import { API_BASE } from '../utils/config';
+import api from '../utils/api';
 
 const ForgotPassword: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -15,19 +15,10 @@ const ForgotPassword: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`${API_BASE}/api/forgot-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setSent(true);
-      } else {
-        setError(data.message || 'Something went wrong. Please try again.');
-      }
-    } catch {
-      setError('Could not connect to the server. Please try again.');
+      await api.post('/forgot-password', { email });
+      setSent(true);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Could not connect to the server. Please try again.');
     } finally {
       setLoading(false);
     }

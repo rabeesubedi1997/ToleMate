@@ -2,7 +2,8 @@
 import { Link } from 'react-router-dom';
 import { Bell, Calendar, MessageCircle, CreditCard, Star, Settings, Trash2, ChevronDown } from 'lucide-react';
 import SeoHead from '../components/SeoHead';
-import { API_BASE } from '../utils/config';
+import api from '../utils/api';
+import { serviceUrl } from '../utils/slug';
 
 interface Notification { id: number; type: 'booking' | 'message' | 'payment' | 'review' | 'system'; title: string; message: string; data: any; is_read: boolean; created_at: string; }
 
@@ -27,12 +28,7 @@ const Notifications: React.FC = () => {
     setSmsEnabled(next);
     localStorage.setItem('tolemate_sms_pref', JSON.stringify(next));
     try {
-      const token = localStorage.getItem('token');
-      await fetch(`${API_BASE}/api/user/profile`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ sms_notifications: next }),
-      });
+      await api.put('/user/profile', { sms_notifications: next });
     } catch { /* ignore */ }
   };
   const togglePref = (key: string) => {
@@ -45,31 +41,30 @@ const Notifications: React.FC = () => {
 
   const fetchNotifications = async () => {
     try {
-      const token = localStorage.getItem('token'); const params = new URLSearchParams();
-      if (filter !== 'all') { if (filter === 'unread') params.append('unread_only', '1'); else params.append('type', filter); }
-      const response = await fetch(`${API_BASE}/api/notifications?${params}`, { headers: { 'Authorization': `Bearer ${token}` } });
-      const data = await response.json();
-      if (response.ok) setNotifications(data.data || data);
+      const params: any = {};
+      if (filter !== 'all') { if (filter === 'unread') params.unread_only = '1'; else params.type = filter; }
+      const response = await api.get('/notifications', { params });
+      setNotifications(response.data.data || response.data);
     } catch (error) { console.error(error); } finally { setLoading(false); }
   };
 
   const fetchUnreadCount = async () => {
-    try { const token = localStorage.getItem('token'); const response = await fetch(`${API_BASE}/api/notifications/unread-count`, { headers: { 'Authorization': `Bearer ${token}` } }); const data = await response.json(); if (response.ok) setUnreadCount(data.unread_count); } catch (error) { console.error(error); }
+    try { const response = await api.get('/notifications/unread-count'); setUnreadCount(response.data.unread_count); } catch (error) { console.error(error); }
   };
 
   const markAsRead = async (id?: number) => {
-    try { const token = localStorage.getItem('token'); const url = id ? `/api/notifications/${id}/read` : '/api/notifications/read';
-      const response = await fetch(`${API_BASE}${url}`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}` } });
-      if (response.ok) { fetchNotifications(); fetchUnreadCount(); }
+    try { const url = id ? `/notifications/${id}/read` : '/notifications/read';
+      await api.put(url);
+      fetchNotifications(); fetchUnreadCount();
     } catch (error) { console.error(error); }
   };
 
   const markAsUnread = async (id: number) => {
-    try { const token = localStorage.getItem('token'); const response = await fetch(`${API_BASE}/api/notifications/${id}/unread`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}` } }); if (response.ok) { fetchNotifications(); fetchUnreadCount(); } } catch (error) { console.error(error); }
+    try { await api.put(`/notifications/${id}/unread`); fetchNotifications(); fetchUnreadCount(); } catch (error) { console.error(error); }
   };
 
   const deleteNotification = async (id: number) => {
-    try { const token = localStorage.getItem('token'); const response = await fetch(`${API_BASE}/api/notifications/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } }); if (response.ok) { fetchNotifications(); fetchUnreadCount(); } } catch (error) { console.error(error); }
+    try { await api.delete(`/notifications/${id}`); fetchNotifications(); fetchUnreadCount(); } catch (error) { console.error(error); }
   };
 
   const formatDate = (dateString: string) => {

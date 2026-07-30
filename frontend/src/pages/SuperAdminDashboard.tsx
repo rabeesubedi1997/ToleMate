@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { API_BASE } from '../utils/config';
+import api from '../utils/api';
 import { useToast } from '../context/ToastContext';
 import SeoHead from '../components/SeoHead';
 import {
@@ -8,7 +8,7 @@ import {
   Plus, Trash2, Search, ChevronDown, ExternalLink, RefreshCw, DollarSign
 } from 'lucide-react';
 
-const API = `${API_BASE}/api`;
+
 
 type OverviewTab = 'overview' | 'moderation' | 'admins' | 'logs' | 'commissions';
 
@@ -36,51 +36,49 @@ const SuperAdminDashboard: React.FC = () => {
   const [showCreateAdmin, setShowCreateAdmin] = useState(false);
   const [newAdmin, setNewAdmin] = useState({ name: '', email: '', password: '', role: 'admin' });
 
-  const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' };
-
   const fetchOverview = useCallback(async () => {
-    const r = await fetch(`${API}/super-admin/overview`, { headers });
-    if (r.ok) setOverview(await r.json());
-  }, [token]);
+    try {
+      const { data } = await api.get('/super-admin/overview');
+      setOverview(data);
+    } catch {}
+  }, []);
 
   const fetchPendingServices = useCallback(async () => {
-    const r = await fetch(`${API}/super-admin/services/moderation?status=${moderationFilter}`, { headers });
-    if (r.ok) {
-      const d = await r.json();
-      setAllServices(d.data || d);
-    }
-  }, [token, moderationFilter]);
+    try {
+      const { data } = await api.get(`/super-admin/services/moderation?status=${moderationFilter}`);
+      setAllServices(data.data || data);
+    } catch {}
+  }, [moderationFilter]);
 
   const fetchAdmins = useCallback(async () => {
-    const r = await fetch(`${API}/super-admin/admins`, { headers });
-    if (r.ok) setAdmins(await r.json());
-  }, [token]);
+    try {
+      const { data } = await api.get('/super-admin/admins');
+      setAdmins(data);
+    } catch {}
+  }, []);
 
   const fetchLogs = useCallback(async () => {
-    const r = await fetch(`${API}/super-admin/activity-logs`, { headers });
-    if (r.ok) {
-      const d = await r.json();
-      setLogs(d.data || d);
-    }
-  }, [token]);
+    try {
+      const { data } = await api.get('/super-admin/activity-logs');
+      setLogs(data.data || data);
+    } catch {}
+  }, []);
 
   const fetchCommissions = useCallback(async () => {
     const params = commissionFilter ? `?status=${commissionFilter}` : '';
-    const r = await fetch(`${API}/super-admin/commissions${params}`, { headers });
-    if (r.ok) {
-      const d = await r.json();
-      setCommissions(d.data || d);
-    }
-  }, [token, commissionFilter]);
+    try {
+      const { data } = await api.get(`/super-admin/commissions${params}`);
+      setCommissions(data.data || data);
+    } catch {}
+  }, [commissionFilter]);
 
   const fetchCommissionStats = useCallback(async () => {
-    const r = await fetch(`${API}/super-admin/commissions/stats`, { headers });
-    if (r.ok) {
-      const d = await r.json();
-      setCommissionStats(d);
-      setNewRate(String(d.default_rate ?? 10));
-    }
-  }, [token]);
+    try {
+      const { data } = await api.get('/super-admin/commissions/stats');
+      setCommissionStats(data);
+      setNewRate(String(data.default_rate ?? 10));
+    } catch {}
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -103,9 +101,12 @@ const SuperAdminDashboard: React.FC = () => {
 
   const handleApprove = async (id: number) => {
     setActionLoading(`approve-${id}`);
-    const r = await fetch(`${API}/super-admin/services/${id}/approve`, { method: 'POST', headers });
-    if (r.ok) { toast('Service approved', 'success'); fetchPendingServices(); fetchOverview(); }
-    else { const d = await r.json(); toast(d.message || 'Failed to approve', 'error'); }
+    try {
+      await api.post(`/super-admin/services/${id}/approve`);
+      toast('Service approved', 'success'); fetchPendingServices(); fetchOverview();
+    } catch (err: any) {
+      toast(err.response?.data?.message || 'Failed to approve', 'error');
+    }
     setActionLoading(null);
   };
 
@@ -113,30 +114,42 @@ const SuperAdminDashboard: React.FC = () => {
     const reason = prompt('Rejection reason:');
     if (!reason) return;
     setActionLoading(`reject-${id}`);
-    const r = await fetch(`${API}/super-admin/services/${id}/reject`, { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ reason }) });
-    if (r.ok) { toast('Service rejected', 'success'); fetchPendingServices(); fetchOverview(); }
-    else { const d = await r.json(); toast(d.message || 'Failed to reject', 'error'); }
+    try {
+      await api.post(`/super-admin/services/${id}/reject`, { reason });
+      toast('Service rejected', 'success'); fetchPendingServices(); fetchOverview();
+    } catch (err: any) {
+      toast(err.response?.data?.message || 'Failed to reject', 'error');
+    }
     setActionLoading(null);
   };
 
   const handleCreateAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const r = await fetch(`${API}/super-admin/admins`, { method: 'POST', headers, body: JSON.stringify(newAdmin) });
-    if (r.ok) { toast('Admin created', 'success'); setShowCreateAdmin(false); setNewAdmin({ name: '', email: '', password: '', role: 'admin' }); fetchAdmins(); }
-    else { const d = await r.json(); toast(d.message || 'Failed to create admin', 'error'); }
+    try {
+      await api.post('/super-admin/admins', newAdmin);
+      toast('Admin created', 'success'); setShowCreateAdmin(false); setNewAdmin({ name: '', email: '', password: '', role: 'admin' }); fetchAdmins();
+    } catch (err: any) {
+      toast(err.response?.data?.message || 'Failed to create admin', 'error');
+    }
   };
 
   const handleDeleteAdmin = async (id: number) => {
     if (!window.confirm('Delete this admin? This cannot be undone.')) return;
-    const r = await fetch(`${API}/super-admin/admins/${id}`, { method: 'DELETE', headers });
-    if (r.ok) { toast('Admin deleted', 'success'); fetchAdmins(); }
-    else { const d = await r.json(); toast(d.message || 'Failed to delete', 'error'); }
+    try {
+      await api.delete(`/super-admin/admins/${id}`);
+      toast('Admin deleted', 'success'); fetchAdmins();
+    } catch (err: any) {
+      toast(err.response?.data?.message || 'Failed to delete', 'error');
+    }
   };
 
   const handleSuspendAdmin = async (id: number) => {
-    const r = await fetch(`${API}/super-admin/admins/${id}/suspend`, { method: 'PUT', headers });
-    if (r.ok) { toast('Admin status toggled', 'success'); fetchAdmins(); }
-    else { const d = await r.json(); toast(d.message || 'Failed to suspend', 'error'); }
+    try {
+      await api.put(`/super-admin/admins/${id}/suspend`);
+      toast('Admin status toggled', 'success'); fetchAdmins();
+    } catch (err: any) {
+      toast(err.response?.data?.message || 'Failed to suspend', 'error');
+    }
   };
 
   const sidebarTabs = [
@@ -371,8 +384,8 @@ const SuperAdminDashboard: React.FC = () => {
                           <td className="p-4 text-right">
                             {c.status === 'pending' && (
                               <button onClick={async () => {
-                                const r = await fetch(`${API}/super-admin/commissions/${c.id}/pay`, { method: 'PUT', headers });
-                                if (r.ok) { toast('Commission marked as paid', 'success'); fetchCommissions(); fetchCommissionStats(); }
+                                const r = await api.put(`/super-admin/commissions/${c.id}/pay`);
+                                if (r.status === 200) { toast('Commission marked as paid', 'success'); fetchCommissions(); fetchCommissionStats(); }
                                 else toast('Failed to update', 'error');
                               }} className="text-xs font-medium text-green-600 hover:underline">Mark Paid</button>
                             )}
@@ -398,8 +411,8 @@ const SuperAdminDashboard: React.FC = () => {
                     <div className="flex gap-3">
                       <button onClick={() => setShowRateModal(false)} className="btn-secondary flex-1">Cancel</button>
                       <button onClick={async () => {
-                        const r = await fetch(`${API}/super-admin/commissions/rate`, { method: 'POST', headers, body: JSON.stringify({ rate: parseFloat(newRate) }) });
-                        if (r.ok) { toast('Rate updated', 'success'); setShowRateModal(false); fetchCommissionStats(); }
+                        const r = await api.post('/super-admin/commissions/rate', { rate: parseFloat(newRate) });
+                        if (r.status === 200) { toast('Rate updated', 'success'); setShowRateModal(false); fetchCommissionStats(); }
                         else toast('Failed to update rate', 'error');
                       }} className="btn-primary flex-1">Save</button>
                     </div>

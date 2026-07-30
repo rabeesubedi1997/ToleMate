@@ -2,7 +2,7 @@
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Lock, Eye, EyeOff, CheckCircle2, ArrowLeft } from 'lucide-react';
 import SeoHead from '../components/SeoHead';
-import { API_BASE } from '../utils/config';
+import api from '../utils/api';
 
 const ResetPassword: React.FC = () => {
   const navigate = useNavigate();
@@ -41,27 +41,21 @@ const ResetPassword: React.FC = () => {
     setFieldErrors({});
 
     try {
-      const res = await fetch(`${API_BASE}/api/reset-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({
-          token,
-          email,
-          password,
-          password_confirmation: confirmPassword,
-        }),
+      await api.post('/reset-password', {
+        token,
+        email,
+        password,
+        password_confirmation: confirmPassword,
       });
-      const data = await res.json();
-      if (res.ok) {
-        setSuccess(true);
-        setTimeout(() => navigate('/login'), 3000);
-      } else if (data.errors) {
+      setSuccess(true);
+      setTimeout(() => navigate('/login'), 3000);
+    } catch (err: any) {
+      const data = err.response?.data;
+      if (data?.errors) {
         setFieldErrors(data.errors);
       } else {
-        setError(data.message || 'Password reset failed. Please try again.');
+        setError(data?.message || 'Could not connect to the server. Please try again.');
       }
-    } catch {
-      setError('Could not connect to the server. Please try again.');
     } finally {
       setLoading(false);
     }

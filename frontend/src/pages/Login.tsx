@@ -4,7 +4,7 @@ import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
 import { Mail, Lock } from 'lucide-react';
 import SeoHead from '../components/SeoHead';
-import { API_BASE } from '../utils/config';
+import api from '../utils/api';
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -24,17 +24,7 @@ const Login: React.FC = () => {
     setError('');
 
     try {
-      const response = await fetch(`${API_BASE}/api/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Login failed');
-      }
+      const { data } = await api.post('/login', { email, password });
 
       login(data.access_token, data.user);
 
@@ -52,7 +42,7 @@ const Login: React.FC = () => {
         navigate('/dashboard');
       }
     } catch (err: any) {
-      setError(err.message || 'An error occurred during login');
+      setError(err.response?.data?.message || err.message || 'An error occurred during login');
     } finally {
       setIsLoading(false);
     }

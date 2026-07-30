@@ -240,7 +240,9 @@ class SuperAdminController extends Controller
     public function changeUserRole(Request $request, $id)
     {
         $request->validate([
-            'role' => 'required|in:customer,vendor,admin,super_admin',
+            'role'          => 'required|in:customer,vendor,admin,super_admin',
+            'business_name' => 'nullable|string|max:255',
+            'description'   => 'nullable|string',
         ]);
 
         $user = User::find($id);
@@ -254,6 +256,18 @@ class SuperAdminController extends Controller
 
         $oldRole = $user->role;
         $user->update(['role' => $request->role]);
+
+        if ($request->role === 'vendor' && !$user->vendor) {
+            $businessName = $request->business_name ?? $user->name . "'s Business";
+            Vendor::create([
+                'user_id'             => $user->id,
+                'business_name'       => $businessName,
+                'description'         => $request->description ?? 'New vendor on ToleMate',
+                'rating'              => 0.0,
+                'service_area_radius' => 10,
+                'whatsapp_number'     => $user->phone,
+            ]);
+        }
 
         ActivityLog::log($request->user()->id, 'user.role_changed', $user, ['role' => $oldRole], ['role' => $request->role]);
 

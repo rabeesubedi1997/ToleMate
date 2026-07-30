@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Calendar, CheckCircle, Clock, XCircle, CreditCard, MessageCircle, Star, Download, RefreshCw } from 'lucide-react';
-import { API_BASE } from '../utils/config';
+import api from '../utils/api';
 import SeoHead from '../components/SeoHead';
 import { useToast } from '../context/ToastContext';
 
@@ -53,11 +53,8 @@ const BookingDetail: React.FC = () => {
   useEffect(() => {
     const fetchBooking = async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/bookings/${id}`, {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-        });
-        if (!res.ok) { setNotFound(true); return; }
-        setBooking(await res.json());
+        const res = await api.get(`/bookings/${id}`);
+        setBooking(res.data);
       } catch { setNotFound(true); }
       finally { setLoading(false); }
     };
@@ -68,20 +65,13 @@ const BookingDetail: React.FC = () => {
     if (!rescheduleDate) return;
     setRescheduling(true);
     try {
-      const res = await fetch(`${API_BASE}/api/bookings/${id}/reschedule`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-        body: JSON.stringify({ reschedule_to: rescheduleDate }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setBooking(prev => prev ? { ...prev, ...data.booking } : prev);
-        setRescheduleOpen(false);
-        toast('Reschedule request sent to vendor!');
-      } else {
-        toast(data.message || 'Failed to send request', 'error');
-      }
-    } catch { toast('Error sending request', 'error'); }
+      const res = await api.post(`/bookings/${id}/reschedule`, { reschedule_to: rescheduleDate });
+      setBooking(prev => prev ? { ...prev, ...res.data.booking } : prev);
+      setRescheduleOpen(false);
+      toast('Reschedule request sent to vendor!');
+    } catch (err: any) {
+      toast(err.response?.data?.message || 'Error sending request', 'error');
+    }
     finally { setRescheduling(false); }
   };
 

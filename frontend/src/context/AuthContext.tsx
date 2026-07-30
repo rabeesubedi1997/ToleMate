@@ -1,6 +1,6 @@
-﻿import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { API_BASE } from '../utils/config';
+﻿import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
+import api from '../utils/api';
 interface User {
   id: number;
   name: string;
@@ -48,16 +48,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const logout = useCallback(async () => {
-    const storedToken = localStorage.getItem('token');
-    if (storedToken) {
-      try {
-        await fetch(`${API_BASE}/api/logout`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${storedToken}`, Accept: 'application/json' },
-        });
-      } catch {
-        // Proceed with local logout even if server call fails
-      }
+    try {
+      await api.post('/logout');
+    } catch {
+      // Proceed with local logout even if server call fails
     }
     localStorage.removeItem('token');
     localStorage.removeItem('user');

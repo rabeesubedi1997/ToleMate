@@ -58,8 +58,7 @@ class AdminController extends Controller
 
     public function getUsers(Request $request)
     {
-        $users = User::where('role', '!=', 'super_admin')
-            ->orderBy('created_at', 'desc')->paginate(15);
+        $users = User::orderBy('created_at', 'desc')->paginate(15);
         return response()->json($users);
     }
 
@@ -87,12 +86,26 @@ class AdminController extends Controller
         $validRoles = $request->user()->role === 'super_admin' ? 'customer,vendor,admin,super_admin' : 'customer,vendor,admin';
 
         $request->validate([
-            'name' => 'sometimes|string|max:255',
-            'email' => 'sometimes|email|unique:users,email,' . $id,
-            'role' => 'sometimes|in:' . $validRoles,
+            'name'          => 'sometimes|string|max:255',
+            'email'         => 'sometimes|email|unique:users,email,' . $id,
+            'role'          => 'sometimes|in:' . $validRoles,
+            'business_name' => 'nullable|string|max:255',
+            'description'   => 'nullable|string',
         ]);
 
         $user->update($request->only(['name', 'email', 'role']));
+
+        if ($user->role === 'vendor' && !$user->vendor) {
+            $businessName = $request->business_name ?? $user->name . "'s Business";
+            Vendor::create([
+                'user_id'             => $user->id,
+                'business_name'       => $businessName,
+                'description'         => $request->description ?? 'New vendor on ToleMate',
+                'rating'              => 0.0,
+                'service_area_radius' => 10,
+                'whatsapp_number'     => $user->phone,
+            ]);
+        }
 
         return response()->json([
             'message' => 'User updated successfully',
@@ -238,6 +251,7 @@ class AdminController extends Controller
                 'description'         => $request->description ?: 'New vendor on ToleMate',
                 'rating'              => 0.0,
                 'service_area_radius' => 10,
+                'whatsapp_number'     => $request->phone,
             ]);
         }
 
@@ -358,12 +372,20 @@ class AdminController extends Controller
 
     public function deleteVendor(Request $request, $id)
     {
-        $vendor = Vendor::find($id);
+        $vendor = Vendor::withTrashed()->find($id);
         if (!$vendor) {
             return response()->json(['message' => 'Vendor not found'], 404);
         }
-        Service::where('vendor_id', $id)->delete();
-        $vendor->delete();
+
+        if ($vendor->trashed()) {
+            // Force-delete if already soft-deleted
+            $vendor->forceDelete();
+        } else {
+            // Soft-delete and deactivate services
+            Service::where('vendor_id', $id)->update(['is_active' => false]);
+            $vendor->delete();
+        }
+
         return response()->json(['message' => 'Vendor deleted successfully']);
     }
 
@@ -489,12 +511,8 @@ class AdminController extends Controller
                 Vendor::whereIn('id', $ids)->update(['is_featured' => false]);
                 break;
             case 'delete':
-                $vendors = Vendor::whereIn('id', $ids)->with('user')->get();
-                foreach ($vendors as $v) {
-                    Service::where('vendor_id', $v->id)->delete();
-                    if ($v->user) $v->user->delete();
-                    $v->delete();
-                }
+                Vendor::whereIn('id', $ids)->get()->each->delete();
+                Service::whereIn('vendor_id', $ids)->update(['is_active' => false]);
                 break;
         }
 
@@ -517,10 +535,10 @@ class AdminController extends Controller
         $vendor = Vendor::find($id);
         if (!$vendor) return response()->json(['message' => 'Vendor not found'], 404);
 
-        $validator = Validator::make($request->all(), [
-            'features'   => 'required|array',
-            'features.*' => 'boolean',
-        ]);
+    $validator = Validator::make($request->all(), [
+        'features'   => 'required|array|min:1',
+        'features.*' => 'boolean',
+    ]);
         if ($validator->fails()) return response()->json(['errors' => $validator->errors()], 422);
 
         foreach ($request->features as $feature => $isEnabled) {
@@ -554,6 +572,32 @@ class AdminController extends Controller
             );
         }
         return response()->json(['message' => 'Availability updated']);
+    }
+
+    public function updateVendorProfile(Request $request, $id)
+    {
+        $vendor = Vendor::find($id);
+        if (!$vendor) return response()->json(['message' => 'Vendor not found'], 404);
+
+        $validator = Validator::make($request->all(), [
+            'business_name'       => 'sometimes|required|string|max:255',
+            'description'         => 'sometimes|required|string',
+            'service_area_radius' => 'sometimes|required|integer|min:1|max:500',
+            'service_radius_km'   => 'sometimes|nullable|integer|min:0|max:500',
+            'website'             => 'sometimes|nullable|url|max:255',
+            'instagram'           => 'sometimes|nullable|string|max:255',
+            'facebook'            => 'sometimes|nullable|string|max:255',
+            'whatsapp_number'     => 'sometimes|nullable|string|max:20',
+            'avatar'              => 'sometimes|nullable|string|max:255',
+        ]);
+        if ($validator->fails()) return response()->json(['errors' => $validator->errors()], 422);
+
+        $vendor->update($request->only([
+            'business_name', 'description', 'service_area_radius', 'service_radius_km',
+            'website', 'instagram', 'facebook', 'whatsapp_number', 'avatar',
+        ]));
+
+        return response()->json(['message' => 'Vendor profile updated', 'vendor' => $vendor->fresh()->load('user')]);
     }
 
     private function buildRecentActivity(): array

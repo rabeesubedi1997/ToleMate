@@ -2,10 +2,10 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { Upload, ImagePlus, X, ArrowLeft, Lightbulb, Plus, Trash2, CheckCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import api from '../utils/api';
 import { API_BASE } from '../utils/config';
 import SeoHead from '../components/SeoHead';
 
-const API = `${API_BASE}/api`;
 
 const ServiceEdit: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -31,7 +31,7 @@ const ServiceEdit: React.FC = () => {
   const [editingPkg, setEditingPkg] = useState<number | null>(null);
   const [savingPkg, setSavingPkg] = useState(false);
 
-  const h = () => ({ Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' });
+
 
   useEffect(() => {
     fetchCategories();
@@ -47,39 +47,43 @@ const ServiceEdit: React.FC = () => {
   }, [id, user?.role]);
   const fetchPackages = async () => {
     if (!id) return;
-    const res = await fetch(`${API}/services/${id}`);
-    if (res.ok) { const d = await res.json(); setPackages((d.service || d).packages || []); }
+    try {
+      const { data } = await api.get(`/services/${id}`);
+      setPackages((data.service || data).packages || []);
+    } catch {}
   };
 
   const fetchCategories = async () => {
-    const res = await fetch(`${API}/categories`);
-    if (res.ok) setCategories(await res.json());
+    try {
+      const { data } = await api.get('/categories');
+      setCategories(data);
+    } catch {}
   };
 
   const fetchMedia = async () => {
-    const res = await fetch(`${API}/admin/media`, { headers: h() });
-    if (res.ok) { const d = await res.json(); setMediaLibrary(d.data || d); }
+    try {
+      const { data } = await api.get('/admin/media');
+      setMediaLibrary(data.data || data);
+    } catch {}
   };
 
   const fetchVendors = async () => {
-    const res = await fetch(`${API}/admin/vendors`, { headers: h() });
-    if (res.ok) { const d = await res.json(); setVendors(d.data || d); }
+    try {
+      const { data } = await api.get('/admin/vendors');
+      setVendors(data.data || data);
+    } catch {}
   };
 
   const fetchMyVendorProfile = async () => {
     try {
-      const res = await fetch(`${API}/vendor/profile`, { headers: h() });
-      if (res.ok) {
-        const profile = await res.json();
-        setFormData((prev: any) => ({ ...prev, vendor_id: profile.id?.toString() ?? '' }));
-      }
+      const { data } = await api.get('/vendor/profile');
+      setFormData((prev: any) => ({ ...prev, vendor_id: data.id?.toString() ?? '' }));
     } catch {}
   };
 
   const fetchService = async () => {
-    const res = await fetch(`${API}/services/${id}`);
-    if (res.ok) {
-      const s = await res.json();
+    try {
+      const { data: s } = await api.get(`/services/${id}`);
       setFormData({
         name: s.name,
         description: s.description,
@@ -93,7 +97,7 @@ const ServiceEdit: React.FC = () => {
         sale_price: s.sale_price?.toString() || '',
         sale_ends_at: s.sale_ends_at ? s.sale_ends_at.slice(0, 16) : '',
       });
-    }
+    } catch {}
     setLoading(false);
   };
 
@@ -111,19 +115,25 @@ const ServiceEdit: React.FC = () => {
       sort_order: editingPkg === null ? packages.length : packages.findIndex(p => p.id === editingPkg),
     };
     const url = editingPkg === null
-      ? `${API}/services/${id}/packages`
-      : `${API}/services/${id}/packages/${editingPkg}`;
+      ? `/services/${id}/packages`
+      : `/services/${id}/packages/${editingPkg}`;
     const method = editingPkg === null ? 'POST' : 'PUT';
     try {
-      const res = await fetch(url, { method, headers: h(), body: JSON.stringify(payload) });
-      if (res.ok) { setPkgForm({ name: '', description: '', price: '', delivery_days: '', features: '' }); setEditingPkg(null); fetchPackages(); }
+      if (editingPkg === null) {
+        await api.post(url, payload);
+      } else {
+        await api.put(url, payload);
+      }
+      setPkgForm({ name: '', description: '', price: '', delivery_days: '', features: '' }); setEditingPkg(null); fetchPackages();
     } catch {} finally { setSavingPkg(false); }
   };
 
   const handleDeletePackage = async (pkgId: number) => {
     if (!id) return;
-    const res = await fetch(`${API}/services/${id}/packages/${pkgId}`, { method: 'DELETE', headers: h() });
-    if (res.ok) fetchPackages();
+    try {
+      await api.delete(`/services/${id}/packages/${pkgId}`);
+      fetchPackages();
+    } catch {}
   };
 
   const startEditPkg = (pkg: any) => {
@@ -141,12 +151,8 @@ const ServiceEdit: React.FC = () => {
     const file = e.target.files?.[0]; if (!file) return;
     const uploadData = new FormData(); uploadData.append('file', file);
     try {
-      const res = await fetch(`${API}/admin/media`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: uploadData,
-      });
-      if (res.ok) { const data = await res.json(); setFormData((prev: any) => ({ ...prev, images: [...prev.images, data.media.file_path] })); fetchMedia(); }
+      const { data } = await api.post('/admin/media', uploadData);
+      setFormData((prev: any) => ({ ...prev, images: [...prev.images, data.media.file_path] })); fetchMedia();
     } catch (err) { console.error(err); }
   };
 
@@ -154,15 +160,16 @@ const ServiceEdit: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setSaving(true); setError('');
-    const url = id ? `${API}/services/${id}` : `${API}/services`;
     try {
-      const res = await fetch(url, {
-        method: id ? 'PUT' : 'POST',
-        headers: h(),
-        body: JSON.stringify(formData),
-      });
-      if (res.ok) navigate(-1); else { const d = await res.json(); setError(d.message || 'Failed to save service'); }
-    } catch (err) { setError('Connection error'); } finally { setSaving(false); }
+      if (id) {
+        await api.put(`/services/${id}`, formData);
+      } else {
+        await api.post('/services', formData);
+      }
+      navigate(-1);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Connection error');
+    } finally { setSaving(false); }
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="spinner"></div></div>;
@@ -396,7 +403,7 @@ const ServiceEdit: React.FC = () => {
                 {mediaLibrary.map((item: any) => (
                   <button key={item.id} onClick={() => { if (!formData.images.includes(item.file_path)) setFormData({...formData, images: [...formData.images, item.file_path]}); setShowMediaModal(false); }}
                     className="group relative aspect-square rounded-lg overflow-hidden border-2 border-transparent hover:border-primary-500 transition-all">
-                    <img src={`${API.replace('/api', '')}${item.file_path}`} className="w-full h-full object-cover" alt="Library" />
+                    <img src={`${API_BASE}${item.file_path}`} className="w-full h-full object-cover" alt="Library" />
                   </button>
                 ))}
               </div>

@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Heart, Star, Trash2, Search, MapPin, CheckCircle } from 'lucide-react';
 import { getServiceImage } from '../utils/serviceImage';
-import { API_BASE, FALLBACK_IMAGE } from '../utils/config';
+import api from '../utils/api';
+import { FALLBACK_IMAGE } from '../utils/config';
 import SeoHead from '../components/SeoHead';
+import { serviceUrl } from '../utils/slug';
 import { ServiceCardSkeleton } from '../components/Skeleton';
 
 const Favorites: React.FC = () => {
@@ -35,9 +37,8 @@ const Favorites: React.FC = () => {
     setLoading(true);
     Promise.all(
       favoriteIds.map(id =>
-        fetch(`${API_BASE}/api/services/${id}`)
-          .then(r => r.ok ? r.json() : null)
-          .then(d => d?.service || null)
+        api.get(`/services/${id}`)
+          .then(({ data }) => data?.service || null)
           .catch(() => null)
       )
     ).then(results => { setServices(results.filter(Boolean)); }).finally(() => setLoading(false));
@@ -49,9 +50,8 @@ const Favorites: React.FC = () => {
     setVendorsLoading(true);
     Promise.all(
       favVendorIds.map(id =>
-        fetch(`${API_BASE}/api/vendors/${id}`)
-          .then(r => r.ok ? r.json() : null)
-          .then(d => d?.vendor ? { ...d.vendor, review_count: d.review_count, completed_jobs: d.completed_jobs } : null)
+        api.get(`/vendors/${id}`)
+          .then(({ data }) => data?.vendor ? { ...data.vendor, review_count: data.review_count, completed_jobs: data.completed_jobs } : null)
           .catch(() => null)
       )
     ).then(results => { setFavVendors(results.filter(Boolean)); }).finally(() => setVendorsLoading(false));
@@ -148,7 +148,7 @@ const Favorites: React.FC = () => {
                   <Heart className="w-3.5 h-3.5 fill-red-500 text-red-500" />
                 </button>
 
-                <Link to={`/services/${service.id}`} className="flex flex-col flex-1">
+                <Link to={serviceUrl(service)} className="flex flex-col flex-1">
                   <div className="relative h-44 overflow-hidden">
                     <img
                       src={getServiceImage(service)}

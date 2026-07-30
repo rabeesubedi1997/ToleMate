@@ -5,12 +5,14 @@ import { useSettings } from '../context/SettingsContext';
 import { useTranslation } from 'react-i18next';
 import {
   Search, Star, Users, Shield, Clock, CheckCircle2,
-  ChevronDown, ChevronUp, Smartphone, ArrowRight,
+  ChevronDown, ChevronUp, ArrowRight,
   Wrench, Zap, Droplets, Monitor, Sparkles, Heart,
   PartyPopper, Scissors, Car, Package
 } from 'lucide-react';
 import { getServiceImage } from '../utils/serviceImage';
-import { API_BASE, FALLBACK_IMAGE, assetUrl } from '../utils/config';
+import { serviceUrl, slugify } from '../utils/slug';
+import { FALLBACK_IMAGE, assetUrl } from '../utils/config';
+import api from '../utils/api';
 
 const HERO_BG = 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=1600&q=80';
 
@@ -85,9 +87,8 @@ const Home: React.FC = () => {
 
   /* ── Fetch settings + services ── */
   useEffect(() => {
-    fetch(`${API_BASE}/api/settings`)
-      .then(r => r.ok ? r.json() : {})
-      .then((data: any) => {
+    api.get('/settings')
+      .then(({ data }: any) => {
         const raw = data?.slider_images;
         try { setSliderImages(JSON.parse(raw || '[]').filter((s: any) => s.enabled !== false)); } catch { setSliderImages([]); }
         const iv = parseInt(data?.slider_interval || '5000', 10);
@@ -95,23 +96,20 @@ const Home: React.FC = () => {
       })
       .catch(() => {});
 
-    fetch(`${API_BASE}/api/services?per_page=12`)
-      .then(r => r.ok ? r.json() : { data: [] })
-      .then(data => {
+    api.get('/services?per_page=12')
+      .then(({ data }: any) => {
         const all: any[] = data.data || data || [];
         setFeaturedServices(all.slice(0, 8));
         setPopularServices(all.slice(0, 6));
       })
       .catch(() => {});
 
-    fetch(`${API_BASE}/api/featured-vendors`)
-      .then(r => r.ok ? r.json() : [])
-      .then((data: any[]) => setFeaturedVendors(data))
+    api.get('/featured-vendors')
+      .then(({ data }: any) => setFeaturedVendors(data))
       .catch(() => {});
 
-    fetch(`${API_BASE}/api/categories`)
-      .then(r => r.ok ? r.json() : [])
-      .then((data: any[]) => {
+    api.get('/categories')
+      .then(({ data }: any) => {
         const map: Record<string, number> = {};
         data.forEach((c: any) => { map[c.name] = c.services_count ?? 0; });
         setApiCategories(map);
@@ -263,7 +261,7 @@ const Home: React.FC = () => {
                 className="flex-shrink-0 snap-start flex flex-col items-center gap-2.5 p-3 w-24 sm:w-auto rounded-2xl border border-gray-100 hover:border-primary-200 hover:bg-primary-50 transition-all group cursor-pointer"
               >
                 <div className="w-14 h-14 rounded-2xl overflow-hidden shadow-sm group-hover:shadow-md transition-shadow">
-                  <img src={cat.img} alt={cat.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" />
+                  <img src={cat.img} alt={cat.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" />
                 </div>
                 <span className="text-xs font-medium text-gray-700 group-hover:text-primary-700 text-center leading-tight">{cat.name}</span>
                 {apiCategories[cat.name] != null && apiCategories[cat.name] > 0 && (
@@ -294,7 +292,7 @@ const Home: React.FC = () => {
             <div className="flex gap-4 overflow-x-auto pb-2 lg:grid lg:grid-cols-4 lg:overflow-visible">
               {featuredServices.map(service => (
                 <Link
-                  to={`/services/${service.id}`}
+                  to={serviceUrl(service)}
                   key={service.id}
                   className="flex-shrink-0 w-56 sm:w-64 lg:w-auto card overflow-hidden hover:shadow-lg transition-all group"
                 >
@@ -352,7 +350,7 @@ const Home: React.FC = () => {
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               {popularServices.map(service => (
                 <Link
-                  to={`/services/${service.id}`}
+                  to={serviceUrl(service)}
                   key={`pop-${service.id}`}
                   className="card group overflow-hidden hover:shadow-lg transition-all"
                 >
@@ -360,6 +358,7 @@ const Home: React.FC = () => {
                     <img
                       src={getServiceImage(service)}
                       alt={service.name}
+                      loading="lazy"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       onError={e => { (e.target as HTMLImageElement).src = FALLBACK_IMAGE; }}
                     />
@@ -405,7 +404,7 @@ const Home: React.FC = () => {
                   className="card p-5 flex items-start gap-4 hover:shadow-lg transition-all group">
                   <div className="w-14 h-14 rounded-2xl bg-primary-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
                     {v.avatar ? (
-                      <img src={assetUrl(v.avatar)} alt={v.business_name} className="w-full h-full object-cover" />
+                      <img src={assetUrl(v.avatar)} alt={v.business_name} loading="lazy" className="w-full h-full object-cover" />
                     ) : (
                       <span className="text-xl font-bold text-primary-600">{v.business_name?.charAt(0)}</span>
                     )}
@@ -444,7 +443,7 @@ const Home: React.FC = () => {
             </div>
             <div className="flex gap-3 overflow-x-auto pb-1 snap-x">
               {recentlyViewed.map((s: any) => (
-                <Link key={s.id} to={`/services/${s.id}`}
+                <Link key={s.id} to={`/services/${s.id}/${slugify(s.name || 'service')}`}
                   className="flex-shrink-0 snap-start w-44 card p-3 hover:shadow-md transition-all group">
                   <p className="text-xs font-semibold text-gray-900 line-clamp-2 group-hover:text-primary-600 transition-colors mb-1">{s.name}</p>
                   <p className="text-xs text-gray-400 line-clamp-1">{s.vendor}</p>
@@ -594,30 +593,7 @@ const Home: React.FC = () => {
               </div>
             </div>
 
-            {/* App download */}
-            <div className="text-center">
-              <div className="inline-flex w-16 h-16 bg-primary-600 rounded-2xl items-center justify-center mb-4 shadow-lg">
-                <Smartphone className="w-8 h-8 text-white" />
-              </div>
-              <h3 className="text-lg font-bold text-white mb-2">Download Our App</h3>
-              <p className="text-gray-400 text-sm mb-6">Book services on the go, anytime anywhere.</p>
-              <div className="flex gap-3 justify-center flex-wrap">
-                <a href="#" className="flex items-center gap-3 bg-white/10 hover:bg-white/20 border border-white/20 text-white px-5 py-3 rounded-xl transition-colors">
-                  <span className="text-2xl leading-none">🍎</span>
-                  <div className="text-left">
-                    <p className="text-xs text-white/50 leading-none mb-0.5">Download on</p>
-                    <p className="text-sm font-semibold leading-none">App Store</p>
-                  </div>
-                </a>
-                <a href="#" className="flex items-center gap-3 bg-white/10 hover:bg-white/20 border border-white/20 text-white px-5 py-3 rounded-xl transition-colors">
-                  <span className="text-2xl leading-none">▶</span>
-                  <div className="text-left">
-                    <p className="text-xs text-white/50 leading-none mb-0.5">Get it on</p>
-                    <p className="text-sm font-semibold leading-none">Google Play</p>
-                  </div>
-                </a>
-              </div>
-            </div>
+
           </div>
         </div>
       </section>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, RefreshCw } from 'lucide-react';
-import { API_BASE } from '../utils/config';
+import api from '../utils/api';
 import { useToast } from '../context/ToastContext';
 
 interface PageSeo {
@@ -15,11 +15,11 @@ const PageSeoManager: React.FC = () => {
   const [editing, setEditing] = useState<PageSeo | null>(null);
   const [form, setForm] = useState({ page: '', title: '', description: '', keywords: '', og_image: '', no_index: false });
 
-  const headers = { Authorization: `Bearer ${localStorage.getItem('token')}`, 'Content-Type': 'application/json' };
-
   const fetchPages = async () => {
-    const r = await fetch(`${API_BASE}/api/admin/page-seo`, { headers });
-    if (r.ok) setPages(await r.json());
+    try {
+      const { data } = await api.get('/admin/page-seo');
+      setPages(data);
+    } catch { }
     setLoading(false);
   };
 
@@ -27,21 +27,25 @@ const PageSeoManager: React.FC = () => {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    const url = editing ? `${API_BASE}/api/admin/page-seo/${editing.id}` : `${API_BASE}/api/admin/page-seo`;
-    const method = editing ? 'PUT' : 'POST';
-    const r = await fetch(url, { method, headers, body: JSON.stringify(form) });
-    if (r.ok) {
+    try {
+      if (editing) {
+        await api.put(`/admin/page-seo/${editing.id}`, form);
+      } else {
+        await api.post('/admin/page-seo', form);
+      }
       toast(editing ? 'Page SEO updated' : 'Page SEO created', 'success');
       resetForm(); fetchPages();
-    } else {
-      const d = await r.json(); toast(d.message || 'Failed to save', 'error');
+    } catch (err: any) {
+      toast(err.response?.data?.message || 'Failed to save', 'error');
     }
   };
 
   const handleDelete = async (id: number) => {
     if (!window.confirm('Delete this page SEO?')) return;
-    const r = await fetch(`${API_BASE}/api/admin/page-seo/${id}`, { method: 'DELETE', headers });
-    if (r.ok) { toast('Page SEO deleted', 'success'); fetchPages(); }
+    try {
+      await api.delete(`/admin/page-seo/${id}`);
+      toast('Page SEO deleted', 'success'); fetchPages();
+    } catch { }
   };
 
   const resetForm = () => {

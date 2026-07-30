@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, DollarSign, Clock, CheckCircle, XCircle, Star, BarChart3 } from 'lucide-react';
-import { API_BASE } from '../utils/config';
+import api from '../utils/api';
 
 interface Analytics {
   total_bookings: number;
@@ -25,10 +25,8 @@ const VendorAnalytics: React.FC<{ vendorId?: number; allBookings: any[] }> = ({ 
   useEffect(() => {
     const fetchAnalytics = async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/vendor/analytics`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-        });
-        if (res.ok) setData(await res.json());
+        const { data } = await api.get('/vendor/analytics');
+        setData(data);
       } catch { } finally { setLoading(false); }
     };
     fetchAnalytics();

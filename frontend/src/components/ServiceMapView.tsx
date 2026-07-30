@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { Link } from 'react-router-dom';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { slugify } from '../utils/slug';
 
 // Fix Leaflet's broken default icon paths when bundled with webpack/CRA
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -135,7 +136,7 @@ const ServiceMapView: React.FC<Props> = ({ services, userCoords, radius }) => {
                     </span>
                   </div>
                   <Link
-                    to={`/services/${service.id}`}
+                    to={`/services/${service.id}/${slugify(service.name || 'service')}`}
                     className="block w-full text-center bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold py-1.5 rounded-lg transition-colors"
                   >
                     View &amp; Book →

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, User, Mail, Phone, MapPin, CalendarDays, Star, DollarSign } from 'lucide-react';
-import { API_BASE } from '../utils/config';
+import api from '../utils/api';
 import { useToast } from '../context/ToastContext';
 import SeoHead from '../components/SeoHead';
 
@@ -16,29 +16,23 @@ const CustomerProfile: React.FC = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      const token = localStorage.getItem('token');
-      const headers = { 'Authorization': `Bearer ${token}` };
       try {
         const [userRes, bookingRes] = await Promise.all([
-          fetch(`${API_BASE}/api/user`, { headers }),
-          fetch(`${API_BASE}/api/bookings`, { headers }),
+          api.get('/user'),
+          api.get('/bookings'),
         ]);
-        if (userRes.ok) {
-          const u = await userRes.json();
-          setUser(u);
-          setForm({ name: u.name || '', email: u.email || '', phone: u.phone || '', address: u.address || '' });
-        }
-        if (bookingRes.ok) {
-          const d = await bookingRes.json();
-          const bookings = d.data || d;
-          const completed = bookings.filter((b: any) => b.status === 'completed');
-          const spent = completed.reduce((s: number, b: any) => s + (b.price || 0), 0);
-          const reviews = bookings.filter((b: any) => b.review);
-          const avgRating = reviews.length
-            ? reviews.reduce((s: number, b: any) => s + (b.review?.rating || 0), 0) / reviews.length
-            : 0;
-          setStats({ total: bookings.length, completed: completed.length, spent, avgRating: Math.round(avgRating * 10) / 10 });
-        }
+        const u = userRes.data;
+        setUser(u);
+        setForm({ name: u.name || '', email: u.email || '', phone: u.phone || '', address: u.address || '' });
+        const d = bookingRes.data;
+        const bookings = d.data || d;
+        const completed = bookings.filter((b: any) => b.status === 'completed');
+        const spent = completed.reduce((s: number, b: any) => s + (b.price || 0), 0);
+        const reviews = bookings.filter((b: any) => b.review);
+        const avgRating = reviews.length
+          ? reviews.reduce((s: number, b: any) => s + (b.review?.rating || 0), 0) / reviews.length
+          : 0;
+        setStats({ total: bookings.length, completed: completed.length, spent, avgRating: Math.round(avgRating * 10) / 10 });
       } catch (e) { console.error(e); }
       finally { setLoading(false); }
     };
@@ -49,14 +43,11 @@ const CustomerProfile: React.FC = () => {
     e.preventDefault();
     setSaving(true);
     try {
-      const res = await fetch(`${API_BASE}/api/user/profile`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-        body: JSON.stringify(form),
-      });
-      if (res.ok) { toast('Profile updated!'); }
-      else { const d = await res.json(); toast(d.message || 'Failed to update', 'error'); }
-    } catch { toast('Error updating profile', 'error'); }
+      await api.put('/user/profile', form);
+      toast('Profile updated!');
+    } catch (err: any) {
+      toast(err.response?.data?.message || 'Error updating profile', 'error');
+    }
     finally { setSaving(false); }
   };
 

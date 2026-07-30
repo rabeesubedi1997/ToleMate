@@ -5,6 +5,16 @@ import './i18n';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 
+// Suppress harmless ResizeObserver loop error in dev mode (Chrome bug)
+const origError = console.error;
+console.error = (...args: any[]) => {
+  if (/ResizeObserver loop/.test(args[0]?.toString() || '')) return;
+  origError.call(console, ...args);
+};
+window.addEventListener('error', (e) => {
+  if (/ResizeObserver/.test(e.message)) { e.preventDefault(); e.stopPropagation(); }
+});
+
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );

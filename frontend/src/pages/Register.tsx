@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useSettings } from '../context/SettingsContext';
 import { User, Briefcase } from 'lucide-react';
 import SeoHead from '../components/SeoHead';
-import { API_BASE } from '../utils/config';
+import api from '../utils/api';
 
 const Register: React.FC = () => {
   const navigate = useNavigate();
@@ -37,17 +37,7 @@ const Register: React.FC = () => {
     }
 
     try {
-      const response = await fetch(`${API_BASE}/api/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Registration failed');
-      }
+      const { data } = await api.post('/register', formData);
 
       localStorage.setItem('token', data.access_token);
       localStorage.setItem('user', JSON.stringify(data.user));

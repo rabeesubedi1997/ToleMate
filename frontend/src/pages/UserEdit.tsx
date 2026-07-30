@@ -1,7 +1,7 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
-import { API_BASE } from '../utils/config';
+import api from '../utils/api';
 import SeoHead from '../components/SeoHead';
 
 const UserEdit: React.FC = () => {
@@ -15,13 +15,11 @@ const UserEdit: React.FC = () => {
   useEffect(() => { fetchUser(); }, [id]);
 
   const fetchUser = async () => {
-    const res = await fetch(`${API_BASE}/api/admin/users/${id}`, {
-      headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-    });
-    if (res.ok) {
-      const data = await res.json();
+    try {
+      const res = await api.get(`/admin/users/${id}`);
+      const data = res.data;
       setFormData({ name: data.name, email: data.email, role: data.role });
-    }
+    } catch { /* ignore */ }
     setLoading(false);
   };
 
@@ -30,14 +28,11 @@ const UserEdit: React.FC = () => {
     setSaving(true);
     setError('');
     try {
-      const res = await fetch(`${API_BASE}/api/admin/users/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-        body: JSON.stringify(formData)
-      });
-      if (res.ok) navigate('/admin-dashboard');
-      else { const data = await res.json(); setError(data.message || 'Update failed'); }
-    } catch (err) { setError('Connection error'); }
+      await api.put(`/admin/users/${id}`, formData);
+      navigate('/admin-dashboard');
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Connection error');
+    }
     finally { setSaving(false); }
   };
 

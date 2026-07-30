@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { CalendarDays, Search, MessageCircle, CreditCard, Star, Plus, RefreshCw, XCircle, UserCog, ChevronDown, Lock } from 'lucide-react';
 import { DashboardSkeleton } from '../components/Skeleton';
 import { useToast } from '../context/ToastContext';
-import { API_BASE } from '../utils/config';
+import api from '../utils/api';
 import SeoHead from '../components/SeoHead';
 
 interface Booking {
@@ -100,33 +100,27 @@ const Dashboard: React.FC = () => {
     if (!token) { navigate('/login'); return; }
     fetchUser(); fetchBookings();
     // Fetch loyalty points
-    fetch(`${API_BASE}/api/loyalty`, { headers: { 'Authorization': `Bearer ${token}` } })
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d != null) setLoyaltyPoints(d.balance); })
+    api.get('/loyalty')
+      .then(({ data }) => { if (data != null) setLoyaltyPoints(data.balance); })
       .catch(() => {});
   }, [navigate, location.state]);
 
   useEffect(() => { if (user) fetchBookings(activeTab === 'all' ? undefined : activeTab); }, [activeTab, user]);
 
   const fetchUser = async () => {
-    const token = localStorage.getItem('token');
     try {
-      const response = await fetch(`${API_BASE}/api/user`, { headers: { 'Authorization': `Bearer ${token}` } });
-      if (response.ok) {
-        const u = await response.json();
-        setUser(u);
-        setProfileData({ name: u.name || '', phone: u.phone || '' });
-      }
+      const { data: u } = await api.get('/user');
+      setUser(u);
+      setProfileData({ name: u.name || '', phone: u.phone || '' });
     } catch (error) { console.error(error); }
   };
 
   const fetchBookings = async (status?: string) => {
-    const token = localStorage.getItem('token');
     const params = status ? `?status=${status}` : '';
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE}/api/bookings${params}`, { headers: { 'Authorization': `Bearer ${token}` } });
-      if (response.ok) { const data = await response.json(); setBookings(data.data || data); }
+      const { data } = await api.get(`/bookings${params}`);
+      setBookings(data.data || data);
     } catch (error) { console.error(error); } finally { setLoading(false); }
   };
 
@@ -139,54 +133,31 @@ const Dashboard: React.FC = () => {
     if (!selectedBookingForReview) return;
     setSubmittingReview(true); setReviewError('');
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE}/api/reviews`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ booking_id: selectedBookingForReview.id, rating: reviewData.rating, comment: reviewData.comment }),
-      });
-      if (response.ok) { setMessage('Review submitted!'); setReviewModalOpen(false); fetchBookings(activeTab === 'all' ? undefined : activeTab); }
-      else { setReviewError((await response.json()).message || 'Failed to submit review'); }
-    } catch (error) { setReviewError('Network error.'); } finally { setSubmittingReview(false); }
+      await api.post('/reviews', { booking_id: selectedBookingForReview.id, rating: reviewData.rating, comment: reviewData.comment });
+      setMessage('Review submitted!'); setReviewModalOpen(false); fetchBookings(activeTab === 'all' ? undefined : activeTab);
+    } catch (error: any) { setReviewError(error.response?.data?.message || 'Network error.'); } finally { setSubmittingReview(false); }
   };
 
   const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
   const cancelBooking = async (bookingId: number) => {
     if (!window.confirm('Cancel this booking?')) return;
-    const token = localStorage.getItem('token');
     try {
-      const res = await fetch(`${API_BASE}/api/bookings/${bookingId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ status: 'cancelled' }),
-      });
-      if (res.ok) {
-        toast('Booking cancelled', 'info');
-        fetchBookings(activeTab === 'all' ? undefined : activeTab);
-      } else {
-        toast('Could not cancel booking', 'error');
-      }
-    } catch { toast('Network error', 'error'); }
+      await api.put(`/bookings/${bookingId}`, { status: 'cancelled' });
+      toast('Booking cancelled', 'info');
+      fetchBookings(activeTab === 'all' ? undefined : activeTab);
+    } catch { toast('Could not cancel booking', 'error'); }
   };
 
   const saveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingProfile(true);
     try {
-      const res = await fetch(`${API_BASE}/api/user/profile`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-        body: JSON.stringify(profileData),
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        setUser(prev => prev ? { ...prev, name: updated.name || profileData.name } : prev);
-        toast('Profile updated!');
-        setProfileModalOpen(false);
-      } else {
-        toast('Could not update profile', 'error');
-      }
-    } catch { toast('Network error', 'error'); }
+      const { data: updated } = await api.put('/user/profile', profileData);
+      setUser(prev => prev ? { ...prev, name: updated.name || profileData.name } : prev);
+      toast('Profile updated!');
+      setProfileModalOpen(false);
+    } catch { toast('Could not update profile', 'error'); }
     finally { setSavingProfile(false); }
   };
 
@@ -415,19 +386,10 @@ const Dashboard: React.FC = () => {
               e.preventDefault();
               setSavingPw(true);
               try {
-                const res = await fetch(`${API_BASE}/api/user/change-password`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-                  body: JSON.stringify(pwData),
-                });
-                if (res.ok) {
-                  toast('Password changed!');
-                  setPwModalOpen(false);
-                  setPwData({ current_password: '', new_password: '', new_password_confirmation: '' });
-                } else {
-                  const d = await res.json();
-                  toast(d.message || Object.values(d.errors || {}).flat().join(', ') || 'Failed', 'error');
-                }
+                await api.post('/user/change-password', pwData);
+                toast('Password changed!');
+                setPwModalOpen(false);
+                setPwData({ current_password: '', new_password: '', new_password_confirmation: '' });
               } catch { toast('Network error', 'error'); }
               finally { setSavingPw(false); }
             }} className="space-y-3">

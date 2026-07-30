@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
 use App\Models\Vendor;
@@ -72,16 +73,13 @@ class VendorController extends Controller
     public function profile(Request $request)
     {
         $user = $request->user();
-
-        if ($user->role !== 'vendor') {
-            return response()->json(['message' => 'Only vendors have a vendor profile'], 403);
-        }
-
-        $vendor = Vendor::where('user_id', $user->id)->first();
+        $vendor = $user->vendor;
 
         if (!$vendor) {
             return response()->json(['message' => 'Vendor profile not found'], 404);
         }
+
+        Gate::authorize('view', $vendor);
 
         return response()->json($vendor);
     }
@@ -89,16 +87,13 @@ class VendorController extends Controller
     public function updateProfile(Request $request)
     {
         $user = $request->user();
-
-        if ($user->role !== 'vendor') {
-            return response()->json(['message' => 'Only vendors can update vendor profile'], 403);
-        }
-
-        $vendor = Vendor::where('user_id', $user->id)->first();
+        $vendor = $user->vendor;
 
         if (!$vendor) {
             return response()->json(['message' => 'Vendor profile not found'], 404);
         }
+
+        Gate::authorize('update', $vendor);
 
         $validator = Validator::make($request->all(), [
             'business_name' => 'sometimes|required|string|max:255',
@@ -109,6 +104,7 @@ class VendorController extends Controller
             'website' => 'sometimes|nullable|url|max:255',
             'instagram' => 'sometimes|nullable|string|max:255',
             'facebook' => 'sometimes|nullable|string|max:255',
+            'whatsapp_number' => 'sometimes|nullable|string|max:20',
         ]);
 
         if ($validator->fails()) {
@@ -124,6 +120,7 @@ class VendorController extends Controller
             'website',
             'instagram',
             'facebook',
+            'whatsapp_number',
         ]));
 
         return response()->json([
@@ -136,11 +133,10 @@ class VendorController extends Controller
     public function getFeatures(Request $request)
     {
         $user = $request->user();
-        if ($user->role !== 'vendor') {
-            return response()->json(['message' => 'Only vendors can access this'], 403);
-        }
-        $vendor = Vendor::where('user_id', $user->id)->first();
+        $vendor = $user->vendor;
         if (!$vendor) return response()->json(['message' => 'Vendor profile not found'], 404);
+
+        Gate::authorize('view', $vendor);
 
         $rows = VendorFeature::where('vendor_id', $vendor->id)->pluck('is_enabled', 'feature');
         $features = [];
@@ -156,11 +152,10 @@ class VendorController extends Controller
     public function uploadAvatar(Request $request)
     {
         $user = $request->user();
-        if ($user->role !== 'vendor') {
-            return response()->json(['message' => 'Only vendors can upload an avatar'], 403);
-        }
-        $vendor = Vendor::where('user_id', $user->id)->first();
+        $vendor = $user->vendor;
         if (!$vendor) return response()->json(['message' => 'Vendor profile not found'], 404);
+
+        Gate::authorize('update', $vendor);
 
         $validator = Validator::make($request->all(), [
             'avatar' => 'required|file|mimes:jpg,jpeg,png,webp|max:2048',
@@ -187,8 +182,10 @@ class VendorController extends Controller
     public function getAvailability(Request $request)
     {
         $user = $request->user();
-        $vendor = Vendor::where('user_id', $user->id)->first();
+        $vendor = $user->vendor;
         if (!$vendor) return response()->json(['message' => 'Vendor profile not found'], 404);
+
+        Gate::authorize('view', $vendor);
 
         $rows = VendorAvailability::where('vendor_id', $vendor->id)->get()->keyBy('day_of_week');
 
@@ -211,8 +208,10 @@ class VendorController extends Controller
     public function updateAvailability(Request $request)
     {
         $user = $request->user();
-        $vendor = Vendor::where('user_id', $user->id)->first();
+        $vendor = $user->vendor;
         if (!$vendor) return response()->json(['message' => 'Vendor profile not found'], 404);
+
+        Gate::authorize('update', $vendor);
 
         $validator = Validator::make($request->all(), [
             'availability'               => 'required|array|min:7|max:7',
@@ -281,6 +280,8 @@ class VendorController extends Controller
         $user = $request->user();
         $vendor = $user->vendor;
         if (!$vendor) return response()->json(['message' => 'Vendor profile not found'], 404);
+
+        Gate::authorize('view', $vendor);
 
         $vendorId = $vendor->id;
 
@@ -353,6 +354,8 @@ class VendorController extends Controller
 
         if (!$vendor) return response()->json(['message' => 'Vendor profile not found'], 404);
 
+        Gate::authorize('update', $vendor);
+
         $request->validate([
             'type' => 'required|in:' . implode(',', VendorDocument::types()),
             'file' => 'required|file|mimes:jpg,jpeg,png,pdf|max:5120',
@@ -389,6 +392,8 @@ class VendorController extends Controller
         $vendor = $user->vendor;
         if (!$vendor) return response()->json(['message' => 'Vendor profile not found'], 404);
 
+        Gate::authorize('view', $vendor);
+
         $docs = VendorDocument::where('vendor_id', $vendor->id)->orderByDesc('created_at')->get();
         return response()->json($docs);
     }
@@ -398,6 +403,8 @@ class VendorController extends Controller
         $user = $request->user();
         $vendor = $user->vendor;
         if (!$vendor) return response()->json(['message' => 'Vendor profile not found'], 404);
+
+        Gate::authorize('update', $vendor);
 
         $doc = VendorDocument::where('id', $id)->where('vendor_id', $vendor->id)->first();
         if (!$doc) return response()->json(['message' => 'Document not found'], 404);
@@ -414,6 +421,8 @@ class VendorController extends Controller
         $user = $request->user();
         $vendor = $user->vendor;
         if (!$vendor) return response()->json(['message' => 'Vendor profile not found'], 404);
+
+        Gate::authorize('view', $vendor);
 
         $docs = VendorDocument::where('vendor_id', $vendor->id)->get();
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { API_BASE } from '../utils/config';
+import api from '../utils/api';
 
 interface SeoHeadProps {
   title?: string;
@@ -38,9 +38,8 @@ const SeoHead: React.FC<SeoHeadProps> = ({
 
   useEffect(() => {
     if (!page) return;
-    fetch(`${API_BASE}/api/page-seo/${encodeURIComponent(page)}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => setDbSeo(d))
+    api.get(`/page-seo/${encodeURIComponent(page)}`)
+      .then(({ data }) => setDbSeo(data))
       .catch(() => {});
   }, [page]);
 

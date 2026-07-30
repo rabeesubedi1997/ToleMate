@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Search, Star, ChevronRight } from 'lucide-react';
-import { API_BASE, FALLBACK_IMAGE, assetUrl } from '../utils/config';
+import api from '../utils/api';
+import { FALLBACK_IMAGE, assetUrl } from '../utils/config';
 import SeoHead from '../components/SeoHead';
+import { serviceUrl } from '../utils/slug';
 
 const CategoryPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -23,27 +25,23 @@ const CategoryPage: React.FC = () => {
 
   const fetchCategory = async () => {
     try {
-      const r = await fetch(`${API_BASE}/api/categories`);
-      if (r.ok) {
-        const cats = await r.json();
-        const cat = (Array.isArray(cats) ? cats : cats.data || []).find((c: any) => String(c.id) === String(id));
-        if (cat) setCategory(cat);
-      }
+      const r = await api.get('/categories');
+      const cats = r.data;
+      const cat = (Array.isArray(cats) ? cats : cats.data || []).find((c: any) => String(c.id) === String(id));
+      if (cat) setCategory(cat);
     } catch (e) { console.error(e); }
   };
 
   const fetchServices = async (pageNum: number, reset = false) => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ category_id: id || '', page: String(pageNum) });
-      if (search) params.set('query', search);
-      const r = await fetch(`${API_BASE}/api/services/search?${params}`);
-      if (r.ok) {
-        const d = await r.json();
-        const list = d.data || d;
-        setServices(reset ? list : prev => [...prev, ...list]);
-        setHasMore(d.next_page_url ? true : false);
-      }
+      const params: any = { category_id: id || '', page: String(pageNum) };
+      if (search) params.query = search;
+      const r = await api.get('/services/search', { params });
+      const d = r.data;
+      const list = d.data || d;
+      setServices(reset ? list : prev => [...prev, ...list]);
+      setHasMore(d.next_page_url ? true : false);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   };
@@ -114,7 +112,7 @@ const CategoryPage: React.FC = () => {
               {sorted.map(service => {
                 const img = service.images?.[0]?.image_url;
                 return (
-                  <Link key={service.id} to={`/services/${service.id}`}
+                  <Link key={service.id} to={serviceUrl(service)}
                     className="card overflow-hidden hover:shadow-lg transition-shadow group block">
                     <div className="relative h-44 bg-gradient-to-br from-primary-100 to-primary-200 overflow-hidden">
                       {img ? (

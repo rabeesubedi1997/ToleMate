@@ -4,7 +4,7 @@ import { useSettings } from '../../context/SettingsContext';
 import { useAuth } from '../../context/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { Menu, X, Globe, Heart, Bell, MessageCircle } from 'lucide-react';
-import { API_BASE } from '../../utils/config';
+import api from '../../utils/api';
 
 interface MenuItem { id: number; label: string; path: string; icon?: string; children?: MenuItem[]; }
 
@@ -23,11 +23,8 @@ const Header: React.FC = () => {
   useEffect(() => {
     const fetchMenu = async () => {
       try {
-        const token = localStorage.getItem('token');
-        const headers: Record<string, string> = {};
-        if (token) headers['Authorization'] = `Bearer ${token}`;
-        const r = await fetch(`${API_BASE}/api/menus`, { headers });
-        if (r.ok) setNavLinks(await r.json());
+        const { data } = await api.get('/menus');
+        if (data) setNavLinks(data);
       } catch { }
     };
     fetchMenu();
@@ -37,18 +34,12 @@ const Header: React.FC = () => {
     if (!isAuthenticated) return;
 
     const fetchCounts = () => {
-      const token = localStorage.getItem('token');
-      if (!token) return;
-      fetch(`${API_BASE}/api/notifications/unread-count`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      }).then(r => r.ok ? r.json() : null)
-        .then(d => { if (d) setUnreadCount(d.unread_count ?? 0); })
+      api.get('/notifications/unread-count')
+        .then(({ data }) => { if (data) setUnreadCount(data.unread_count ?? 0); })
         .catch(() => {});
 
-      fetch(`${API_BASE}/api/messages/unread-count`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      }).then(r => r.ok ? r.json() : null)
-        .then(d => { if (d) setUnreadMessages(d.unread_count ?? d.count ?? 0); })
+      api.get('/messages/unread-count')
+        .then(({ data }) => { if (data) setUnreadMessages(data.unread_count ?? data.count ?? 0); })
         .catch(() => {});
     };
 
@@ -90,9 +81,7 @@ const Header: React.FC = () => {
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary-600 text-white rounded-lg flex items-center justify-center font-bold text-sm">
-              {siteName.charAt(0) || 'T'}
-            </div>
+            <img src="/apple-touch-icon.png" alt={siteName} className="w-8 h-8 rounded-lg" />
             <span className="font-bold text-lg text-gray-900">{siteName}</span>
           </Link>
 
@@ -183,7 +172,7 @@ const Header: React.FC = () => {
 
       {/* Mobile Navigation */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-gray-100 bg-white animate-fade-in">
+        <div className="md:hidden absolute left-0 right-0 top-full z-40 bg-white animate-fade-in border-t border-gray-100 shadow-lg rounded-b-xl max-h-[calc(100vh-4rem)] overflow-y-auto">
           <div className="container-custom py-3 space-y-1">
             {navLinks.map((link: any, idx: number) => (
               <Link

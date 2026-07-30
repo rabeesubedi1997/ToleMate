@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { Send, MessageCircle, Plus, ArrowLeft, CheckCheck } from 'lucide-react';
 import SeoHead from '../components/SeoHead';
 
+import api from '../utils/api';
 import { API_BASE } from '../utils/config';
 
 const WhatsAppIcon = () => (
@@ -39,7 +40,7 @@ interface Conversation {
   unread?: number;
 }
 
-const API = `${API_BASE}/api`;
+
 
 // Role-specific bubble colours for received messages
 const ROLE_COLORS: Record<string, string> = {
@@ -78,17 +79,12 @@ const Messages: React.FC = () => {
   const [adminUser, setAdminUser] = useState<{ id: number; name: string } | null>(null);
   const [otherPhone, setOtherPhone] = useState<string | null>(null);
 
-  const h = useCallback(
-    () => ({ Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }),
-    [token]
-  );
-
   const fetchAdminUser = useCallback(async () => {
     try {
-      const r = await fetch(`${API}/admin-contact`, { headers: h() });
-      if (r.ok) setAdminUser(await r.json());
+      const { data } = await api.get('/admin-contact');
+      setAdminUser(data);
     } catch {}
-  }, [h]);
+  }, []);
 
   const fetchConversations = useCallback(async () => {
     // Cancel any in-flight request before starting a new one
@@ -96,22 +92,20 @@ const Messages: React.FC = () => {
     const controller = new AbortController();
     convFetchController.current = controller;
     try {
-      const [bookingRes, directRes] = await Promise.all([
-        fetch(`${API}/conversations`, { headers: h(), signal: controller.signal }),
-        fetch(`${API}/direct-conversations`, { headers: h(), signal: controller.signal }),
+      const [bookingRes, directRes] = await Promise.allSettled([
+        api.get('/conversations', { signal: controller.signal }),
+        api.get('/direct-conversations', { signal: controller.signal }),
       ]);
 
       const convs: Conversation[] = [];
 
-      if (bookingRes.ok) {
-        const bookings: any[] = await bookingRes.json();
+      if (bookingRes.status === 'fulfilled' && bookingRes.value.data) {
+        const bookings: any[] = bookingRes.value.data;
         bookings.forEach((b: any) => {
-          // For admin, show customer name as "other"; for vendor show customer; for customer show vendor
           let other: { id: number; name: string; role: string };
           if (user?.role === 'vendor') {
             other = { id: b.customer?.id, name: b.customer?.name ?? 'Customer', role: 'customer' };
           } else if (user?.role === 'admin') {
-            // Admin sees booking as customerâ†”vendor thread
             other = { id: b.customer?.id, name: b.customer?.name ?? 'Customer', role: 'customer' };
           } else {
             other = {
@@ -135,8 +129,8 @@ const Messages: React.FC = () => {
         });
       }
 
-      if (directRes.ok) {
-        const directs: any[] = await directRes.json();
+      if (directRes.status === 'fulfilled' && directRes.value.data) {
+        const directs: any[] = directRes.value.data;
         directs.forEach((d: any) => {
           convs.push({
             type: 'direct',
@@ -165,7 +159,7 @@ const Messages: React.FC = () => {
     } catch (e: any) {
       if (e?.name !== 'AbortError') setLoading(false);
     }
-  }, [h, user?.role, location.search]);
+  }, [user?.role, location.search]);
 
 
 
@@ -197,23 +191,12 @@ const Messages: React.FC = () => {
       if (selected.type === 'booking') body.booking_id = selected.id;
       else body.receiver_id = selected.other.id;
 
-      const r = await fetch(`${API}/messages`, {
-        method: 'POST',
-        headers: h(),
-        body: JSON.stringify(body),
-      });
-      if (r.ok) {
-        const data = await r.json();
-        // Replace optimistic with real message
-        setMessages(prev => prev.map(m => m.id === tempId ? data.message : m));
+      const { data } = await api.post('/messages', body);
+      // Replace optimistic with real message
+      setMessages(prev => prev.map(m => m.id === tempId ? data.message : m));
         setConversations(prev =>
           prev.map(c => c.id === selected.id ? { ...c, lastMessage: text, lastTime: new Date().toISOString() } : c)
         );
-      } else {
-        // Remove optimistic on failure
-        setMessages(prev => prev.filter(m => m.id !== tempId));
-        setNewMessage(text);
-      }
     } catch {
       setMessages(prev => prev.filter(m => m.id !== tempId));
       setNewMessage(text);
@@ -231,9 +214,14 @@ const Messages: React.FC = () => {
     setOtherPhone(null);
     // Fetch phone for vendor or admin to show WhatsApp button
     if (conv.other.role === 'vendor' || conv.other.role === 'admin') {
-      fetch(`${API}/users/${conv.other.id}/phone`, { headers: h() })
-        .then(r => r.ok ? r.json() : null)
-        .then(d => { if (d?.phone) setOtherPhone(d.phone); })
+      api.get(`/users/${conv.other.id}/phone`)
+        .then(({ data }) => {
+          if (data?.phone && data?.whatsapp_enabled !== false) {
+            setOtherPhone(data.whatsapp_number || data.phone);
+          } else {
+            setOtherPhone(null);
+          }
+        })
         .catch(() => {});
     }
     setTimeout(() => inputRef.current?.focus(), 100);
@@ -296,8 +284,8 @@ const Messages: React.FC = () => {
       ? `booking_id=${selected.id}`
       : `with=${selected.other.id}`;
 
-    fetch(`${API}/messages?${param}`, { headers: h() })
-      .then(r => r.ok ? r.json() : [])
+    api.get(`/messages?${param}`)
+      .then(({ data }) => data as IMessage[])
       .then((msgs: IMessage[]) => {
         if (cancelled) return;
         setMessages(msgs);
@@ -323,7 +311,7 @@ const Messages: React.FC = () => {
 
     const connect = (fromLastId: number) => {
       if (destroyed) return;
-      const url = `${API}/events?token=${encodeURIComponent(token)}&lastEventId=${fromLastId}`;
+      const url = `${API_BASE}/api/events?token=${encodeURIComponent(token)}&lastEventId=${fromLastId}`;
       es = new EventSource(url);
 
       // Handle incoming message event

@@ -2,7 +2,8 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { LayoutDashboard, Briefcase, Inbox, CalendarDays, ShoppingBag, Plus, DollarSign, Star, TrendingUp, Menu, X, Clock, MessageSquare, Lock, Camera, BarChart3 } from 'lucide-react';
-import { API_BASE, FALLBACK_IMAGE, assetUrl } from '../utils/config';
+import { FALLBACK_IMAGE, assetUrl } from '../utils/config';
+import api from '../utils/api';
 import { DashboardSkeleton } from '../components/Skeleton';
 import SeoHead from '../components/SeoHead';
 import VendorAnalytics from '../components/VendorAnalytics';
@@ -42,7 +43,7 @@ const VendorDashboard: React.FC = () => {
   const [replySaving, setReplySaving] = useState(false);
 
   // Feature flags from admin
-  const [features, setFeatures] = useState<Record<string, boolean>>({ bookings: true, messaging: true, services: true, availability_edit: true, social_links: true, reviews: true });
+  const [features, setFeatures] = useState<Record<string, boolean>>({ bookings: true, messaging: true, services: true, availability_edit: true, social_links: true, reviews: true, whatsapp: true });
 
   // Bundles
   const [bundles, setBundles] = useState<any[]>([]);
@@ -60,40 +61,35 @@ const VendorDashboard: React.FC = () => {
     fetchAll();
   }, [navigate]);
 
-  const fetchUser = async () => { const r = await fetch(`${API_BASE}/api/user`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }); if (r.ok) setUser(await r.json()); };
-  const fetchVendorData = async () => { const r = await fetch(`${API_BASE}/api/vendor/profile`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }); if (r.ok) { const d = await r.json(); setVendor(d); if (d.id) fetchPortfolio(d.id); } };
-  const fetchServices = async () => { const r = await fetch(`${API_BASE}/api/services`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }); if (r.ok) { const d = await r.json(); setServices(d.data || d); } };
-  const fetchBookingRequests = async () => { const r = await fetch(`${API_BASE}/api/booking-requests`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }); if (r.ok) { const d = await r.json(); setBookingRequests(d.data || d); } };
-  const fetchBookings = async () => { const r = await fetch(`${API_BASE}/api/bookings`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }); if (r.ok) { const d = await r.json(); setAllBookings(d.data || d); } };
+  const fetchUser = async () => { try { const { data } = await api.get('/user'); setUser(data); } catch {} };
+  const fetchVendorData = async () => { try { const { data: d } = await api.get('/vendor/profile'); setVendor(d); if (d.id) fetchPortfolio(d.id); } catch {} };
+  const fetchServices = async () => { try { const { data: d } = await api.get('/services'); setServices(d.data || d); } catch {} };
+  const fetchBookingRequests = async () => { try { const { data: d } = await api.get('/booking-requests'); setBookingRequests(d.data || d); } catch {} };
+  const fetchBookings = async () => { try { const { data: d } = await api.get('/bookings'); setAllBookings(d.data || d); } catch {} };
   const fetchAvailability = async () => {
-    const r = await fetch(`${API_BASE}/api/vendor/availability`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
-    if (r.ok) { const d = await r.json(); setAvailability(d.availability || []); }
+    try { const { data: d } = await api.get('/vendor/availability'); setAvailability(d.availability || []); } catch {}
   };
 
   const fetchVendorReviews = async () => {
-    const r = await fetch(`${API_BASE}/api/vendor/profile`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
-    if (r.ok) {
-      const v = await r.json();
+    try {
+      const { data: v } = await api.get('/vendor/profile');
       if (v.id) {
-        const rev = await fetch(`${API_BASE}/api/vendors/${v.id}/reviews`);
-        if (rev.ok) { const d = await rev.json(); setVendorReviews(d.data || d); }
+        const { data: d } = await api.get(`/vendors/${v.id}/reviews`);
+        setVendorReviews(d.data || d);
       }
-    }
+    } catch {}
   };
 
   const fetchFeatures = async () => {
-    const r = await fetch(`${API_BASE}/api/vendor/features`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
-    if (r.ok) { const d = await r.json(); setFeatures(prev => ({ ...prev, ...d.features })); }
+    try { const { data: d } = await api.get('/vendor/features'); setFeatures(prev => ({ ...prev, ...d.features })); } catch {}
   };
 
   const fetchBundles = async () => {
-    const r = await fetch(`${API_BASE}/api/vendor/bundles`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
-    if (r.ok) { const d = await r.json(); setBundles(d.bundles || []); }
+    try { const { data: d } = await api.get('/vendor/bundles'); setBundles(d.bundles || []); } catch {}
   };
 
   const fetchPortfolio = async (vendorId: number) => {
-    const r = await fetch(`${API_BASE}/api/vendors/${vendorId}/portfolio`);
-    if (r.ok) { const d = await r.json(); setPortfolioItems(d.portfolio || []); }
+    try { const { data: d } = await api.get(`/vendors/${vendorId}/portfolio`); setPortfolioItems(d.portfolio || []); } catch {}
   };
 
   const handlePortfolioUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -101,67 +97,52 @@ const VendorDashboard: React.FC = () => {
     setPortfolioUploading(true);
     const fd = new FormData();
     fd.append('image', e.target.files[0]);
-    const r = await fetch(`${API_BASE}/api/vendor/portfolio`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-      body: fd,
-    });
+    try {
+      const { data: d } = await api.post('/vendor/portfolio', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      setPortfolioItems(prev => [...prev, d.item]);
+    } catch {}
     setPortfolioUploading(false);
-    if (r.ok) { const d = await r.json(); setPortfolioItems(prev => [...prev, d.item]); }
   };
 
   const deletePortfolioItem = async (itemId: number) => {
-    const r = await fetch(`${API_BASE}/api/vendor/portfolio/${itemId}`, {
-      method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-    });
-    if (r.ok) setPortfolioItems(prev => prev.filter(i => i.id !== itemId));
+    try { await api.delete(`/vendor/portfolio/${itemId}`); setPortfolioItems(prev => prev.filter(i => i.id !== itemId)); } catch {}
   };
 
   const createBundle = async () => {
     if (!bundleForm.name || !bundleForm.bundle_price || bundleForm.service_ids.length < 2) return;
     setBundleSaving(true);
-    const r = await fetch(`${API_BASE}/api/vendor/bundles`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-      body: JSON.stringify({ ...bundleForm, discount_percent: bundleForm.discount_percent || 0 }),
-    });
+    try {
+      const { data: d } = await api.post('/vendor/bundles', { ...bundleForm, discount_percent: bundleForm.discount_percent || 0 });
+      setBundles(prev => [...prev, d.bundle]);
+      setBundleForm({ name: '', description: '', service_ids: [], bundle_price: '', discount_percent: '' });
+    } catch {}
     setBundleSaving(false);
-    if (r.ok) { const d = await r.json(); setBundles(prev => [...prev, d.bundle]); setBundleForm({ name: '', description: '', service_ids: [], bundle_price: '', discount_percent: '' }); }
   };
 
   const deleteBundle = async (id: number) => {
-    const r = await fetch(`${API_BASE}/api/vendor/bundles/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
-    if (r.ok) setBundles(prev => prev.filter(b => b.id !== id));
+    try { await api.delete(`/vendor/bundles/${id}`); setBundles(prev => prev.filter(b => b.id !== id)); } catch {}
   };
   const saveAvailability = async () => {
     setAvailSaving(true);
-    const r = await fetch(`${API_BASE}/api/vendor/availability`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-      body: JSON.stringify({ availability }),
-    });
+    try {
+      await api.put('/vendor/availability', { availability });
+      setAvailSaved(true); setTimeout(() => setAvailSaved(false), 2500);
+    } catch {}
     setAvailSaving(false);
-    if (r.ok) { setAvailSaved(true); setTimeout(() => setAvailSaved(false), 2500); }
   };
 
   const respondReschedule = async (bookingId: number, action: 'accept' | 'decline') => {
-    const r = await fetch(`${API_BASE}/api/bookings/${bookingId}/reschedule-respond`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-      body: JSON.stringify({ action }),
-    });
-    if (r.ok) {
-      const d = await r.json();
+    try {
+      const { data: d } = await api.post(`/bookings/${bookingId}/reschedule-respond`, { action });
       setAllBookings(prev => prev.map(b => b.id === bookingId ? { ...b, ...d.booking } : b));
-    }
+    } catch {}
   };
 
   const totalEarnings = allBookings.filter(b => b.status === 'completed').reduce((s, b) => s + (b.price || 0), 0);
   const activeBookingsCount = allBookings.filter(b => ['accepted', 'in_progress'].includes(b.status)).length;
 
   const toggleServiceStatus = async (serviceId: number, currentStatus: boolean) => {
-    try { const r = await fetch(`${API_BASE}/api/services/${serviceId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` }, body: JSON.stringify({ is_active: !currentStatus }) }); if (r.ok) fetchServices(); } catch (e) { console.error(e); }
+    try { await api.put(`/services/${serviceId}`, { is_active: !currentStatus }); fetchServices(); } catch (e) { console.error(e); }
   };
 
   const handleServiceImageUpload = async (serviceId: number, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -170,29 +151,21 @@ const VendorDashboard: React.FC = () => {
     const form = new FormData();
     form.append('image', file);
     try {
-      const r = await fetch(`${API_BASE}/api/services/${serviceId}/image`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-        body: form,
-      });
-      if (r.ok) fetchServices();
+      await api.post(`/services/${serviceId}/image`, form, { headers: { 'Content-Type': 'multipart/form-data' } });
+      fetchServices();
     } catch (err) { console.error(err); }
   };
 
   const updateBookingStatus = async (bookingId: number, status: string) => {
-    try { const r = await fetch(`${API_BASE}/api/bookings/${bookingId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` }, body: JSON.stringify({ status }) }); if (r.ok) fetchBookings(); } catch (e) { console.error(e); }
+    try { await api.put(`/bookings/${bookingId}`, { status }); fetchBookings(); } catch (e) { console.error(e); }
   };
 
   const postReply = async (reviewId: number) => {
     if (!replyText.trim()) return;
     setReplySaving(true);
     try {
-      const r = await fetch(`${API_BASE}/api/reviews/${reviewId}/reply`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-        body: JSON.stringify({ vendor_reply: replyText }),
-      });
-      if (r.ok) { setReplyText(''); setReplyingTo(null); fetchVendorReviews(); }
+      await api.put(`/reviews/${reviewId}/reply`, { vendor_reply: replyText });
+      setReplyText(''); setReplyingTo(null); fetchVendorReviews();
     } finally { setReplySaving(false); }
   };
 

@@ -9,6 +9,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Header from './components/Layout/Header';
 import Footer from './components/Layout/Footer';
 import MobileBottomNav from './components/Layout/MobileBottomNav';
+import ScrollToTop from './components/ScrollToTop';
 import './index.css';
 
 const Home               = lazy(() => import('./pages/Home'));
@@ -23,7 +24,7 @@ const Dashboard          = lazy(() => import('./pages/Dashboard'));
 const Messages           = lazy(() => import('./pages/Messages'));
 const VendorDashboard    = lazy(() => import('./pages/VendorDashboard'));
 const AdminDashboard     = lazy(() => import('./pages/AdminDashboard'));
-const SuperAdminDashboard= lazy(() => import('./pages/SuperAdminDashboard'));
+
 const ServiceEdit        = lazy(() => import('./pages/ServiceEdit'));
 const UserEdit           = lazy(() => import('./pages/UserEdit'));
 const Notifications      = lazy(() => import('./pages/Notifications'));
@@ -60,6 +61,7 @@ function AppContent() {
   return (
     <SettingsProvider>
       <Router>
+        <ScrollToTop />
         <DefaultSeo />
         <div className="min-h-screen flex flex-col bg-gray-50">
           <Header />
@@ -73,7 +75,7 @@ function AppContent() {
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/services" element={<Services />} />
-                <Route path="/services/:id" element={<ServicesDetail />} />
+                <Route path="/services/:id/:slug?" element={<ServicesDetail />} />
                 <Route path="/categories/:id" element={<CategoryPage />} />
                 <Route path="/vendors/:id" element={<VendorPublicProfile />} />
 
@@ -94,7 +96,7 @@ function AppContent() {
 
                 {/* Admin routes */}
                 <Route path="/admin-dashboard" element={<ProtectedRoute allowedRoles={['admin', 'super_admin']}><AdminDashboard /></ProtectedRoute>} />
-                <Route path="/super-admin" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminDashboard /></ProtectedRoute>} />
+                <Route path="/super-admin" element={<Navigate to="/admin-dashboard" replace />} />
                 <Route path="/admin/users/:id/edit" element={<ProtectedRoute allowedRoles={['admin']}><UserEdit /></ProtectedRoute>} />
 
                 {/* Shared authenticated routes */}

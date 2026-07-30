@@ -1,6 +1,7 @@
 ﻿import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import api from '../utils/api';
 import { API_BASE, FALLBACK_IMAGE } from '../utils/config';
 import { useToast } from '../context/ToastContext';
 import {
@@ -8,16 +9,15 @@ import {
   ShoppingBag, RefreshCw, Plus, Trash2, Store, ChevronRight,
   Eye, X, Layers, Calendar, Tag, MessageSquare, ArrowUp,
   ArrowDown, ToggleLeft, ToggleRight, ExternalLink, Edit2, Check, CheckCircle2,
-  Ticket, Globe, Search, List, FileText
+  Ticket, Globe, Search, List, FileText, DollarSign, Shield, Activity, Clock
 } from 'lucide-react';
 import SeoHead from '../components/SeoHead';
 import MenuManager from '../components/MenuManager';
 import PageSeoManager from '../components/PageSeoManager';
 
 type Tab = 'dashboard' | 'users' | 'vendors' | 'bookings' | 'services' |
-           'categories' | 'media' | 'slider' | 'messages' | 'reviews' | 'settings' | 'coupons' | 'seo' | 'menus' | 'page-seo';
-
-const API = `${API_BASE}/api`;
+           'categories' | 'media' | 'slider' | 'messages' | 'reviews' | 'settings' | 'coupons' | 'seo' | 'menus' | 'page-seo' |
+           'commissions' | 'kyc' | 'moderation' | 'activities';
 
 const DEFAULT_SLIDES = [
   { url: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=1200&q=80', title: 'Professional Home Repair Services', link: '/services', enabled: true },
@@ -90,6 +90,9 @@ const AdminDashboard: React.FC = () => {
   const [savingFeatures, setSavingFeatures] = useState(false);
   const [vendorAvailability, setVendorAvailability] = useState<any[]>([]);
   const [savingAdminAvail, setSavingAdminAvail] = useState(false);
+  const [showVendorEdit, setShowVendorEdit] = useState(false);
+  const [vendorEditForm, setVendorEditForm] = useState<any>({});
+  const [savingVendorEdit, setSavingVendorEdit] = useState(false);
 
   // Vendor bulk selection
   const [selectedVendorIds, setSelectedVendorIds] = useState<Set<number>>(new Set());
@@ -113,104 +116,127 @@ const AdminDashboard: React.FC = () => {
   const [resetError, setResetError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
 
-  const h = useCallback(() => ({ Authorization: `Bearer ${token}` }), [token]);
+  // Super Admin state
+  const [pendingServices, setPendingServices] = useState<any[]>([]);
+  const [moderationFilter, setModerationFilter] = useState('pending');
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [commissions, setCommissions] = useState<any[]>([]);
+  const [commissionStats, setCommissionStats] = useState<any>(null);
+  const [commissionFilter, setCommissionFilter] = useState('');
+  const [newRate, setNewRate] = useState('10');
+  const [showRateModal, setShowRateModal] = useState(false);
+  const [kycVendors, setKycVendors] = useState<any[]>([]);
+  const [activities, setActivities] = useState<any[]>([]);
+  const [overview, setOverview] = useState<any>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const headers = h();
     try {
       if (activeTab === 'dashboard') {
-        const r = await fetch(`${API}/admin/stats`, { headers });
-        if (r.ok) setStats(await r.json());
+        const { data } = await api.get('/admin/stats');
+        setStats(data);
       } else if (activeTab === 'users') {
-        const r = await fetch(`${API}/admin/users`, { headers });
-        if (r.ok) { const d = await r.json(); setUsers(d.data || d); }
+        const { data } = await api.get('/admin/users');
+        setUsers(data.data || data);
       } else if (activeTab === 'vendors') {
-        const r = await fetch(`${API}/admin/vendors`, { headers });
-        if (r.ok) { const d = await r.json(); setVendors(d.data || d); }
+        const { data } = await api.get('/admin/vendors');
+        setVendors(data.data || data);
       } else if (activeTab === 'bookings') {
-        const url = bookingFilter ? `${API}/admin/bookings?status=${bookingFilter}` : `${API}/admin/bookings`;
-        const r = await fetch(url, { headers });
-        if (r.ok) { const d = await r.json(); setBookings(d.data || d); }
+        const url = bookingFilter ? `/admin/bookings?status=${bookingFilter}` : '/admin/bookings';
+        const { data } = await api.get(url);
+        setBookings(data.data || data);
       } else if (activeTab === 'services') {
-        const r = await fetch(`${API}/services`, { headers });
-        if (r.ok) { const d = await r.json(); setServices(d.data || d); }
+        const { data } = await api.get('/services');
+        setServices(data.data || data);
       } else if (activeTab === 'categories') {
-        const r = await fetch(`${API}/admin/categories`, { headers });
-        if (r.ok) { const d = await r.json(); setCategories(Array.isArray(d) ? d : d.data || []); }
+        const { data } = await api.get('/admin/categories');
+        setCategories(Array.isArray(data) ? data : data.data || []);
       } else if (activeTab === 'media') {
-        const r = await fetch(`${API}/admin/media`, { headers });
-        if (r.ok) { const d = await r.json(); setMedia(d.data || d); }
+        const { data } = await api.get('/admin/media');
+        setMedia(data.data || data);
       } else if (activeTab === 'slider') {
-        const [settingsRes, mediaRes] = await Promise.all([
-          fetch(`${API}/settings`),
-          fetch(`${API}/admin/media`, { headers }),
+        const [settingsRes, mediaRes] = await Promise.allSettled([
+          api.get('/settings'),
+          api.get('/admin/media'),
         ]);
-        if (settingsRes.ok) {
-          const data = await settingsRes.json();
-          // API returns a key-value object: { slider_images: "[...]" }
+        if (settingsRes.status === 'fulfilled') {
+          const data = settingsRes.value.data;
           const raw = data?.slider_images;
           try {
             const parsed = JSON.parse(raw || '[]');
             setSliderImages(parsed.length > 0 ? parsed : []);
           } catch { setSliderImages([]); }
         }
-        if (mediaRes.ok) { const d = await mediaRes.json(); setMedia(d.data || d); }
+        if (mediaRes.status === 'fulfilled') {
+          const d = mediaRes.value.data;
+          setMedia(d.data || d);
+        }
       } else if (activeTab === 'messages') {
         const controller = new AbortController();
         const abortTimer = setTimeout(() => controller.abort(), 15000);
         const [convResult, directResult] = await Promise.allSettled([
-          fetch(`${API}/admin/conversations`, { headers, signal: controller.signal }),
-          fetch(`${API}/direct-conversations`, { headers, signal: controller.signal }),
+          api.get('/admin/conversations', { signal: controller.signal }),
+          api.get('/direct-conversations', { signal: controller.signal }),
         ]);
         clearTimeout(abortTimer);
-        if (convResult.status === 'fulfilled' && convResult.value.ok) {
-          const d = await convResult.value.json(); setConversations(d.data || d);
+        if (convResult.status === 'fulfilled') {
+          const d = convResult.value.data; setConversations(d.data || d);
         }
-        if (directResult.status === 'fulfilled' && directResult.value.ok) {
-          const d = await directResult.value.json(); setDirectConvs(d);
+        if (directResult.status === 'fulfilled') {
+          const d = directResult.value.data; setDirectConvs(d);
         }
       } else if (activeTab === 'reviews') {
-        const r = await fetch(`${API}/admin/reviews`, { headers });
-        if (r.ok) { const d = await r.json(); setReviews(d.data || d); }
+        const { data } = await api.get('/admin/reviews');
+        setReviews(data.data || data);
       } else if (activeTab === 'coupons') {
-        const r = await fetch(`${API}/admin/coupons`, { headers });
-        if (r.ok) { const d = await r.json(); setCoupons(d); }
+        const { data } = await api.get('/admin/coupons');
+        setCoupons(data);
       } else if (activeTab === 'settings') {
-        const r = await fetch(`${API}/settings`);
-        if (r.ok) {
-          const data = await r.json();
-          const find = (k: string) => data?.[k] || '';
-          setSiteName(find('site_name'));
-          setContactEmail(find('contact_email'));
-          setHeroTitle(find('hero_title'));
-          setHeroSubtitle(find('hero_subtitle'));
+        const { data } = await api.get('/settings');
+        const find = (k: string) => data?.[k] || '';
+        setSiteName(find('site_name'));
+        setContactEmail(find('contact_email'));
+        setHeroTitle(find('hero_title'));
+        setHeroSubtitle(find('hero_subtitle'));
 
-          setSliderInterval(data?.slider_interval || '5000');
-          setSeoHomeTitle(find('seo_home_title'));
-          setSeoHomeDesc(find('seo_home_desc'));
-          setSeoHomeKeywords(find('seo_home_keywords'));
-          setSeoOgImage(find('seo_og_image'));
-          setSeoGtmId(find('seo_gtm_id'));
-          setSeoSiteVerification(find('seo_site_verification'));
-          setSeoSchemaOrg(find('seo_schema_org'));
-        }
+        setSliderInterval(data?.slider_interval || '5000');
+        setSeoHomeTitle(find('seo_home_title'));
+        setSeoHomeDesc(find('seo_home_desc'));
+        setSeoHomeKeywords(find('seo_home_keywords'));
+        setSeoOgImage(find('seo_og_image'));
+        setSeoGtmId(find('seo_gtm_id'));
+        setSeoSiteVerification(find('seo_site_verification'));
+        setSeoSchemaOrg(find('seo_schema_org'));
       } else if (activeTab === 'seo') {
-        const r = await fetch(`${API}/settings`);
-        if (r.ok) {
-          const data = await r.json();
-          const find = (k: string) => data?.[k] || '';
-          setSeoHomeTitle(find('seo_home_title'));
-          setSeoHomeDesc(find('seo_home_desc'));
-          setSeoHomeKeywords(find('seo_home_keywords'));
-          setSeoOgImage(find('seo_og_image'));
-          setSeoGtmId(find('seo_gtm_id'));
-          setSeoSiteVerification(find('seo_site_verification'));
-          setSeoSchemaOrg(find('seo_schema_org'));
-        }
+        const { data } = await api.get('/settings');
+        const find = (k: string) => data?.[k] || '';
+        setSeoHomeTitle(find('seo_home_title'));
+        setSeoHomeDesc(find('seo_home_desc'));
+        setSeoHomeKeywords(find('seo_home_keywords'));
+        setSeoOgImage(find('seo_og_image'));
+        setSeoGtmId(find('seo_gtm_id'));
+        setSeoSiteVerification(find('seo_site_verification'));
+        setSeoSchemaOrg(find('seo_schema_org'));
+      } else if (activeTab === 'moderation') {
+        const { data } = await api.get(`/super-admin/services/moderation?status=${moderationFilter}`);
+        setPendingServices(data.data || data);
+      } else if (activeTab === 'commissions') {
+        const params = commissionFilter ? `?status=${commissionFilter}` : '';
+        const [r1, r2] = await Promise.allSettled([
+          api.get(`/super-admin/commissions${params}`),
+          api.get('/super-admin/commissions/stats'),
+        ]);
+        if (r1.status === 'fulfilled') { const d = r1.value.data; setCommissions(d.data || d); }
+        if (r2.status === 'fulfilled') { const d = r2.value.data; setCommissionStats(d); setNewRate(String(d.default_rate ?? 10)); }
+      } else if (activeTab === 'kyc') {
+        const { data } = await api.get('/super-admin/kyc/pending');
+        setKycVendors(data);
+      } else if (activeTab === 'activities') {
+        const { data } = await api.get('/super-admin/activity-logs');
+        setActivities(data.data || data);
       }
     } catch (e) { console.error(e); } finally { setLoading(false); }
-  }, [activeTab, bookingFilter, h]);
+  }, [activeTab, bookingFilter, moderationFilter, commissionFilter]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -219,37 +245,37 @@ const AdminDashboard: React.FC = () => {
     setVendorDetailTab('services');
     setVendorBookings([]); setVendorChats([]); setVendorServices([]);
     setVendorFeatures({}); setVendorAvailability([]);
-    const headers = h();
     try {
-      const [sRes, bRes, mRes, fRes, aRes] = await Promise.all([
-        fetch(`${API}/admin/vendors/${vendor.id}/services`, { headers }),
-        fetch(`${API}/admin/vendors/${vendor.id}/bookings`, { headers }),
-        fetch(`${API}/admin/vendors/${vendor.id}/messages`, { headers }),
-        fetch(`${API}/admin/vendors/${vendor.id}/features`, { headers }),
-        fetch(`${API}/admin/vendors/${vendor.id}/availability`, { headers }),
+      const [sRes, bRes, mRes, fRes, aRes] = await Promise.allSettled([
+        api.get(`/admin/vendors/${vendor.id}/services`),
+        api.get(`/admin/vendors/${vendor.id}/bookings`),
+        api.get(`/admin/vendors/${vendor.id}/messages`),
+        api.get(`/admin/vendors/${vendor.id}/features`),
+        api.get(`/admin/vendors/${vendor.id}/availability`),
       ]);
-      if (sRes.ok) { const d = await sRes.json(); setVendorServices(d.data || d); }
-      if (bRes.ok) { const d = await bRes.json(); setVendorBookings(d.data || d); }
-      if (mRes.ok) { const d = await mRes.json(); setVendorChats(d.data || d); }
-      if (fRes.ok) { const d = await fRes.json(); setVendorFeatures(d.features || {}); }
-      if (aRes.ok) { const d = await aRes.json(); setVendorAvailability(d.availability || []); }
+      if (sRes.status === 'fulfilled') { const d = sRes.value.data; setVendorServices(d.data || d); } else { console.warn('vendor services fetch rejected', sRes.reason); }
+      if (bRes.status === 'fulfilled') { const d = bRes.value.data; setVendorBookings(d.data || d); } else { console.warn('vendor bookings fetch rejected', bRes.reason); }
+      if (mRes.status === 'fulfilled') { const d = mRes.value.data; setVendorChats(d.data || d); } else { console.warn('vendor messages fetch rejected', mRes.reason); }
+      if (fRes.status === 'fulfilled') { const d = fRes.value.data; setVendorFeatures(d.features || {}); } else { console.warn('vendor features fetch rejected', fRes.reason); }
+      if (aRes.status === 'fulfilled') { const d = aRes.value.data; setVendorAvailability(d.availability || []); } else { console.warn('vendor availability fetch rejected', aRes.reason); }
     } catch (e) { console.error(e); }
   };
 
   // ─── User actions ───
   const handleChangeRole = async (userId: number, newRole: string) => {
     if (!window.confirm(`Change role to "${newRole}"?`)) return;
-    const r = await fetch(`${API}/admin/users/${userId}`, {
-      method: 'PUT', headers: { ...h(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ role: newRole }),
-    });
-    if (r.ok) setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
+    try {
+      await api.put(`/admin/users/${userId}`, { role: newRole });
+      setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
+    } catch {}
   };
 
   const handleDeleteUser = async (id: number) => {
     if (!window.confirm('Delete this user?')) return;
-    const r = await fetch(`${API}/admin/users/${id}`, { method: 'DELETE', headers: h() });
-    if (r.ok) setUsers(users.filter(u => u.id !== id));
+    try {
+      await api.delete(`/admin/users/${id}`);
+      setUsers(users.filter(u => u.id !== id));
+    } catch {}
   };
 
   const handleAdminResetPassword = async (action: 'generate' | 'email') => {
@@ -258,23 +284,14 @@ const AdminDashboard: React.FC = () => {
     setResetError('');
     setResetResult(null);
     try {
-      const r = await fetch(`${API}/admin/users/${resetTarget.id}/reset-password`, {
-        method: 'POST',
-        headers: { ...h(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action }),
-      });
-      const data = await r.json();
-      if (r.ok) {
-        if (action === 'generate' && data.new_password) {
-          setResetResult({ type: 'password', value: data.new_password });
-        } else {
-          setResetResult({ type: 'email', value: data.message });
-        }
+      const { data } = await api.post(`/admin/users/${resetTarget.id}/reset-password`, { action });
+      if (action === 'generate' && data.new_password) {
+        setResetResult({ type: 'password', value: data.new_password });
       } else {
-        setResetError(data.message || 'Failed to reset password.');
+        setResetResult({ type: 'email', value: data.message });
       }
-    } catch {
-      setResetError('Could not connect to the server.');
+    } catch (err: any) {
+      setResetError(err.response?.data?.message || 'Could not connect to the server.');
     } finally {
       setResetLoading(false);
     }
@@ -283,58 +300,52 @@ const AdminDashboard: React.FC = () => {
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault(); setFormError(''); setFormSuccess('');
     try {
-      const r = await fetch(`${API}/admin/users`, {
-        method: 'POST', headers: { ...h(), 'Content-Type': 'application/json' },
-        body: JSON.stringify(newUser),
-      });
-      const data = await r.json();
-      if (!r.ok) { setFormError(data.message || JSON.stringify(data.errors)); return; }
+      await api.post('/admin/users', newUser);
       setFormSuccess('User created successfully!');
       setNewUser({ name: '', email: '', password: '', role: 'customer', phone: '' });
       fetchData();
       setTimeout(() => { setShowCreateUser(false); setFormSuccess(''); }, 1500);
-    } catch (e) { setFormError('Failed to create user.'); }
+    } catch (err: any) {
+      setFormError(err.response?.data?.message || 'Failed to create user.');
+    }
   };
 
   // ─── Vendor actions ───
   const handleCreateVendor = async (e: React.FormEvent) => {
     e.preventDefault(); setFormError(''); setFormSuccess('');
     try {
-      const r = await fetch(`${API}/admin/users`, {
-        method: 'POST', headers: { ...h(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...newVendor, role: 'vendor' }),
-      });
-      const data = await r.json();
-      if (!r.ok) { setFormError(data.message || JSON.stringify(data.errors)); return; }
+      await api.post('/admin/users', { ...newVendor, role: 'vendor' });
       setFormSuccess('Vendor created successfully!');
       setNewVendor({ name: '', email: '', password: '', phone: '', business_name: '', description: '' });
       fetchData();
       setTimeout(() => { setShowCreateVendor(false); setFormSuccess(''); }, 1500);
-    } catch (e) { setFormError('Failed to create vendor.'); }
+    } catch (err: any) {
+      setFormError(err.response?.data?.message || 'Failed to create vendor.');
+    }
   };
 
   const handleDeleteVendor = async (id: number) => {
     if (!window.confirm('Delete this vendor and all their services?')) return;
-    const r = await fetch(`${API}/admin/vendors/${id}`, { method: 'DELETE', headers: h() });
-    if (r.ok) { setVendors(vendors.filter(v => v.id !== id)); setSelectedVendor(null); }
+    try {
+      await api.delete(`/super-admin/vendors/${id}`);
+      setVendors(vendors.filter(v => v.id !== id)); setSelectedVendor(null);
+    } catch {}
   };
 
   const handleVerifyVendor = async (id: number) => {
-    const r = await fetch(`${API}/admin/vendors/${id}/verify`, { method: 'PUT', headers: h() });
-    if (r.ok) {
-      const data = await r.json();
+    try {
+      const { data } = await api.put(`/super-admin/vendors/${id}/verify`);
       setVendors(vendors.map(v => v.id === id ? { ...v, is_verified: data.vendor.is_verified } : v));
       if (selectedVendor?.id === id) setSelectedVendor((prev: any) => ({ ...prev, is_verified: data.vendor.is_verified }));
-    }
+    } catch {}
   };
 
   const handleFeatureVendor = async (id: number) => {
-    const r = await fetch(`${API}/admin/vendors/${id}/feature`, { method: 'PUT', headers: h() });
-    if (r.ok) {
-      const data = await r.json();
+    try {
+      const { data } = await api.put(`/super-admin/vendors/${id}/feature`);
       setVendors(vendors.map(v => v.id === id ? { ...v, is_featured: data.vendor.is_featured } : v));
       if (selectedVendor?.id === id) setSelectedVendor((prev: any) => ({ ...prev, is_featured: data.vendor.is_featured }));
-    }
+    } catch {}
   };
 
   const handleBulkVendorAction = async (action: 'verify' | 'unverify' | 'feature' | 'unfeature' | 'delete') => {
@@ -342,16 +353,10 @@ const AdminDashboard: React.FC = () => {
     if (action === 'delete' && !window.confirm(`Delete ${selectedVendorIds.size} vendor(s)? This cannot be undone.`)) return;
     setBulkLoading(true);
     try {
-      const r = await fetch(`${API}/admin/vendors/bulk`, {
-        method: 'POST',
-        headers: { ...h(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: Array.from(selectedVendorIds), action }),
-      });
-      if (r.ok) {
-        toast(`Bulk ${action} applied to ${selectedVendorIds.size} vendor(s)`);
-        setSelectedVendorIds(new Set());
-        fetchData();
-      } else { toast('Bulk action failed', 'error'); }
+      await api.post('/super-admin/vendors/bulk', { ids: Array.from(selectedVendorIds), action });
+      toast(`Bulk ${action} applied to ${selectedVendorIds.size} vendor(s)`);
+      setSelectedVendorIds(new Set());
+      fetchData();
     } catch { toast('Error performing bulk action', 'error'); }
     finally { setBulkLoading(false); }
   };
@@ -360,14 +365,10 @@ const AdminDashboard: React.FC = () => {
     if (!selectedVendor) return;
     setSavingFeatures(true);
     try {
-      const r = await fetch(`${API}/admin/vendors/${selectedVendor.id}/features`, {
-        method: 'PUT',
-        headers: { ...h(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ features: vendorFeatures }),
-      });
-      if (r.ok) toast('Features updated!');
-      else toast('Failed to update features', 'error');
-    } catch { toast('Error saving features', 'error'); }
+      const resp = await api.put(`/super-admin/vendors/${selectedVendor.id}/features`, { features: vendorFeatures });
+      toast('Features updated!');
+      console.log('Features saved:', resp.data);
+    } catch (err: any) { console.error('Save features error:', err.response?.data || err); toast('Error saving features', 'error'); }
     finally { setSavingFeatures(false); }
   };
 
@@ -375,73 +376,82 @@ const AdminDashboard: React.FC = () => {
     setVendorAvailability(prev => prev.map((s: any) => s.day_of_week === dayIndex ? { ...s, [field]: value } : s));
   };
 
+  const handleSaveVendorEdit = async () => {
+    if (!selectedVendor) return;
+    setSavingVendorEdit(true);
+    try {
+      const { data } = await api.put(`/super-admin/vendors/${selectedVendor.id}/profile`, vendorEditForm);
+      setSelectedVendor(data.vendor);
+      setVendors(prev => prev.map(v => v.id === selectedVendor.id ? data.vendor : v));
+      setShowVendorEdit(false);
+      toast('Vendor profile updated!');
+    } catch (err: any) { console.error('Vendor edit error:', err.response?.data || err); toast('Error updating vendor', 'error'); }
+    finally { setSavingVendorEdit(false); }
+  };
+
   const handleSaveAdminAvailability = async () => {
     if (!selectedVendor) return;
     setSavingAdminAvail(true);
     try {
-      const r = await fetch(`${API}/admin/vendors/${selectedVendor.id}/availability`, {
-        method: 'PUT',
-        headers: { ...h(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ availability: vendorAvailability }),
-      });
-      if (r.ok) toast('Availability updated!');
-      else toast('Failed to update availability', 'error');
+      await api.put(`/super-admin/vendors/${selectedVendor.id}/availability`, { availability: vendorAvailability });
+      toast('Availability updated!');
     } catch { toast('Error saving availability', 'error'); }
     finally { setSavingAdminAvail(false); }
   };
 
   // ─── Booking actions ───
   const handleBookingStatus = async (id: number, status: string) => {
-    const r = await fetch(`${API}/admin/bookings/${id}/status`, {
-      method: 'PUT', headers: { ...h(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
-    });
-    if (r.ok) setBookings(bookings.map(b => b.id === id ? { ...b, status } : b));
+    try {
+      await api.put(`/admin/bookings/${id}/status`, { status });
+      setBookings(bookings.map(b => b.id === id ? { ...b, status } : b));
+    } catch {}
   };
 
   // ─── Service actions ───
   const handleDeleteService = async (id: number) => {
     if (!window.confirm('Delete this service?')) return;
-    const r = await fetch(`${API}/services/${id}`, { method: 'DELETE', headers: h() });
-    if (r.ok) setServices(services.filter(s => s.id !== id));
+    try {
+      await api.delete(`/services/${id}`);
+      setServices(services.filter(s => s.id !== id));
+    } catch {}
   };
 
   // ─── Category actions ───
   const handleCreateCategory = async (e: React.FormEvent) => {
     e.preventDefault(); setFormError(''); setFormSuccess('');
     try {
-      const r = await fetch(`${API}/admin/categories`, {
-        method: 'POST', headers: { ...h(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newCategory }),
-      });
-      const data = await r.json();
-      if (!r.ok) { setFormError(data.message || 'Error'); return; }
+      await api.post('/admin/categories', { name: newCategory });
       setFormSuccess('Category created!');
       setNewCategory('');
       fetchData();
       setTimeout(() => { setShowCreateCategory(false); setFormSuccess(''); }, 1200);
-    } catch (e) { setFormError('Failed.'); }
+    } catch (err: any) {
+      setFormError(err.response?.data?.message || 'Failed.');
+    }
   };
 
   const handleUpdateCategory = async (id: number, name: string) => {
-    const r = await fetch(`${API}/admin/categories/${id}`, {
-      method: 'PUT', headers: { ...h(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
-    });
-    if (r.ok) { setCategories(categories.map(c => c.id === id ? { ...c, name } : c)); setEditCategoryItem(null); }
+    try {
+      await api.put(`/admin/categories/${id}`, { name });
+      setCategories(categories.map(c => c.id === id ? { ...c, name } : c)); setEditCategoryItem(null);
+    } catch {}
   };
 
   const handleDeleteCategory = async (id: number) => {
     if (!window.confirm('Delete this category?')) return;
-    const r = await fetch(`${API}/admin/categories/${id}`, { method: 'DELETE', headers: h() });
-    if (r.ok) setCategories(categories.filter(c => c.id !== id));
+    try {
+      await api.delete(`/admin/categories/${id}`);
+      setCategories(categories.filter(c => c.id !== id));
+    } catch {}
   };
 
   // ─── Review actions ───
   const handleDeleteReview = async (id: number) => {
     if (!window.confirm('Remove this review?')) return;
-    const r = await fetch(`${API}/admin/reviews/${id}`, { method: 'DELETE', headers: h() });
-    if (r.ok) setReviews(reviews.filter(rev => rev.id !== id));
+    try {
+      await api.delete(`/admin/reviews/${id}`);
+      setReviews(reviews.filter(rev => rev.id !== id));
+    } catch {}
   };
 
   // ─── Media actions ───
@@ -450,32 +460,31 @@ const AdminDashboard: React.FC = () => {
     setUploading(true);
     const fd = new FormData(); fd.append('file', file);
     try {
-      const r = await fetch(`${API}/admin/media`, { method: 'POST', headers: h(), body: fd });
-      if (r.ok) fetchData();
+      await api.post('/admin/media', fd);
+      fetchData();
     } catch (e) { console.error(e); } finally { setUploading(false); }
   };
 
   const handleDeleteMedia = async (id: number) => {
     if (!window.confirm('Delete this asset?')) return;
-    const r = await fetch(`${API}/admin/media/${id}`, { method: 'DELETE', headers: h() });
-    if (r.ok) setMedia(media.filter(m => m.id !== id));
+    try {
+      await api.delete(`/admin/media/${id}`);
+      setMedia(media.filter(m => m.id !== id));
+    } catch {}
   };
 
   // ─── Settings ───
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault(); setSavingSettings(true);
     try {
-      const r = await fetch(`${API}/admin/settings`, {
-        method: 'POST', headers: { ...h(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ settings: [
-          { key: 'site_name', value: siteName },
-          { key: 'contact_email', value: contactEmail },
-          { key: 'hero_title', value: heroTitle },
-          { key: 'hero_subtitle', value: heroSubtitle },
-          { key: 'slider_interval', value: sliderInterval },
-        ]}),
-      });
-      if (r.ok) toast('Settings saved!');
+      await api.post('/admin/settings', { settings: [
+        { key: 'site_name', value: siteName },
+        { key: 'contact_email', value: contactEmail },
+        { key: 'hero_title', value: heroTitle },
+        { key: 'hero_subtitle', value: heroSubtitle },
+        { key: 'slider_interval', value: sliderInterval },
+      ]});
+      toast('Settings saved!');
     } catch (e) { console.error(e); } finally { setSavingSettings(false); }
   };
 
@@ -483,28 +492,24 @@ const AdminDashboard: React.FC = () => {
   const handleSaveSeo = async (e: React.FormEvent) => {
     e.preventDefault(); setSavingSeo(true);
     try {
-      const r = await fetch(`${API}/admin/settings`, {
-        method: 'POST', headers: { ...h(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ settings: [
-          { key: 'seo_home_title', value: seoHomeTitle },
-          { key: 'seo_home_desc', value: seoHomeDesc },
-          { key: 'seo_home_keywords', value: seoHomeKeywords },
-          { key: 'seo_og_image', value: seoOgImage },
-          { key: 'seo_gtm_id', value: seoGtmId },
-          { key: 'seo_site_verification', value: seoSiteVerification },
-          { key: 'seo_schema_org', value: seoSchemaOrg },
-        ]}),
-      });
-      if (r.ok) toast('SEO settings saved!');
+      await api.post('/admin/settings', { settings: [
+        { key: 'seo_home_title', value: seoHomeTitle },
+        { key: 'seo_home_desc', value: seoHomeDesc },
+        { key: 'seo_home_keywords', value: seoHomeKeywords },
+        { key: 'seo_og_image', value: seoOgImage },
+        { key: 'seo_gtm_id', value: seoGtmId },
+        { key: 'seo_site_verification', value: seoSiteVerification },
+        { key: 'seo_schema_org', value: seoSchemaOrg },
+      ]});
+      toast('SEO settings saved!');
     } catch (e) { console.error(e); } finally { setSavingSeo(false); }
   };
 
   // ─── Slider ───
   const saveSliderImages = async (images: any[]) => {
-    await fetch(`${API}/admin/settings`, {
-      method: 'POST', headers: { ...h(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ settings: [{ key: 'slider_images', value: JSON.stringify(images) }] }),
-    });
+    try {
+      await api.post('/admin/settings', { settings: [{ key: 'slider_images', value: JSON.stringify(images) }] });
+    } catch {}
   };
 
   const handleSliderUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -512,17 +517,14 @@ const AdminDashboard: React.FC = () => {
     setSliderUploading(true);
     const fd = new FormData(); fd.append('file', file);
     try {
-      const r = await fetch(`${API}/admin/media`, { method: 'POST', headers: h(), body: fd });
-      if (r.ok) {
-        const data = await r.json();
-        const url = `${API_BASE}${data.file_path}`;
-        const updated = [...sliderImages, { url, title: '', link: '', enabled: true }];
-        setSliderImages(updated);
-        await saveSliderImages(updated);
-        // refresh media list
-        const mr = await fetch(`${API}/admin/media`, { headers: h() });
-        if (mr.ok) { const d = await mr.json(); setMedia(d.data || d); }
-      }
+      const { data } = await api.post('/admin/media', fd);
+      const url = `${API_BASE}${data.file_path}`;
+      const updated = [...sliderImages, { url, title: '', link: '', enabled: true }];
+      setSliderImages(updated);
+      await saveSliderImages(updated);
+      // refresh media list
+      const mr = await api.get('/admin/media');
+      setMedia(mr.data.data || mr.data);
     } catch (e) { console.error(e); } finally { setSliderUploading(false); }
   };
 
@@ -597,15 +599,23 @@ const AdminDashboard: React.FC = () => {
     { label: 'Commerce', items: [
       { key: 'coupons', label: 'Coupons', icon: Ticket },
     ]},
-    ...(user?.role === 'super_admin' ? [{ label: 'System', items: [
-      { key: 'seo', label: 'SEO', icon: Globe },
-      { key: 'page-seo', label: 'Page SEO', icon: FileText },
-      { key: 'settings', label: 'Settings', icon: Settings },
-    ]}] : []),
+    ...(user?.role === 'super_admin' ? [
+      { label: 'Super Admin', items: [
+        { key: 'moderation', label: 'Moderation', icon: Clock },
+        { key: 'commissions', label: 'Commissions', icon: DollarSign },
+        { key: 'kyc', label: 'KYC Review', icon: Shield },
+        { key: 'activities', label: 'Activity Log', icon: Activity },
+      ]},
+      { label: 'System', items: [
+        { key: 'seo', label: 'SEO', icon: Globe },
+        { key: 'page-seo', label: 'Page SEO', icon: FileText },
+        { key: 'settings', label: 'Settings', icon: Settings },
+      ]}
+    ] : []),
   ] as const;
 
   const tabLabel = (t: Tab) => {
-    const map: Partial<Record<Tab, string>> = { dashboard: 'Overview', slider: 'Hero Slider', media: 'Media Library', categories: 'Categories', messages: 'Messages' };
+    const map: Partial<Record<Tab, string>> = { dashboard: 'Overview', slider: 'Hero Slider', media: 'Media Library', categories: 'Categories', messages: 'Messages', moderation: 'Moderation', activities: 'Activity Log' };
     return map[t] || t.charAt(0).toUpperCase() + t.slice(1);
   };
 
@@ -920,8 +930,10 @@ const AdminDashboard: React.FC = () => {
                                   value={v.subscription_plan || 'free'}
                                   onChange={async e => {
                                     const plan = e.target.value;
-                                    const res = await fetch(`${API}/super-admin/vendors/${v.id}/plan`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }, body: JSON.stringify({ plan }) });
-                                    if (res.ok) { setVendors(prev => prev.map(x => x.id === v.id ? { ...x, subscription_plan: plan } : x)); toast(`Plan updated to ${plan}`, 'success'); }
+                                    try {
+                                      await api.put(`/super-admin/vendors/${v.id}/plan`, { plan });
+                                      setVendors(prev => prev.map(x => x.id === v.id ? { ...x, subscription_plan: plan } : x)); toast(`Plan updated to ${plan}`, 'success');
+                                    } catch {}
                                   }}
                                   className={`text-xs font-semibold rounded-full px-2 py-0.5 border-0 cursor-pointer ${v.subscription_plan === 'pro' ? 'bg-purple-100 text-purple-700' : v.subscription_plan === 'basic' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}
                                 >
@@ -992,11 +1004,55 @@ const AdminDashboard: React.FC = () => {
                           </button>
                         </>
                       )}
+                      <button onClick={() => { setVendorEditForm({ business_name: selectedVendor.business_name, description: selectedVendor.description, website: selectedVendor.website, instagram: selectedVendor.instagram, facebook: selectedVendor.facebook, whatsapp_number: selectedVendor.whatsapp_number }); setShowVendorEdit(!showVendorEdit); }} className={`btn-secondary text-sm flex items-center gap-1.5 ${showVendorEdit ? 'bg-primary-50 border-primary-200 text-primary-700' : ''}`}><Edit2 className="w-4 h-4" /> Edit</button>
                       <Link to={`/vendors/${selectedVendor.id}`} target="_blank" className="btn-secondary text-sm flex items-center gap-1.5"><ExternalLink className="w-4 h-4" /> View profile</Link>
                       <button onClick={() => handleDeleteVendor(selectedVendor.id)} className="btn-secondary text-sm text-red-600 border-red-200 hover:bg-red-50 flex items-center gap-1.5"><Trash2 className="w-4 h-4" /> Delete</button>
                     </div>
                   </div>
                   {selectedVendor.description && <p className="mt-3 text-sm text-gray-500 border-t border-gray-100 pt-3">{selectedVendor.description}</p>}
+
+                  {showVendorEdit && (
+                    <div className="mt-4 border-t border-gray-100 pt-4 space-y-3">
+                      <h4 className="text-sm font-semibold text-gray-800">Edit Vendor Info</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs text-gray-500 mb-1 block">Business Name</label>
+                          <input value={vendorEditForm.business_name || ''} onChange={e => setVendorEditForm((prev: any) => ({...prev, business_name: e.target.value}))}
+                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none" />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-500 mb-1 block">WhatsApp Number</label>
+                          <input value={vendorEditForm.whatsapp_number || ''} onChange={e => setVendorEditForm((prev: any) => ({...prev, whatsapp_number: e.target.value}))}
+                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none" placeholder="e.g. 97798XXXXXXXX" />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="text-xs text-gray-500 mb-1 block">Description</label>
+                          <textarea value={vendorEditForm.description || ''} onChange={e => setVendorEditForm((prev: any) => ({...prev, description: e.target.value}))} rows={2}
+                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none" />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-500 mb-1 block">Website</label>
+                          <input value={vendorEditForm.website || ''} onChange={e => setVendorEditForm((prev: any) => ({...prev, website: e.target.value}))}
+                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none" />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-500 mb-1 block">Instagram</label>
+                          <input value={vendorEditForm.instagram || ''} onChange={e => setVendorEditForm((prev: any) => ({...prev, instagram: e.target.value}))}
+                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none" />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-500 mb-1 block">Facebook</label>
+                          <input value={vendorEditForm.facebook || ''} onChange={e => setVendorEditForm((prev: any) => ({...prev, facebook: e.target.value}))}
+                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none" />
+                        </div>
+                      </div>
+                      <div className="flex gap-2 pt-2">
+                        <button onClick={handleSaveVendorEdit} disabled={savingVendorEdit}
+                          className="btn-primary text-sm px-4 py-2">{savingVendorEdit ? 'Saving...' : 'Save'}</button>
+                        <button onClick={() => setShowVendorEdit(false)} className="btn-secondary text-sm px-4 py-2">Cancel</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Vendor sub-tabs */}
@@ -1087,6 +1143,7 @@ const AdminDashboard: React.FC = () => {
                         { key: 'availability_edit',label: 'Availability Edit', desc: 'Vendor can edit their Mon–Fri working hours' },
                         { key: 'social_links',     label: 'Social Links',      desc: 'Vendor can set and display website/Instagram/Facebook links' },
                         { key: 'reviews',          label: 'Reviews',           desc: 'Customer reviews are shown on the vendor public profile' },
+                        { key: 'whatsapp',         label: 'WhatsApp',          desc: 'WhatsApp chat button is shown on the vendor profile and service pages' },
                       ].map(({ key, label, desc }) => (
                         <div key={key} className="flex items-center justify-between p-4 rounded-xl border border-gray-100 hover:bg-gray-50 transition-colors">
                           <div>
@@ -1519,18 +1576,12 @@ const AdminDashboard: React.FC = () => {
                       e.preventDefault();
                       setCouponSaving(true);
                       try {
-                        const res = await fetch(`${API}/admin/coupons`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
-                          body: JSON.stringify({ ...couponForm, discount_value: Number(couponForm.discount_value), min_order: couponForm.min_order ? Number(couponForm.min_order) : 0, max_uses: couponForm.max_uses ? Number(couponForm.max_uses) : undefined }),
-                        });
-                        const data = await res.json();
-                        if (!res.ok) { toast(data.message || 'Error', 'error'); return; }
+                        const { data } = await api.post('/admin/coupons', { ...couponForm, discount_value: Number(couponForm.discount_value), min_order: couponForm.min_order ? Number(couponForm.min_order) : 0, max_uses: couponForm.max_uses ? Number(couponForm.max_uses) : undefined });
                         setCoupons(prev => [data.coupon, ...prev]);
                         setCouponForm({ code: '', discount_type: 'flat', discount_value: '', min_order: '', max_uses: '', expires_at: '', description: '' });
                         setShowCouponForm(false);
                         toast('Coupon created', 'success');
-                      } finally { setCouponSaving(false); }
+                      } catch (err: any) { toast(err.response?.data?.message || 'Error', 'error'); } finally { setCouponSaving(false); }
                     }} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div><label className="block text-xs font-medium text-gray-600 mb-1">Code *</label>
                         <input required className="input-field uppercase" placeholder="SAVE20" value={couponForm.code} onChange={e => setCouponForm(p => ({ ...p, code: e.target.value.toUpperCase() }))} /></div>
@@ -1573,21 +1624,208 @@ const AdminDashboard: React.FC = () => {
                           <td className="px-4 py-3">{c.expires_at ? new Date(c.expires_at).toLocaleDateString() : '—'}</td>
                           <td className="px-4 py-3">
                             <button onClick={async () => {
-                              const res = await fetch(`${API}/admin/coupons/${c.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }, body: JSON.stringify({ is_active: !c.is_active }) });
-                              if (res.ok) setCoupons(prev => prev.map(x => x.id === c.id ? { ...x, is_active: !c.is_active } : x));
+                              try {
+                                await api.put(`/admin/coupons/${c.id}`, { is_active: !c.is_active });
+                                setCoupons(prev => prev.map(x => x.id === c.id ? { ...x, is_active: !c.is_active } : x));
+                              } catch {}
                             }} className={`badge cursor-pointer ${c.is_active ? 'badge-success' : 'badge-danger'}`}>{c.is_active ? 'Active' : 'Inactive'}</button>
                           </td>
                           <td className="px-4 py-3">
                             <button onClick={async () => {
                               if (!window.confirm(`Delete coupon ${c.code}?`)) return;
-                              const res = await fetch(`${API}/admin/coupons/${c.id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
-                              if (res.ok) { setCoupons(prev => prev.filter(x => x.id !== c.id)); toast('Deleted', 'success'); }
+                              try {
+                                await api.delete(`/admin/coupons/${c.id}`);
+                                setCoupons(prev => prev.filter(x => x.id !== c.id)); toast('Deleted', 'success');
+                              } catch {}
                             }} className="text-red-400 hover:text-red-600 transition-colors"><Trash2 className="w-4 h-4" /></button>
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
+                </div>
+              </div>
+            )}
+
+            {/* ═══ MODERATION (Super Admin) ═══ */}
+            {activeTab === 'moderation' && user?.role === 'super_admin' && (
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 mb-6">Service Moderation</h2>
+                <div className="flex gap-2 mb-4 flex-wrap">
+                  {['pending', 'approved', 'rejected', 'draft'].map(s => (
+                    <button key={s} onClick={() => setModerationFilter(s)}
+                      className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${moderationFilter === s ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
+                    >{s.charAt(0).toUpperCase() + s.slice(1)}</button>
+                  ))}
+                  <button onClick={fetchData} className="ml-auto p-2 text-gray-400 hover:text-gray-600"><RefreshCw className="w-4 h-4" /></button>
+                </div>
+                <div className="card overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                      <thead><tr className="bg-gray-50 text-xs text-gray-500 font-medium">
+                        <th className="p-4">Service</th><th className="p-4">Vendor</th><th className="p-4">Price</th><th className="p-4">Status</th><th className="p-4">Created</th><th className="p-4 text-right">Actions</th>
+                      </tr></thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {pendingServices.map((s: any) => (
+                          <tr key={s.id} className="hover:bg-gray-50">
+                            <td className="p-4"><p className="text-sm font-medium text-gray-900">{s.name}</p><p className="text-xs text-gray-400">{s.category?.name}</p></td>
+                            <td className="p-4 text-sm text-gray-700">{s.vendor?.business_name || s.vendor?.user?.name || '—'}</td>
+                            <td className="p-4 text-sm text-gray-700">Rs. {s.price || '—'}</td>
+                            <td className="p-4"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${s.status === 'approved' ? 'bg-green-100 text-green-700' : s.status === 'rejected' ? 'bg-red-100 text-red-700' : s.status === 'draft' ? 'bg-gray-100 text-gray-500' : 'bg-yellow-100 text-yellow-700'}`}>{s.status}</span></td>
+                            <td className="p-4 text-xs text-gray-400">{new Date(s.created_at).toLocaleDateString()}</td>
+                            <td className="p-4 text-right">
+                              {s.status === 'pending' && (
+                                <div className="flex items-center justify-end gap-2">
+                                  <button onClick={async () => { setActionLoading(`approve-${s.id}`); try { await api.post(`/super-admin/services/${s.id}/approve`); toast('Approved', 'success'); fetchData(); } catch { toast('Failed', 'error'); } setActionLoading(null); }}
+                                    className="px-3 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-lg hover:bg-green-200 disabled:opacity-50" disabled={actionLoading === `approve-${s.id}`}>Approve</button>
+                                  <button onClick={async () => { const reason = prompt('Rejection reason:'); if (!reason) return; setActionLoading(`reject-${s.id}`); try { await api.post(`/super-admin/services/${s.id}/reject`, { reason }); toast('Rejected', 'success'); fetchData(); } catch { toast('Failed', 'error'); } setActionLoading(null); }}
+                                    className="px-3 py-1 text-xs font-medium bg-red-100 text-red-700 rounded-lg hover:bg-red-200 disabled:opacity-50" disabled={actionLoading === `reject-${s.id}`}>Reject</button>
+                                </div>
+                              )}
+                              {s.rejection_reason && <p className="text-xs text-red-500 mt-1" title={s.rejection_reason}>Reason: {s.rejection_reason.substring(0, 50)}...</p>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {pendingServices.length === 0 && <p className="text-sm text-gray-400 p-6 text-center">No {moderationFilter} services.</p>}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ═══ COMMISSIONS (Super Admin) ═══ */}
+            {activeTab === 'commissions' && user?.role === 'super_admin' && (
+              <div>
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-bold text-gray-900">Commission Management</h2>
+                  <button onClick={() => { setShowRateModal(true); }} className="btn-primary text-sm flex items-center gap-2"><DollarSign className="w-4 h-4" /> Set Rate</button>
+                </div>
+                {commissionStats && (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div className="card p-4"><p className="text-2xl font-bold text-gray-900">Rs. {Number(commissionStats.total_commission).toLocaleString()}</p><p className="text-xs text-gray-400 mt-1">Total Commission</p></div>
+                    <div className="card p-4"><p className="text-2xl font-bold text-yellow-600">Rs. {Number(commissionStats.pending_commission).toLocaleString()}</p><p className="text-xs text-gray-400 mt-1">Pending Payout</p></div>
+                    <div className="card p-4"><p className="text-2xl font-bold text-green-600">Rs. {Number(commissionStats.paid_commission).toLocaleString()}</p><p className="text-xs text-gray-400 mt-1">Paid Out</p></div>
+                    <div className="card p-4"><p className="text-2xl font-bold text-primary-600">{commissionStats.total_orders}</p><p className="text-xs text-gray-400 mt-1">Total Orders</p></div>
+                  </div>
+                )}
+                <div className="flex gap-2 mb-4">
+                  {['', 'pending', 'paid', 'refunded'].map(s => (
+                    <button key={s} onClick={() => setCommissionFilter(s)}
+                      className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${commissionFilter === s ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
+                    >{s ? s.charAt(0).toUpperCase() + s.slice(1) : 'All'}</button>
+                  ))}
+                  <button onClick={fetchData} className="ml-auto p-2 text-gray-400 hover:text-gray-600"><RefreshCw className="w-4 h-4" /></button>
+                </div>
+                <div className="card overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                      <thead><tr className="bg-gray-50 text-xs text-gray-500 font-medium">
+                        <th className="p-4">Booking</th><th className="p-4">Service</th><th className="p-4">Amount</th><th className="p-4">Rate</th><th className="p-4">Commission</th><th className="p-4">Status</th><th className="p-4">Paid At</th><th className="p-4 text-right">Actions</th>
+                      </tr></thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {commissions.map((c: any) => (
+                          <tr key={c.id} className="hover:bg-gray-50">
+                            <td className="p-4 text-xs text-gray-500">#{c.booking_id}</td>
+                            <td className="p-4 text-sm text-gray-900">{c.service?.name || '—'}</td>
+                            <td className="p-4 text-sm text-gray-700">Rs. {Number(c.amount).toLocaleString()}</td>
+                            <td className="p-4 text-xs text-gray-500">{c.commission_rate}%</td>
+                            <td className="p-4 text-sm font-medium text-gray-900">Rs. {Number(c.commission_amount).toLocaleString()}</td>
+                            <td className="p-4"><span className={`text-xs font-medium rounded-full px-2 py-0.5 ${c.status === 'paid' ? 'bg-green-100 text-green-700' : c.status === 'refunded' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{c.status}</span></td>
+                            <td className="p-4 text-xs text-gray-400">{c.paid_at ? new Date(c.paid_at).toLocaleDateString() : '—'}</td>
+                            <td className="p-4 text-right">
+                              {c.status === 'pending' && (
+                                <button onClick={async () => { try { await api.put(`/super-admin/commissions/${c.id}/pay`); toast('Marked as paid', 'success'); fetchData(); } catch { toast('Failed', 'error'); } }}
+                                  className="text-xs font-medium text-green-600 hover:underline">Mark Paid</button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {commissions.length === 0 && <p className="text-sm text-gray-400 p-6 text-center">No commissions found.</p>}
+                  </div>
+                </div>
+                {showRateModal && (
+                  <div className="fixed inset-0 bg-black/40 z-40 flex items-center justify-center" onClick={() => setShowRateModal(false)}>
+                    <div className="bg-white rounded-2xl p-6 w-full max-w-sm mx-4" onClick={e => e.stopPropagation()}>
+                      <h3 className="text-lg font-bold text-gray-900 mb-2">Commission Rate</h3>
+                      <p className="text-xs text-gray-500 mb-4">Default percentage deducted from each booking.</p>
+                      <div className="flex items-center gap-2 mb-4">
+                        <input type="number" step="0.1" min="0" max="100" className="input-field" value={newRate} onChange={e => setNewRate(e.target.value)} />
+                        <span className="text-sm text-gray-500">%</span>
+                      </div>
+                      <div className="flex gap-3">
+                        <button onClick={() => setShowRateModal(false)} className="btn-secondary flex-1">Cancel</button>
+                        <button onClick={async () => { try { await api.post('/super-admin/commissions/rate', { rate: parseFloat(newRate) }); toast('Rate updated', 'success'); setShowRateModal(false); fetchData(); } catch { toast('Failed', 'error'); } }} className="btn-primary flex-1">Save</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ═══ KYC REVIEW (Super Admin) ═══ */}
+            {activeTab === 'kyc' && user?.role === 'super_admin' && (
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 mb-6">KYC Document Review</h2>
+                <div className="space-y-4">
+                  {kycVendors.length === 0 && <div className="card p-8 text-center"><Shield className="w-10 h-10 text-gray-200 mx-auto mb-3" /><p className="text-sm text-gray-400">No pending KYC submissions.</p></div>}
+                  {kycVendors.map((v: any) => (
+                    <div key={v.id} className="card p-5">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <h3 className="font-semibold text-gray-900">{v.business_name}</h3>
+                          <p className="text-xs text-gray-400">{v.user?.name} ({v.user?.email})</p>
+                        </div>
+                        <span className="text-xs font-medium bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full">{v.kyc_status}</span>
+                      </div>
+                      <div className="space-y-3">
+                        {v.documents?.map((doc: any) => (
+                          <div key={doc.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                            <div>
+                              <p className="text-sm font-medium text-gray-800">{doc.type}</p>
+                              <p className="text-xs text-gray-400">{doc.file_path}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button onClick={async () => { try { await api.post(`/super-admin/kyc/documents/${doc.id}/approve`); toast('Document approved', 'success'); fetchData(); } catch { toast('Failed', 'error'); } }}
+                                className="px-3 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-lg hover:bg-green-200">Approve</button>
+                              <button onClick={async () => { const reason = prompt('Rejection reason:'); if (!reason) return; try { await api.post(`/super-admin/kyc/documents/${doc.id}/reject`, { reason }); toast('Rejected', 'success'); fetchData(); } catch { toast('Failed', 'error'); } }}
+                                className="px-3 py-1 text-xs font-medium bg-red-100 text-red-700 rounded-lg hover:bg-red-200">Reject</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ═══ ACTIVITY LOGS (Super Admin) ═══ */}
+            {activeTab === 'activities' && user?.role === 'super_admin' && (
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 mb-6">Activity Log</h2>
+                <div className="card overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                      <thead><tr className="bg-gray-50 text-xs text-gray-500 font-medium">
+                        <th className="p-4">Admin</th><th className="p-4">Action</th><th className="p-4">Target</th><th className="p-4">Details</th><th className="p-4">Time</th>
+                      </tr></thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {activities.map((log: any) => (
+                          <tr key={log.id} className="hover:bg-gray-50">
+                            <td className="p-4 text-sm text-gray-900">{log.user?.name || '—'}</td>
+                            <td className="p-4"><span className="text-xs font-medium rounded-full px-2 py-0.5 bg-gray-100 text-gray-700">{log.action}</span></td>
+                            <td className="p-4 text-xs text-gray-500">{log.subject_type ? log.subject_type.split('\\').pop() : '—'} #{log.subject_id || '—'}</td>
+                            <td className="p-4 text-xs text-gray-500 max-w-xs truncate">{log.new_values ? JSON.stringify(log.new_values).substring(0, 60) : '—'}</td>
+                            <td className="p-4 text-xs text-gray-400">{new Date(log.created_at).toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {activities.length === 0 && <p className="text-sm text-gray-400 p-6 text-center">No activity logs yet.</p>}
+                  </div>
                 </div>
               </div>
             )}

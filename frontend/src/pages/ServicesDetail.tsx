@@ -4,8 +4,10 @@ import SeoHead, { breadcrumbJsonLd } from '../components/SeoHead';
 import { Star, Shield, MessageCircle, CheckCircle, ChevronRight, Clock, Heart, ChevronLeft, ChevronRight as ChevronRightIcon, Share2 } from 'lucide-react';
 import { getServiceImage } from '../utils/serviceImage';
 import { useSettings } from '../context/SettingsContext';
-import { API_BASE, FALLBACK_IMAGE } from '../utils/config';
+import { FALLBACK_IMAGE } from '../utils/config';
+import api from '../utils/api';
 import { ServiceDetailSkeleton } from '../components/Skeleton';
+import { serviceUrl, slugify } from '../utils/slug';
 
 const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -15,7 +17,7 @@ const WhatsAppIcon = () => (
   </svg>
 );
 
-const formatWhatsApp = (phone: string) => phone.replace(/\D/g, '');
+const formatWhatsApp = (phone: string | null | undefined) => (phone || '').replace(/\D/g, '');
 
 const ServicesDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -56,10 +58,9 @@ const ServicesDetail: React.FC = () => {
   useEffect(() => {
     const fetchServiceData = async () => {
       try {
-        const serviceRes = await fetch(`${API_BASE}/api/services/${id}`);
-        if (!serviceRes.ok) throw new Error('Service not found');
-        const serviceData = await serviceRes.json();
+        const { data: serviceData } = await api.get(`/services/${id}`);
         const serviceObj = serviceData.service;
+        console.log('Service vendor data:', serviceObj.vendor);
         setService(serviceObj);
 
         // Track recently viewed (max 10, most recent first)
@@ -71,19 +72,16 @@ const ServicesDetail: React.FC = () => {
         } catch {}
 
         const [reviewsRes, availRes] = await Promise.all([
-          fetch(`${API_BASE}/api/vendors/${serviceObj.vendor_id}/reviews`),
-          fetch(`${API_BASE}/api/vendors/${serviceObj.vendor_id}/availability`),
+          api.get(`/vendors/${serviceObj.vendor_id}/reviews`),
+          api.get(`/vendors/${serviceObj.vendor_id}/availability`),
         ]);
-        if (reviewsRes.ok) { const d = await reviewsRes.json(); setReviews(d.data || d); }
-        if (availRes.ok) { const d = await availRes.json(); setAvailability(d.availability || []); }
+        setReviews(reviewsRes.data.data || reviewsRes.data);
+        setAvailability(availRes.data.availability || []);
 
         // Similar services: same category, exclude this service
         if (serviceObj.category_id) {
-          const simRes = await fetch(`${API_BASE}/api/services/search?category_id=${serviceObj.category_id}&per_page=4`);
-          if (simRes.ok) {
-            const simData = await simRes.json();
-            setSimilarServices((simData.data || simData).filter((s: any) => s.id !== serviceObj.id).slice(0, 3));
-          }
+          const { data: simData } = await api.get('/services/search', { params: { category_id: serviceObj.category_id, per_page: 4 } });
+          setSimilarServices((simData.data || simData).filter((s: any) => s.id !== serviceObj.id).slice(0, 3));
         }
       } catch (error) { console.error(error); }
       finally { setLoading(false); }
@@ -399,7 +397,7 @@ const ServicesDetail: React.FC = () => {
                 <h3 className="font-semibold text-gray-900 mb-4 text-sm">You may also like</h3>
                 <div className="space-y-3">
                   {similarServices.map(s => (
-                    <Link key={s.id} to={`/services/${s.id}`} className="flex gap-3 group hover:bg-gray-50 rounded-lg p-2 -mx-2 transition-colors">
+                    <Link key={s.id} to={serviceUrl(s)} className="flex gap-3 group hover:bg-gray-50 rounded-lg p-2 -mx-2 transition-colors">
                       <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0">
                         <img src={getServiceImage(s)} alt={s.name} loading="lazy"
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
@@ -455,9 +453,9 @@ const ServicesDetail: React.FC = () => {
                 </Link>
               )}
 
-              {service.vendor?.user?.phone && (
+              {service.vendor?.whatsapp_enabled && (service.vendor?.whatsapp_number || service.vendor?.user?.phone) && (
                 <a
-                  href={`https://wa.me/${formatWhatsApp(service.vendor.user.phone)}?text=${encodeURIComponent(`Hi! I'm interested in your service: ${service.name}`)}`}
+                  href={`https://wa.me/${formatWhatsApp(service.vendor.whatsapp_number || service.vendor?.user?.phone)}?text=${encodeURIComponent(`Hi! I'm interested in your service: ${service.name}`)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center justify-center gap-2 w-full py-3 mb-4 bg-[#25D366] hover:bg-[#1ebe5c] text-white rounded-lg font-medium text-sm transition-colors"

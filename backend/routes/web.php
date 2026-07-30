@@ -4,10 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Models\Service;
 use App\Models\Category;
 use App\Models\Vendor;
-
-Route::get('/', function () {
-    return view('welcome');
-});
+use App\Http\Controllers\PrerenderController;
 
 Route::get('/robots.txt', function () {
     $base = url('/');
@@ -28,6 +25,8 @@ Route::get('/sitemap.xml', function () {
     $pages = [
         ['loc' => $base, 'priority' => '1.0', 'changefreq' => 'weekly'],
         ['loc' => $base . '/services', 'priority' => '0.9', 'changefreq' => 'daily'],
+        ['loc' => $base . '/login', 'priority' => '0.3', 'changefreq' => 'monthly'],
+        ['loc' => $base . '/register', 'priority' => '0.5', 'changefreq' => 'monthly'],
     ];
     foreach ($pages as $p) {
         $xml .= '<url><loc>' . e($p['loc']) . '</loc><priority>' . $p['priority'] . '</priority><changefreq>' . $p['changefreq'] . '</changefreq></url>';
@@ -48,3 +47,7 @@ Route::get('/sitemap.xml', function () {
     $xml .= '</urlset>';
     return response($xml)->header('Content-Type', 'application/xml');
 });
+
+Route::get('/{path?}', [PrerenderController::class, 'handle'])
+    ->where('path', '.*')
+    ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class);

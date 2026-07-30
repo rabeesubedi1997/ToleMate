@@ -1,5 +1,5 @@
 ﻿import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { API_BASE } from '../utils/config';
+import api from '../utils/api';
 
 interface SettingsContextType {
   settings: Record<string, string>;
@@ -17,11 +17,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
   const fetchSettings = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE}/api/settings`);
-      if (response.ok) {
-        const data = await response.json();
-        setSettings(data);
-      }
+      const { data } = await api.get('/settings');
+      setSettings(data);
     } catch (error) {
       console.error('Failed to load site settings', error);
     } finally {

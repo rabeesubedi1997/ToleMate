@@ -1,7 +1,7 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Megaphone, Send, DollarSign, Calendar, Zap, Clock, AlarmClock, Filter } from 'lucide-react';
-import { API_BASE } from '../utils/config';
+import api from '../utils/api';
 import SeoHead from '../components/SeoHead';
 import { useToast } from '../context/ToastContext';
 
@@ -39,7 +39,7 @@ const Marketplace: React.FC = () => {
   const [filterCategory, setFilterCategory] = useState('');
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/categories`).then(r => r.json()).then(setCategories).catch(console.error);
+    api.get('/categories').then(({ data }) => setCategories(data)).catch(console.error);
     fetchMyServices();
   }, []);
 
@@ -48,37 +48,29 @@ const Marketplace: React.FC = () => {
   const fetchRequests = async () => {
     setLoading(true);
     try {
-      const params = filterCategory ? `?category_id=${filterCategory}` : '';
-      const res = await fetch(`${API_BASE}/api/booking-requests${params}`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-      });
-      if (res.ok) { const data = await res.json(); setRequests(data.data || []); }
+      const params: any = {};
+      if (filterCategory) params.category_id = filterCategory;
+      const res = await api.get('/booking-requests', { params });
+      setRequests(res.data.data || []);
     } catch (error) { console.error(error); } finally { setLoading(false); }
   };
 
   const fetchMyServices = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/services`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
-      if (res.ok) { const data = await res.json(); setServices(data.data || []); }
+      const res = await api.get('/services');
+      setServices(res.data.data || []);
     } catch (error) { console.error(error); }
   };
 
   const handleRespond = async (id: number) => {
     try {
-      const res = await fetch(`${API_BASE}/api/booking-requests/${id}/respond`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-        body: JSON.stringify(quoteData),
-      });
-      if (res.ok) {
-        setRequests(prev => prev.filter(r => r.id !== id));
-        setRespondingTo(null);
-        setQuoteData({ service_id: '', price: '', message: '' });
-      } else {
-        const data = await res.json();
-        toast(data.message || 'Failed to send quote', 'error');
-      }
-    } catch (error) { console.error(error); }
+      await api.post(`/booking-requests/${id}/respond`, quoteData);
+      setRequests(prev => prev.filter(r => r.id !== id));
+      setRespondingTo(null);
+      setQuoteData({ service_id: '', price: '', message: '' });
+    } catch (err: any) {
+      toast(err.response?.data?.message || 'Failed to send quote', 'error');
+    }
   };
 
   const formatDate = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });

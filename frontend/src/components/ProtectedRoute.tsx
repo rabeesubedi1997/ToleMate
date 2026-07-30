@@ -24,8 +24,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
   }
 
   if (allowedRoles && user && !allowedRoles.includes(user.role)) {
-    // Redirect to their correct dashboard
-    if (user.role === 'super_admin') return <Navigate to="/super-admin" replace />;
+    // Super admin bypasses all role gates
+    if (user.role === 'super_admin') return <>{children}</>;
     if (user.role === 'admin') return <Navigate to="/admin-dashboard" replace />;
     if (user.role === 'vendor') return <Navigate to="/vendor-dashboard" replace />;
     return <Navigate to="/dashboard" replace />;

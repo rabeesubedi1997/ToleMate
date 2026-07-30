@@ -137,6 +137,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/vendors/{id}/plan', [AdminController::class, 'updateVendorPlan']);
         Route::put('/vendors/{id}/features', [AdminController::class, 'updateVendorFeatures']);
         Route::put('/vendors/{id}/availability', [AdminController::class, 'updateVendorAvailability']);
+        Route::put('/vendors/{id}/profile', [AdminController::class, 'updateVendorProfile']);
     });
 
     // Vendor profile
@@ -215,11 +216,17 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Get phone number for a vendor/admin (for WhatsApp contact)
     Route::get('/users/{id}/phone', function (\Illuminate\Http\Request $request, $id) {
-        $target = \App\Models\User::select('id', 'role', 'phone')->find($id);
+        $target = \App\Models\User::with('vendor')->select('id', 'role', 'phone')->find($id);
         if (!$target || !in_array($target->role, ['vendor', 'admin'])) {
             return response()->json(null, 404);
         }
-        return response()->json(['phone' => $target->phone]);
+        $whatsappEnabled = $target->vendor ? $target->vendor->hasFeature('whatsapp') : false;
+        $whatsappNumber = $target->vendor?->whatsapp_number;
+        return response()->json([
+            'phone' => $target->phone,
+            'whatsapp_enabled' => $whatsappEnabled,
+            'whatsapp_number' => $whatsappNumber,
+        ]);
     });
 
     // Notification routes

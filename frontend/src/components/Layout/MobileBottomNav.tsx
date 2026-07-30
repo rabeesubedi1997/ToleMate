@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Home, Search, Bell, MessageCircle, User, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { API_BASE } from '../../utils/config';
+import api from '../../utils/api';
 
 const MobileBottomNav: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
@@ -12,17 +12,13 @@ const MobileBottomNav: React.FC = () => {
 
   useEffect(() => {
     if (!isAuthenticated) return;
-    const token = localStorage.getItem('token');
-    const headers = { Authorization: `Bearer ${token}` };
 
-    fetch(`${API_BASE}/api/notifications/unread-count`, { headers })
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d) setUnreadNotif(d.unread_count ?? 0); })
+    api.get('/notifications/unread-count')
+      .then(({ data }) => { if (data) setUnreadNotif(data.unread_count ?? 0); })
       .catch(() => {});
 
-    fetch(`${API_BASE}/api/messages/unread-count`, { headers })
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d) setUnreadMsg(d.unread_count ?? d.count ?? 0); })
+    api.get('/messages/unread-count')
+      .then(({ data }) => { if (data) setUnreadMsg(data.unread_count ?? data.count ?? 0); })
       .catch(() => {});
   }, [isAuthenticated, location.pathname]);
 

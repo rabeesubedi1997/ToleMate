@@ -1,7 +1,7 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Shield, Lock, CheckCircle, CalendarDays, ArrowRight, Wallet, CreditCard } from 'lucide-react';
-import { API_BASE } from '../utils/config';
+import api from '../utils/api';
 import SeoHead from '../components/SeoHead';
 
 type PaymentMethod = 'khalti' | 'card';
@@ -20,7 +20,8 @@ const Checkout: React.FC = () => {
 
   useEffect(() => {
     fetchBooking();
-    fetch(`${API_BASE}/api/settings`).then(r => r.ok ? r.json() : []).then((settings: any[]) => {
+    api.get('/settings').then(({ data }) => {
+      const settings = Array.isArray(data) ? data : [];
       const key = settings.find((s: any) => s.key === 'khalti_public_key')?.value;
       if (key) setKhaltiPublicKey(key);
     }).catch(() => {});
@@ -28,10 +29,8 @@ const Checkout: React.FC = () => {
 
   const fetchBooking = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/bookings/${id}`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-      });
-      if (res.ok) setBooking(await res.json());
+      const res = await api.get(`/bookings/${id}`);
+      setBooking(res.data);
     } catch (error) { console.error(error); } finally { setLoading(false); }
   };
 
@@ -56,7 +55,6 @@ const Checkout: React.FC = () => {
     }
 
     const KhaltiCheckout = (window as any).KhaltiCheckout;
-    const token = localStorage.getItem('token');
 
     khaltiRef.current = new KhaltiCheckout({
       publicKey: khaltiPublicKey || 'KHALTI_PUBLIC_KEY_PLACEHOLDER',
@@ -65,12 +63,8 @@ const Checkout: React.FC = () => {
       amount: totalPaisa,
       onSuccess: async (response: any) => {
         try {
-          const res = await fetch(`${API_BASE}/api/payments/khalti/verify`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ booking_id: id, khalti_idx: response.idx, amount: totalPaisa })
-          });
-          if (res.ok) { setPaymentSuccess(true); }
+          await api.post('/payments/khalti/verify', { booking_id: id, khalti_idx: response.idx, amount: totalPaisa });
+          setPaymentSuccess(true);
         } catch { }
       },
       onError: (error: any) => { console.error(error); },
@@ -85,12 +79,8 @@ const Checkout: React.FC = () => {
     setProcessing(true);
     try {
       await new Promise(resolve => setTimeout(resolve, 2000));
-      const res = await fetch(`${API_BASE}/api/payments/mock`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-        body: JSON.stringify({ booking_id: id, payment_method: 'Stripe Mock', card_last_four: cardData.number.slice(-4) || '4242' })
-      });
-      if (res.ok) { setPaymentSuccess(true); }
+      await api.post('/payments/mock', { booking_id: id, payment_method: 'Stripe Mock', card_last_four: cardData.number.slice(-4) || '4242' });
+      setPaymentSuccess(true);
     } catch (error) { console.error(error); } finally { setProcessing(false); }
   };
 
