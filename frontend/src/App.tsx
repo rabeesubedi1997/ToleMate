@@ -1,5 +1,5 @@
 import React, { Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { HelmetProvider, Helmet } from 'react-helmet-async';
 import { SettingsProvider } from './context/SettingsContext';
 import { useSettings } from './context/SettingsContext';
@@ -58,6 +58,12 @@ const PageLoader = () => (
 );
 
 function AppContent() {
+  const { pathname } = useLocation();
+  const isDashboardRoute =
+    pathname.startsWith('/admin-dashboard') ||
+    pathname.startsWith('/vendor-dashboard') ||
+    pathname.startsWith('/super-admin');
+
   return (
     <SettingsProvider>
       <Router>
@@ -109,7 +115,7 @@ function AppContent() {
               </Routes>
             </Suspense>
           </main>
-          <Footer />
+          {!isDashboardRoute && <Footer />}
           <MobileBottomNav />
         </div>
       </Router>

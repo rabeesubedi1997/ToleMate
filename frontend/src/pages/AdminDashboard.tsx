@@ -36,7 +36,8 @@ const AdminDashboard: React.FC = () => {
   const mainRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    mainRef.current?.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+    window.scrollTo(0, 0);
+    if (mainRef.current) mainRef.current.scrollTop = 0;
   }, [activeTab]);
 
   // Data state
@@ -631,7 +632,7 @@ const AdminDashboard: React.FC = () => {
         description="ToleMate administration panel. Manage users, vendors, services, and platform settings."
         noIndex={true}
       />
-    <div className="min-h-screen flex">
+    <div className="min-h-screen md:h-[calc(100vh-4rem)] md:overflow-hidden flex">
       {/* Mobile overlay */}
       {isSidebarOpen && <div className="fixed inset-0 bg-black/40 z-30 md:hidden" onClick={() => setIsSidebarOpen(false)} />}
 

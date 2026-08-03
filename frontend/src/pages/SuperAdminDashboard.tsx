@@ -19,7 +19,8 @@ const SuperAdminDashboard: React.FC = () => {
   const mainRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    mainRef.current?.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+    window.scrollTo(0, 0);
+    if (mainRef.current) mainRef.current.scrollTop = 0;
   }, [activeTab]);
   const [overview, setOverview] = useState<any>(null);
   const [pendingServices, setPendingServices] = useState<any[]>([]);
@@ -178,7 +179,7 @@ const SuperAdminDashboard: React.FC = () => {
   return (
     <>
       <SeoHead title="Super Admin Panel" description="ToleMate super administration panel" noIndex={true} />
-      <div className="min-h-screen flex bg-gray-50">
+      <div className="min-h-screen md:h-[calc(100vh-4rem)] md:overflow-hidden flex bg-gray-50">
         {/* Sidebar */}
         <aside className="w-56 bg-white border-r border-gray-200 flex-shrink-0 hidden md:block">
           <div className="p-4 border-b border-gray-100">

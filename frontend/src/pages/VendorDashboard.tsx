@@ -32,7 +32,8 @@ const VendorDashboard: React.FC = () => {
   const mainRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    mainRef.current?.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+    window.scrollTo(0, 0);
+    if (mainRef.current) mainRef.current.scrollTop = 0;
   }, [activeTab]);
   const [bookingFilter, setBookingFilter] = useState<'all' | 'pending' | 'active' | 'completed' | 'cancelled'>('all');
 
@@ -197,7 +198,7 @@ const VendorDashboard: React.FC = () => {
         description="Manage your services, bookings, and business profile on ToleMate."
         noIndex={true}
       />
-    <div className="min-h-screen flex">
+    <div className="min-h-screen md:h-[calc(100vh-4rem)] md:overflow-hidden flex">
       {/* Mobile menu toggle */}
       <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
         className="md:hidden fixed bottom-6 right-6 z-50 w-12 h-12 bg-primary-600 text-white rounded-full shadow-lg flex items-center justify-center">
