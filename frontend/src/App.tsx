@@ -114,8 +114,6 @@ function AppLayout() {
           {!isDashboardRoute && <Footer />}
           <MobileBottomNav />
         </div>
-      </Router>
-    </SettingsProvider>
   );
 }
 
