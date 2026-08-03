@@ -41,19 +41,22 @@ echo "==> Running migrations + seeders..."
 php artisan migrate --force
 php artisan db:seed --force
 
-# ---------- 4. Build web frontend ----------
-echo "==> Building web frontend..."
+# ---------- 4. Web frontend ----------
+echo "==> Preparing web frontend..."
 cd ../frontend
-if command -v node >/dev/null 2>&1; then
+if [ -d build ]; then
+    echo "    Using prebuilt frontend from git..."
+    cp -r build/* ../backend/public/
+elif command -v node >/dev/null 2>&1; then
+    echo "    Building frontend with Node..."
     npm install --no-audit --no-fund
     npm run build
     echo "==> Copying build into Laravel public/ ..."
     cp -r build/* ../backend/public/
 else
-    echo "!! Node.js not found on this server."
-    echo "!! Build the frontend on your local machine and upload:"
-    echo "     cd frontend && npm run build"
-    echo "     copy the contents of frontend/build/ into backend/public/"
+    echo "!! No prebuilt frontend and no Node.js on this server."
+    echo "!! Build it locally (cd frontend && npm run build), commit,"
+    echo "!! then re-run this script."
 fi
 
 # ---------- 5. Laravel caches ----------

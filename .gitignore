@@ -33,7 +33,7 @@ backend/Homestead.yaml
 
 # ─── Frontend (React) ───────────────────────────────────────
 frontend/node_modules/
-frontend/build/
+# frontend/build/ is committed to git because the shared host has no Node.js
 frontend/coverage/
 frontend/.pnp
 frontend/.pnp.js
