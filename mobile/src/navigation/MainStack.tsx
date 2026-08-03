@@ -40,6 +40,11 @@ const MainStack: React.FC<{ role: string }> = ({ role }) => (
       }
     />
     <Stack.Screen
+      name="PublicTabs"
+      component={CustomerTabs}
+      options={{ animation: 'slide_from_right' }}
+    />
+    <Stack.Screen
       name="ServiceDetail"
       component={ServiceDetailScreen}
       options={{ animation: 'slide_from_right' }}
@@ -56,6 +61,11 @@ const MainStack: React.FC<{ role: string }> = ({ role }) => (
     />
     <Stack.Screen
       name="AdminChat"
+      component={AdminChatScreen}
+      options={{ animation: 'slide_from_right' }}
+    />
+    <Stack.Screen
+      name="Chat"
       component={AdminChatScreen}
       options={{ animation: 'slide_from_right' }}
     />

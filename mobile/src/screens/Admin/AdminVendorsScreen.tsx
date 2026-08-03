@@ -65,6 +65,51 @@ const AdminVendorsScreen: React.FC = () => {
   const [showAvailability, setShowAvailability] = useState(false);
   const [availDraft, setAvailDraft] = useState<DaySlot[]>([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [newVendor, setNewVendor] = useState({
+    name: '',
+    email: '',
+    password: '',
+    phone: '',
+    business_name: '',
+    description: '',
+  });
+
+  const createVendor = async () => {
+    if (!newVendor.name.trim() || !newVendor.email.trim() || !newVendor.password) {
+      Alert.alert('Missing fields', 'Name, email and password are required.');
+      return;
+    }
+    if (newVendor.password.length < 6) {
+      Alert.alert('Weak password', 'Password must be at least 6 characters.');
+      return;
+    }
+    setCreating(true);
+    try {
+      await api.post('/admin/users', { ...newVendor, role: 'vendor' });
+      setShowCreate(false);
+      setNewVendor({
+        name: '',
+        email: '',
+        password: '',
+        phone: '',
+        business_name: '',
+        description: '',
+      });
+      Alert.alert('Vendor created', 'A user account with the vendor role was created.');
+      await load();
+    } catch (e: any) {
+      Alert.alert(
+        'Failed',
+        e?.response?.data?.message ??
+          Object.values(e?.response?.data?.errors ?? {}).flat()[0] ??
+          'Could not create vendor.',
+      );
+    } finally {
+      setCreating(false);
+    }
+  };
 
   const load = useCallback(async () => {
     try {
@@ -277,6 +322,16 @@ const AdminVendorsScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <AdminHeader title="Vendors" subtitle="Manage professionals" />
+
+      <TouchableOpacity
+        style={styles.addBtn}
+        onPress={() => {
+          setShowCreate(true);
+        }}
+      >
+        <MaterialIcons name="add" size={18} color={COLORS.white} />
+        <Text style={styles.addBtnText}>Add vendor</Text>
+      </TouchableOpacity>
 
       <View style={styles.searchBox}>
         <MaterialIcons name="search" size={18} color={COLORS.gray400} />
@@ -560,6 +615,80 @@ const AdminVendorsScreen: React.FC = () => {
           </>
         )}
       </Modal>
+
+      <Modal
+        visible={showCreate}
+        title="Add New Vendor"
+        onClose={() => setShowCreate(false)}
+      >
+        <Text style={styles.note}>
+          A user account with the <Text style={styles.noteStrong}>vendor</Text> role
+          will be created along with a vendor profile.
+        </Text>
+        <Text style={styles.fieldLabel}>Full name</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="e.g. Ram Shrestha"
+          placeholderTextColor={COLORS.gray400}
+          value={newVendor.name}
+          onChangeText={t => setNewVendor(v => ({ ...v, name: t }))}
+        />
+        <Text style={styles.fieldLabel}>Email</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="vendor@example.com"
+          placeholderTextColor={COLORS.gray400}
+          value={newVendor.email}
+          onChangeText={t => setNewVendor(v => ({ ...v, email: t }))}
+          autoCapitalize="none"
+          keyboardType="email-address"
+        />
+        <Text style={styles.fieldLabel}>Password</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Min 6 characters"
+          placeholderTextColor={COLORS.gray400}
+          value={newVendor.password}
+          onChangeText={t => setNewVendor(v => ({ ...v, password: t }))}
+          secureTextEntry
+        />
+        <Text style={styles.fieldLabel}>Phone</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="98XXXXXXXX"
+          placeholderTextColor={COLORS.gray400}
+          value={newVendor.phone}
+          onChangeText={t => setNewVendor(v => ({ ...v, phone: t }))}
+          keyboardType="phone-pad"
+        />
+        <Text style={styles.fieldLabel}>Business name</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="e.g. Sparkling Clean Services"
+          placeholderTextColor={COLORS.gray400}
+          value={newVendor.business_name}
+          onChangeText={t => setNewVendor(v => ({ ...v, business_name: t }))}
+        />
+        <Text style={styles.fieldLabel}>Description</Text>
+        <TextInput
+          style={[styles.input, styles.inputMultiline]}
+          placeholder="What services does this vendor offer?"
+          placeholderTextColor={COLORS.gray400}
+          value={newVendor.description}
+          onChangeText={t => setNewVendor(v => ({ ...v, description: t }))}
+          multiline
+          numberOfLines={3}
+        />
+        <TouchableOpacity
+          style={[styles.primaryBtn, creating && styles.btnDisabled]}
+          onPress={createVendor}
+          disabled={creating}
+        >
+          <Text style={styles.primaryBtnText}>
+            {creating ? 'Creating...' : 'Create vendor'}
+          </Text>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 };
@@ -568,6 +697,58 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.light,
+  },
+  addBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.md,
+    height: 42,
+    marginHorizontal: SPACING.md,
+    marginTop: SPACING.sm,
+  },
+  addBtnText: {
+    color: COLORS.white,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  note: {
+    fontSize: 12,
+    color: COLORS.gray600,
+    backgroundColor: COLORS.gray50,
+    borderWidth: 1,
+    borderColor: COLORS.gray200,
+    borderRadius: RADIUS.md,
+    padding: SPACING.sm,
+    marginBottom: SPACING.sm,
+  },
+  noteStrong: {
+    fontWeight: '700',
+    color: COLORS.gray800,
+  },
+  fieldLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.gray600,
+    marginTop: SPACING.sm,
+    marginBottom: 6,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: COLORS.gray200,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.gray50,
+    paddingHorizontal: SPACING.md,
+    height: 44,
+    fontSize: 14,
+    color: COLORS.gray900,
+  },
+  inputMultiline: {
+    height: 76,
+    textAlignVertical: 'top',
+    paddingTop: SPACING.sm,
   },
   searchBox: {
     flexDirection: 'row',

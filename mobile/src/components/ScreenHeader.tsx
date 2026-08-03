@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useAuth } from '../context/AuthContext';
 import { COLORS, SPACING, FONT_SIZE } from '../theme';
@@ -13,10 +14,11 @@ interface Props {
 
 const ScreenHeader: React.FC<Props> = ({ title, subtitle, showUser = true }) => {
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const initial = (user?.name ?? '?').split(' ')[0]?.[0] ?? '?';
   return (
-    <View style={styles.header}>
+    <View style={[styles.header, { paddingTop: insets.top + SPACING.md }]}>
       <TouchableOpacity
         style={styles.back}
         onPress={() => navigation.goBack()}
@@ -47,7 +49,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.md,
     paddingBottom: SPACING.xs,
   },
   back: {

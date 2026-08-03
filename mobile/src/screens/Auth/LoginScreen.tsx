@@ -10,6 +10,7 @@ import {
   ActivityIndicator
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, SPACING } from '../../theme';
 import { useAuth } from '../../context/AuthContext';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -19,6 +20,7 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
 const LoginScreen = ({ navigation }: Props) => {
   const { login } = useAuth();
+  const insets = useSafeAreaInsets();
   const [email, setEmail] = useState('superadmin@tolemate.com');
   const [password, setPassword] = useState('password');
   const [loading, setLoading] = useState(false);
@@ -46,7 +48,7 @@ const LoginScreen = ({ navigation }: Props) => {
     <LinearGradient colors={[COLORS.gray50, COLORS.gray100]} style={styles.container}>
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.content}
+        style={[styles.content, { paddingTop: insets.top + SPACING.md }]}
       >
         <View style={styles.header}>
           <View style={styles.logoContainer}>

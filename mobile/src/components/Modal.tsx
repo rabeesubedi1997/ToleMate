@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { COLORS, SPACING, RADIUS, SHADOW, FONT_SIZE } from '../theme';
 
@@ -20,40 +21,43 @@ interface Props {
   children: React.ReactNode;
 }
 
-const Modal: React.FC<Props> = ({ visible, title, onClose, children }) => (
-  <RNModal
-    visible={visible}
-    transparent
-    animationType="fade"
-    onRequestClose={onClose}
-  >
-    <KeyboardAvoidingView
-      style={styles.overlay}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+const Modal: React.FC<Props> = ({ visible, title, onClose, children }) => {
+  const insets = useSafeAreaInsets();
+  return (
+    <RNModal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
     >
-      <Pressable style={styles.backdrop} onPress={onClose} />
-      <View style={styles.sheet}>
-        <View style={styles.handle} />
-        <View style={styles.titleRow}>
-          <Text style={styles.title}>{title}</Text>
-          <TouchableOpacity
-            onPress={onClose}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      <KeyboardAvoidingView
+        style={styles.overlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <Pressable style={styles.backdrop} onPress={onClose} />
+        <View style={[styles.sheet, { paddingBottom: insets.bottom + SPACING.xl }]}>
+          <View style={styles.handle} />
+          <View style={styles.titleRow}>
+            <Text style={styles.title}>{title}</Text>
+            <TouchableOpacity
+              onPress={onClose}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <MaterialIcons name="close" size={22} color={COLORS.gray500} />
+            </TouchableOpacity>
+          </View>
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.content}
           >
-            <MaterialIcons name="close" size={22} color={COLORS.gray500} />
-          </TouchableOpacity>
+            {children}
+          </ScrollView>
         </View>
-        <ScrollView
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.content}
-        >
-          {children}
-        </ScrollView>
-      </View>
-    </KeyboardAvoidingView>
-  </RNModal>
-);
+      </KeyboardAvoidingView>
+    </RNModal>
+  );
+};
 
 const styles = StyleSheet.create({
   overlay: {
@@ -70,7 +74,6 @@ const styles = StyleSheet.create({
     borderTopRightRadius: RADIUS.xxl,
     paddingHorizontal: SPACING.md,
     paddingTop: SPACING.sm,
-    paddingBottom: SPACING.xl,
     maxHeight: '85%',
     ...SHADOW.raised,
   },

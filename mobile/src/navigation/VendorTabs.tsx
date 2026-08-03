@@ -3,7 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import VendorDashboardScreen from '../screens/Vendor/VendorDashboardScreen';
 import VendorServicesScreen from '../screens/Vendor/VendorServicesScreen';
-import MessagesScreen from '../screens/Customer/MessagesScreen';
+import ChatsScreen from '../screens/Customer/ChatsScreen';
 import VendorProfileScreen from '../screens/Vendor/VendorProfileScreen';
 import { COLORS } from '../theme';
 import { VendorTabParamList } from './types';
@@ -34,7 +34,7 @@ const VendorTabs: React.FC = () => (
   >
     <Tab.Screen name="Dashboard" component={VendorDashboardScreen} />
     <Tab.Screen name="Services" component={VendorServicesScreen} />
-    <Tab.Screen name="Messages" component={MessagesScreen} />
+    <Tab.Screen name="Messages" component={ChatsScreen} />
     <Tab.Screen name="Profile" component={VendorProfileScreen} />
   </Tab.Navigator>
 );

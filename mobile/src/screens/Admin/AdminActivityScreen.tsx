@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import EmptyState from '../../components/EmptyState';
@@ -31,6 +32,7 @@ interface StatsActivity {
 
 const AdminActivityScreen: React.FC = () => {
   const { isSuperAdmin } = useAuth();
+  const insets = useSafeAreaInsets();
   const [logs, setLogs] = useState<(LogItem | StatsActivity)[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -101,7 +103,7 @@ const AdminActivityScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + SPACING.md }]}>
         <Text style={styles.title}>Activity Log</Text>
         {isSuperAdmin ? (
           <View style={styles.pill}>
@@ -156,7 +158,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.md,
   },
   title: {
     fontSize: FONT_SIZE.xl,

@@ -7,8 +7,8 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   FlatList,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import api from '../../api/client';

@@ -3,7 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import HomeScreen from '../screens/Customer/HomeScreen';
 import MarketplaceScreen from '../screens/Customer/MarketplaceScreen';
-import MessagesScreen from '../screens/Customer/MessagesScreen';
+import ChatsScreen from '../screens/Customer/ChatsScreen';
 import NotificationsScreen from '../screens/Customer/NotificationsScreen';
 import ProfileScreen from '../screens/Customer/ProfileScreen';
 import { COLORS } from '../theme';
@@ -36,7 +36,7 @@ const CustomerTabs: React.FC = () => (
   >
     <Tab.Screen name="Home" component={HomeScreen} />
     <Tab.Screen name="Marketplace" component={MarketplaceScreen} />
-    <Tab.Screen name="Messages" component={MessagesScreen} />
+    <Tab.Screen name="Messages" component={ChatsScreen} />
     <Tab.Screen name="Notifications" component={NotificationsScreen} />
     <Tab.Screen name="Profile" component={ProfileScreen} />
   </Tab.Navigator>

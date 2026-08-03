@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme';
@@ -34,6 +35,7 @@ const POLL_MS = 4000;
 const AdminChatScreen: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute<Route>();
+  const insets = useSafeAreaInsets();
   const { user: me } = useAuth();
   const { title, subtitle, bookingId, withId } = route.params;
 
@@ -136,7 +138,7 @@ const AdminChatScreen: React.FC = () => {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={0}
     >
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + SPACING.md }]}>
         <TouchableOpacity
           style={styles.back}
           onPress={() => navigation.goBack()}
@@ -176,7 +178,7 @@ const AdminChatScreen: React.FC = () => {
         />
       )}
 
-      <View style={styles.inputBar}>
+      <View style={[styles.inputBar, { paddingBottom: insets.bottom + SPACING.sm }]}>
         <TextInput
           style={styles.input}
           placeholder="Type a message..."
@@ -207,7 +209,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.md,
     paddingBottom: SPACING.sm,
     backgroundColor: COLORS.white,
     borderBottomWidth: 1,

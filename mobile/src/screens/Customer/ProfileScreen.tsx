@@ -6,8 +6,8 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { useNavigation, CompositeNavigationProp } from '@react-navigation/native';
@@ -42,7 +42,7 @@ const ProfileScreen: React.FC = () => {
     .toUpperCase();
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Profile</Text>

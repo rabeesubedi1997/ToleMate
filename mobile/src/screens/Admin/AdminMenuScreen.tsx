@@ -57,6 +57,21 @@ const GROUPS: Group[] = [
     ],
   },
   {
+    label: 'Links',
+    items: [
+      {
+        label: 'View Site',
+        icon: 'public',
+        target: 'PublicTabs',
+      },
+      {
+        label: 'Marketplace',
+        icon: 'storefront',
+        target: 'PublicTabs',
+      },
+    ],
+  },
+  {
     label: 'System',
     superOnly: true,
     items: [

@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useAuth } from '../context/AuthContext';
 import { COLORS, SPACING, FONT_SIZE } from '../theme';
@@ -11,10 +12,11 @@ interface Props {
 }
 
 const AdminHeader: React.FC<Props> = ({ title, subtitle, brand = 'ToleMate Admin' }) => {
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const initial = (user?.name ?? '?').split(' ')[0]?.[0] ?? '?';
   return (
-    <View style={styles.header}>
+    <View style={[styles.header, { paddingTop: insets.top + SPACING.md }]}>
       <View style={styles.brandRow}>
         <MaterialIcons name="handyman" size={16} color={COLORS.primary700} />
         <Text style={styles.brand}>{brand}</Text>
@@ -42,7 +44,6 @@ const AdminHeader: React.FC<Props> = ({ title, subtitle, brand = 'ToleMate Admin
 const styles = StyleSheet.create({
   header: {
     paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.md,
     paddingBottom: SPACING.xs,
   },
   brandRow: {
