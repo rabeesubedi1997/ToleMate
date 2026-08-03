@@ -1,0 +1,21 @@
+# ToleMate frontend docroot (frontend/build)
+# - /api and /storage are forwarded to the Laravel backend via the
+#   "backend" symlink (frontend/build/backend -> ../../backend/public),
+#   created by deploy.sh on the server.
+# - All other routes fall back to index.html so SPA pages (e.g.
+#   /admin-dashboard) survive a browser refresh.
+<IfModule mod_rewrite.c>
+    Options +FollowSymLinks
+    RewriteEngine On
+
+    # API -> Laravel backend
+    RewriteRule ^api/?(.*)$ backend/index.php [QSA,L]
+
+    # Uploaded media -> Laravel storage symlink
+    RewriteRule ^storage/(.*)$ backend/storage/$1 [L]
+
+    # SPA fallback: any request that is not a real file/dir -> index.html
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.html [L]
+</IfModule>

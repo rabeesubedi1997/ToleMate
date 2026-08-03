@@ -31,6 +31,7 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
+    "postbuild": "node -e \"require('fs').copyFileSync('public/.htaccess','build/.htaccess')\"",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
