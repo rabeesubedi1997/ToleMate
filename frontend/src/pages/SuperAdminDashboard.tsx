@@ -19,7 +19,7 @@ const SuperAdminDashboard: React.FC = () => {
   const mainRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    mainRef.current?.scrollTo(0, 0);
+    mainRef.current?.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
   }, [activeTab]);
   const [overview, setOverview] = useState<any>(null);
   const [pendingServices, setPendingServices] = useState<any[]>([]);

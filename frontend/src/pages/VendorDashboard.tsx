@@ -32,7 +32,7 @@ const VendorDashboard: React.FC = () => {
   const mainRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    mainRef.current?.scrollTo(0, 0);
+    mainRef.current?.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
   }, [activeTab]);
   const [bookingFilter, setBookingFilter] = useState<'all' | 'pending' | 'active' | 'completed' | 'cancelled'>('all');
 

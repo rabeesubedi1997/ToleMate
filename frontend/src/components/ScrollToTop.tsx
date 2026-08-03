@@ -5,8 +5,12 @@ export default function ScrollToTop() {
   const { pathname } = useLocation();
 
   useEffect(() => {
-    window.scrollTo(0, 0);
-    document.querySelectorAll<HTMLElement>('[data-scroll-top]').forEach(el => el.scrollTo(0, 0));
+    const reset = () => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+      document.querySelectorAll<HTMLElement>('[data-scroll-top]').forEach(el => el.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior }));
+    };
+    reset();
+    requestAnimationFrame(reset);
   }, [pathname]);
 
   return null;
