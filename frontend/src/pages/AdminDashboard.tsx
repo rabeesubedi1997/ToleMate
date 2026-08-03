@@ -12,7 +12,6 @@ import {
   Ticket, Globe, Search, List, FileText, DollarSign, Shield, Activity, Clock
 } from 'lucide-react';
 import SeoHead from '../components/SeoHead';
-import Footer from '../components/Layout/Footer';
 import MenuManager from '../components/MenuManager';
 import PageSeoManager from '../components/PageSeoManager';
 
@@ -1929,7 +1928,6 @@ const AdminDashboard: React.FC = () => {
 
           </>)}
         </div>
-        <Footer />
       </main>
 
       {/* ═══ MEDIA PICKER MODAL ═══ */}

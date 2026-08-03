@@ -3,7 +3,6 @@ import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 import { useToast } from '../context/ToastContext';
 import SeoHead from '../components/SeoHead';
-import Footer from '../components/Layout/Footer';
 import {
   LayoutDashboard, Users, Store, Briefcase, Shield, Activity, CheckCircle, XCircle, Clock,
   Plus, Trash2, Search, ChevronDown, ExternalLink, RefreshCw, DollarSign
@@ -458,7 +457,6 @@ const SuperAdminDashboard: React.FC = () => {
               </div>
             </div>
           )}
-        <Footer />
         </main>
       </div>
     </>
