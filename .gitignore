@@ -65,3 +65,9 @@ mobile/yarn-error.log*
 # ─── Logs ───────────────────────────────────────────────────
 *.log
 backend/storage/logs/*.log
+
+# Local build artifacts (not for deployment)
+*.apk
+mobile/android/build-log.txt
+mobile/ios/_xcode.env
+

@@ -1,136 +1,221 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  StyleSheet, 
-  View, 
-  Text, 
-  ScrollView, 
-  TextInput, 
-  TouchableOpacity, 
+import React, { useEffect, useState, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TextInput,
+  TouchableOpacity,
   FlatList,
-  Image,
-  Dimensions
+  ActivityIndicator,
+  SafeAreaView,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
-import { COLORS, SPACING } from '../../theme';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import type { CompositeNavigationProp } from '@react-navigation/native';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useNavigation } from '@react-navigation/native';
 import api from '../../api/client';
+import { useAuth } from '../../context/AuthContext';
+import { COLORS, SPACING } from '../../theme';
+import ServiceCard, { Service } from '../../components/ServiceCard';
+import AppImage from '../../components/AppImage';
+import { CustomerTabParamList, MainStackParamList } from '../../navigation/types';
 
-const { width } = Dimensions.get('window');
+type Nav = CompositeNavigationProp<
+  BottomTabNavigationProp<CustomerTabParamList, 'Home'>,
+  NativeStackNavigationProp<MainStackParamList>
+>;
 
-const CATEGORIES = [
-  { id: 1, name: 'Repair', icon: '🔧' },
-  { id: 2, name: 'Cleaning', icon: '🧹' },
-  { id: 3, name: 'Tech', icon: '💻' },
-  { id: 4, name: 'Tutor', icon: '📚' },
-  { id: 5, name: 'Health', icon: '🧘' },
-];
+interface Category {
+  id: number;
+  name: string;
+  services_count?: number;
+}
 
-const HomeScreen = ({ navigation }: any) => {
-  const [services, setServices] = useState([]);
+interface Vendor {
+  id: number;
+  business_name: string;
+  avatar?: string | null;
+  rating?: string | number | null;
+  is_verified?: boolean;
+  user?: { id: number; name?: string } | null;
+}
+
+const HomeScreen: React.FC = () => {
+  const navigation = useNavigation<Nav>();
+  const { user } = useAuth();
+  const [search, setSearch] = useState('');
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchServices();
+    const load = async () => {
+      try {
+        const [catRes, vendorRes, serviceRes] = await Promise.all([
+          api.get('/categories'),
+          api.get('/featured-vendors'),
+          api.get('/services', { params: { per_page: 8 } }),
+        ]);
+        setCategories(catRes.data);
+        setVendors(vendorRes.data);
+        const svc = Array.isArray(serviceRes.data)
+          ? serviceRes.data
+          : serviceRes.data.data ?? [];
+        setServices(svc);
+      } catch (e) {
+        console.warn('home load failed', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
   }, []);
 
-  const fetchServices = async () => {
-    try {
-      const response = await api.get('/services');
-      setServices(response.data.data || response.data);
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const openSearch = useCallback(() => {
+    navigation.navigate('Marketplace', { search: search.trim() || undefined });
+  }, [navigation, search]);
 
-  const renderCategory = ({ item }: any) => (
-    <TouchableOpacity style={styles.categoryItem}>
+  const openCategory = useCallback(
+    (id: number) => navigation.navigate('Marketplace', { categoryId: id }),
+    [navigation],
+  );
+
+  const openService = useCallback(
+    (service: Service) =>
+      navigation.navigate('ServiceDetail', { id: service.id }),
+    [navigation],
+  );
+
+  const openVendor = useCallback(
+    (id: number) => navigation.navigate('VendorPublic', { id }),
+    [navigation],
+  );
+
+  const renderCategory = ({ item }: { item: Category }) => (
+    <TouchableOpacity
+      style={styles.categoryItem}
+      activeOpacity={0.8}
+      onPress={() => openCategory(item.id)}
+    >
       <View style={styles.categoryIcon}>
-        <Text style={{ fontSize: 24 }}>{item.icon}</Text>
+        <MaterialIcons name="category" size={22} color={COLORS.primary} />
       </View>
-      <Text style={styles.categoryName}>{item.name}</Text>
+      <Text style={styles.categoryName} numberOfLines={1}>
+        {item.name}
+      </Text>
     </TouchableOpacity>
   );
 
-  const renderService = ({ item }: any) => (
-    <TouchableOpacity 
-      style={styles.serviceCard}
-      onPress={() => navigation.navigate('ServiceDetails', { id: item.id })}
+  const renderVendor = ({ item }: { item: Vendor }) => (
+    <TouchableOpacity
+      style={styles.vendorCard}
+      activeOpacity={0.85}
+      onPress={() => openVendor(item.id)}
     >
-      <View style={styles.serviceImagePlaceholder}>
-        <Text style={{ fontSize: 40 }}>{item.category?.name === 'Cleaning' ? '🧹' : '💼'}</Text>
-      </View>
-      <View style={styles.serviceInfo}>
-        <Text style={styles.serviceCategory}>{item.category?.name}</Text>
-        <Text style={styles.serviceName}>{item.name}</Text>
-        <View style={styles.serviceFooter}>
-          <Text style={styles.servicePrice}>${item.price}</Text>
-          <View style={styles.ratingContainer}>
-            <Text style={styles.ratingText}>★ {item.vendor?.rating || '5.0'}</Text>
-          </View>
-        </View>
-      </View>
+      <AppImage uri={item.avatar} style={styles.vendorAvatar} />
+      <Text style={styles.vendorName} numberOfLines={1}>
+        {item.business_name}
+      </Text>
+      <Text style={styles.vendorRating}>
+        ★ {item.rating ? Number(item.rating).toFixed(1) : 'New'}
+      </Text>
     </TouchableOpacity>
   );
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Namaste,</Text>
-          <Text style={styles.userName}>Find a Professional</Text>
-        </View>
-        <TouchableOpacity style={styles.profileButton}>
-          <Image 
-            source={{ uri: 'https://i.pravatar.cc/100' }} 
-            style={styles.avatar} 
-          />
-        </TouchableOpacity>
-      </View>
-
+    <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Header */}
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.greeting}>Namaste,</Text>
+            <Text style={styles.userName}>
+              {user?.name?.split(' ')[0] ?? 'Guest'}
+            </Text>
+          </View>
+          <View style={styles.headerBadge}>
+            <MaterialIcons name="handyman" size={22} color={COLORS.primary} />
+          </View>
+        </View>
+
         {/* Search */}
         <View style={styles.searchContainer}>
-          <View style={styles.searchInputWrapper}>
-            <Text style={styles.searchIcon}>🔍</Text>
-            <TextInput 
-              placeholder="What service do you need?" 
-              style={styles.searchInput}
-            />
-          </View>
-        </View>
-
-        {/* Categories */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Categories</Text>
-          <FlatList 
-            data={CATEGORIES}
-            renderItem={renderCategory}
-            keyExtractor={item => item.id.toString()}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoriesList}
+          <MaterialIcons name="search" size={20} color={COLORS.slate500} />
+          <TextInput
+            placeholder="What service do you need?"
+            style={styles.searchInput}
+            value={search}
+            onChangeText={setSearch}
+            returnKeyType="search"
+            onSubmitEditing={openSearch}
+            placeholderTextColor={COLORS.slate400}
           />
-        </View>
-
-        {/* Featured */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recommended for You</Text>
-            <TouchableOpacity>
-              <Text style={styles.seeAll}>See All</Text>
+          {search.length > 0 ? (
+            <TouchableOpacity onPress={openSearch}>
+              <Text style={styles.searchGo}>Go</Text>
             </TouchableOpacity>
-          </View>
-          
-          <FlatList 
-            data={services}
-            renderItem={renderService}
-            keyExtractor={(item: any) => item.id.toString()}
-            scrollEnabled={false}
-          />
+          ) : null}
         </View>
+
+        {loading ? (
+          <ActivityIndicator
+            style={styles.loader}
+            size="large"
+            color={COLORS.primary}
+          />
+        ) : (
+          <>
+            {/* Categories */}
+            <Text style={styles.sectionTitle}>Categories</Text>
+            <FlatList
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              data={categories}
+              keyExtractor={item => String(item.id)}
+              renderItem={renderCategory}
+              contentContainerStyle={styles.categoryList}
+              nestedScrollEnabled
+            />
+
+            {/* Featured vendors */}
+            {vendors.length > 0 ? (
+              <>
+                <Text style={styles.sectionTitle}>Featured Professionals</Text>
+                <FlatList
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  data={vendors}
+                  keyExtractor={item => String(item.id)}
+                  renderItem={renderVendor}
+                  contentContainerStyle={styles.vendorList}
+                  nestedScrollEnabled
+                />
+              </>
+            ) : null}
+
+            {/* Services */}
+            <Text style={styles.sectionTitle}>Popular Services</Text>
+            <View style={styles.grid}>
+              {services.map(service => (
+                <ServiceCard
+                  key={service.id}
+                  service={service}
+                  onPress={openService}
+                />
+              ))}
+            </View>
+            {services.length === 0 ? (
+              <Text style={styles.emptyText}>
+                No services available yet — be the first to book!
+              </Text>
+            ) : null}
+          </>
+        )}
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -138,176 +223,149 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.light,
-    paddingTop: 50,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.xl,
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.sm,
   },
   greeting: {
     fontSize: 14,
     color: COLORS.slate500,
-    fontWeight: '600',
   },
   userName: {
-    fontSize: 24,
-    fontWeight: '900',
+    fontSize: 22,
+    fontWeight: '700',
     color: COLORS.dark,
-    letterSpacing: -0.5,
   },
-  profileButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 18,
-    borderWidth: 2,
-    borderColor: COLORS.white,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-  },
-  avatar: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 16,
-  },
-  searchContainer: {
-    paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.xl,
-  },
-  searchInputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  headerBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: COLORS.white,
-    borderRadius: 20,
-    paddingHorizontal: SPACING.md,
-    height: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
-  searchIcon: {
-    marginRight: SPACING.sm,
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: SPACING.md,
+    marginTop: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    height: 46,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
-    fontWeight: '600',
+    marginLeft: SPACING.sm,
+    fontSize: 15,
     color: COLORS.dark,
+    paddingVertical: 0,
   },
-  section: {
-    marginBottom: SPACING.xl,
+  searchGo: {
+    color: COLORS.primary,
+    fontWeight: '700',
+    fontSize: 15,
   },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.md,
+  loader: {
+    marginTop: SPACING.xxl,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: '900',
+    marginTop: SPACING.lg,
+    marginHorizontal: SPACING.md,
+    fontSize: 17,
+    fontWeight: '700',
     color: COLORS.dark,
-    paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.md,
   },
-  seeAll: {
-    color: COLORS.primary,
-    fontWeight: '800',
-    fontSize: 14,
-  },
-  categoriesList: {
-    paddingLeft: SPACING.lg,
+  categoryList: {
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.sm,
+    gap: SPACING.sm,
   },
   categoryItem: {
+    width: 86,
     alignItems: 'center',
-    marginRight: SPACING.lg,
   },
   categoryIcon: {
-    width: 65,
-    height: 65,
+    width: 60,
+    height: 60,
+    borderRadius: 18,
     backgroundColor: COLORS.white,
-    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: SPACING.sm,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
   categoryName: {
+    marginTop: 6,
     fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.slate600,
+    fontWeight: '600',
+    color: COLORS.dark,
+    textAlign: 'center',
   },
-  serviceCard: {
+  vendorList: {
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.sm,
+    gap: SPACING.sm,
+  },
+  vendorCard: {
+    width: 110,
+    alignItems: 'center',
     backgroundColor: COLORS.white,
-    marginHorizontal: SPACING.lg,
-    marginBottom: SPACING.md,
-    borderRadius: 24,
-    flexDirection: 'row',
-    padding: SPACING.md,
+    borderRadius: 14,
+    padding: SPACING.sm,
     shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 10,
     elevation: 2,
   },
-  serviceImagePlaceholder: {
-    width: 100,
-    height: 100,
-    backgroundColor: COLORS.light,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
+  vendorAvatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
   },
-  serviceInfo: {
-    flex: 1,
-    marginLeft: SPACING.md,
-    justifyContent: 'center',
-  },
-  serviceCategory: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: COLORS.primary,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 4,
-  },
-  serviceName: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: COLORS.dark,
-    marginBottom: SPACING.sm,
-  },
-  serviceFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  servicePrice: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: COLORS.dark,
-  },
-  ratingContainer: {
-    backgroundColor: '#fffbeb',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  ratingText: {
+  vendorName: {
+    marginTop: 6,
     fontSize: 12,
-    fontWeight: '900',
-    color: '#b45309',
+    fontWeight: '600',
+    color: COLORS.dark,
+    textAlign: 'center',
+  },
+  vendorRating: {
+    marginTop: 2,
+    fontSize: 11,
+    color: COLORS.accent,
+    fontWeight: '600',
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.sm,
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: COLORS.slate500,
+    padding: SPACING.xl,
+    fontSize: 14,
   },
 });
 

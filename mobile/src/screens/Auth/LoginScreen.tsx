@@ -5,22 +5,22 @@ import {
   Text, 
   TextInput, 
   TouchableOpacity, 
-  Dimensions, 
   KeyboardAvoidingView, 
   Platform,
-  Image,
   ActivityIndicator
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { COLORS, SPACING } from '../../theme';
-import api from '../../api/client';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '../../context/AuthContext';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { AuthStackParamList } from '../../navigation/types';
 
-const { width } = Dimensions.get('window');
+type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
-const LoginScreen = ({ navigation }: any) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+const LoginScreen = ({ navigation }: Props) => {
+  const { login } = useAuth();
+  const [email, setEmail] = useState('superadmin@tolemate.com');
+  const [password, setPassword] = useState('password');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -34,12 +34,7 @@ const LoginScreen = ({ navigation }: any) => {
     setError('');
     
     try {
-      const response = await api.post('/login', { email, password });
-      if (response.data.token) {
-        await AsyncStorage.setItem('token', response.data.token);
-        await AsyncStorage.setItem('user', JSON.stringify(response.data.user));
-        navigation.navigate('Home');
-      }
+      await login(email, password);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Login failed');
     } finally {
@@ -48,7 +43,7 @@ const LoginScreen = ({ navigation }: any) => {
   };
 
   return (
-    <LinearGradient colors={['#f8fafc', '#e2e8f0']} style={styles.container}>
+    <LinearGradient colors={[COLORS.gray50, COLORS.gray100]} style={styles.container}>
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.content}
@@ -56,7 +51,7 @@ const LoginScreen = ({ navigation }: any) => {
         <View style={styles.header}>
           <View style={styles.logoContainer}>
             <LinearGradient 
-              colors={[COLORS.primary, '#3b82f6']} 
+              colors={[COLORS.primary, COLORS.primaryDark]} 
               style={styles.logo}
             >
               <Text style={styles.logoText}>T</Text>
@@ -98,7 +93,7 @@ const LoginScreen = ({ navigation }: any) => {
             disabled={loading}
           >
             <LinearGradient 
-              colors={[COLORS.primary, '#1d4ed8']} 
+              colors={[COLORS.primary, COLORS.primaryDark]} 
               style={styles.buttonGradient}
             >
               {loading ? (
@@ -168,13 +163,15 @@ const styles = StyleSheet.create({
   },
   form: {
     backgroundColor: COLORS.white,
-    borderRadius: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.gray200,
     padding: SPACING.lg,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 15,
-    elevation: 5,
+    shadowRadius: 12,
+    elevation: 2,
   },
   label: {
     fontSize: 10,
@@ -187,25 +184,20 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   input: {
-    backgroundColor: COLORS.light,
-    borderRadius: 16,
+    backgroundColor: COLORS.white,
+    borderRadius: 8,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.md,
-    fontSize: 16,
+    fontSize: 15,
     color: COLORS.dark,
-    fontWeight: '600',
+    fontWeight: '500',
     borderWidth: 1,
-    borderColor: '#f1f5f9',
+    borderColor: COLORS.gray300,
   },
   loginButton: {
     marginTop: SPACING.md,
-    borderRadius: 16,
+    borderRadius: 8,
     overflow: 'hidden',
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 8,
   },
   buttonGradient: {
     paddingVertical: SPACING.md,
@@ -214,9 +206,9 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: COLORS.white,
-    fontSize: 14,
-    fontWeight: '900',
-    letterSpacing: 2,
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   errorText: {
     color: COLORS.rose,
