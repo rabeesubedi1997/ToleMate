@@ -10,7 +10,8 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../../api/client';
 import StatCard from '../../components/StatCard';
-import { COLORS, SPACING, RADIUS, SHADOW, FONT_SIZE } from '../../theme';
+import AdminHeader from '../../components/AdminHeader';
+import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme';
 
 interface Analytics {
   total_bookings: number;
@@ -75,10 +76,11 @@ const VendorDashboardScreen: React.FC = () => {
         />
       }
     >
-      <View style={styles.header}>
-        <Text style={styles.title}>Vendor Dashboard</Text>
-        <Text style={styles.subtitle}>Your business at a glance</Text>
-      </View>
+      <AdminHeader
+        title="Dashboard"
+        subtitle="Your business at a glance"
+        brand="ToleMate Partner"
+      />
 
       {loading ? (
         <ActivityIndicator
@@ -211,20 +213,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.light,
-  },
-  header: {
-    paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.md,
-  },
-  title: {
-    fontSize: FONT_SIZE.xl,
-    fontWeight: '700',
-    color: COLORS.gray900,
-  },
-  subtitle: {
-    marginTop: 2,
-    fontSize: 13,
-    color: COLORS.gray500,
   },
   loader: {
     marginTop: SPACING.xxl,

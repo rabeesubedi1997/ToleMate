@@ -9,6 +9,7 @@ import {
   Pressable,
   TextInput,
   Modal,
+  Alert,
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -29,7 +30,8 @@ const AdminCategoriesScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
-  const [newName, setNewName] = useState('');
+  const [editing, setEditing] = useState<Category | null>(null);
+  const [name, setName] = useState('');
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -50,19 +52,56 @@ const AdminCategoriesScreen: React.FC = () => {
     }, [load]),
   );
 
-  const addCategory = async () => {
-    if (!newName.trim()) return;
+  const openCreate = () => {
+    setEditing(null);
+    setName('');
+    setModalOpen(true);
+  };
+
+  const openEdit = (cat: Category) => {
+    setEditing(cat);
+    setName(cat.name);
+    setModalOpen(true);
+  };
+
+  const save = async () => {
+    if (!name.trim()) return;
     setSaving(true);
     try {
-      await api.post('/admin/categories', { name: newName.trim() });
-      setNewName('');
+      if (editing) {
+        await api.put(`/admin/categories/${editing.id}`, { name: name.trim() });
+      } else {
+        await api.post('/admin/categories', { name: name.trim() });
+      }
+      setName('');
       setModalOpen(false);
       load();
-    } catch (e) {
-      console.warn('add category failed', e);
+    } catch (e: any) {
+      Alert.alert('Failed', e?.response?.data?.message ?? 'Could not save category.');
     } finally {
       setSaving(false);
     }
+  };
+
+  const remove = (cat: Category) => {
+    Alert.alert('Delete category', `Delete "${cat.name}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await api.delete(`/admin/categories/${cat.id}`);
+            load();
+          } catch (e: any) {
+            Alert.alert(
+              'Failed',
+              e?.response?.data?.message ?? 'Could not delete category.',
+            );
+          }
+        },
+      },
+    ]);
   };
 
   const renderItem = ({ item }: { item: Category }) => (
@@ -72,12 +111,24 @@ const AdminCategoriesScreen: React.FC = () => {
       </View>
       <View style={styles.body}>
         <Text style={styles.name}>{item.name}</Text>
-        {item.parent_id ? (
-          <Text style={styles.meta}>Subcategory</Text>
-        ) : null}
+        {item.parent_id ? <Text style={styles.meta}>Subcategory</Text> : null}
       </View>
-      <View style={styles.countPill}>
-        <Text style={styles.countText}>{item.services_count} services</Text>
+      <View style={styles.actions}>
+        <View style={styles.countPill}>
+          <Text style={styles.countText}>{item.services_count}</Text>
+        </View>
+        <Pressable
+          onPress={() => openEdit(item)}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+        >
+          <MaterialIcons name="edit-outline" size={18} color={COLORS.primary700} />
+        </Pressable>
+        <Pressable
+          onPress={() => remove(item)}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+        >
+          <MaterialIcons name="delete-outline" size={18} color={COLORS.rose} />
+        </Pressable>
       </View>
     </View>
   );
@@ -85,7 +136,7 @@ const AdminCategoriesScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <ScreenHeader title="Categories" subtitle="Manage service categories" />
-      <Pressable style={styles.addBtn} onPress={() => setModalOpen(true)}>
+      <Pressable style={styles.addBtn} onPress={openCreate}>
         <MaterialIcons name="add" size={18} color={COLORS.white} />
         <Text style={styles.addBtnText}>Add Category</Text>
       </Pressable>
@@ -126,13 +177,15 @@ const AdminCategoriesScreen: React.FC = () => {
       >
         <View style={styles.modalWrap}>
           <View style={styles.modal}>
-            <Text style={styles.modalTitle}>New Category</Text>
+            <Text style={styles.modalTitle}>
+              {editing ? 'Rename category' : 'New Category'}
+            </Text>
             <TextInput
               style={styles.input}
               placeholder="Category name"
               placeholderTextColor={COLORS.gray400}
-              value={newName}
-              onChangeText={setNewName}
+              value={name}
+              onChangeText={setName}
               autoCapitalize="words"
             />
             <View style={styles.modalRow}>
@@ -144,11 +197,11 @@ const AdminCategoriesScreen: React.FC = () => {
               </Pressable>
               <Pressable
                 style={[styles.modalBtn, styles.saveBtn]}
-                onPress={addCategory}
+                onPress={save}
                 disabled={saving}
               >
                 <Text style={styles.saveText}>
-                  {saving ? 'Saving...' : 'Add'}
+                  {saving ? 'Saving...' : editing ? 'Save' : 'Add'}
                 </Text>
               </Pressable>
             </View>
@@ -218,6 +271,11 @@ const styles = StyleSheet.create({
   meta: {
     fontSize: 11,
     color: COLORS.gray400,
+  },
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
   },
   countPill: {
     backgroundColor: COLORS.neutralBg,

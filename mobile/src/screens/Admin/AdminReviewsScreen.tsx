@@ -6,6 +6,8 @@ import {
   FlatList,
   ActivityIndicator,
   RefreshControl,
+  Alert,
+  Pressable,
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -48,6 +50,27 @@ const AdminReviewsScreen: React.FC = () => {
     }, [load]),
   );
 
+  const remove = (item: Review) => {
+    Alert.alert('Remove review', 'Remove this review?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await api.delete(`/admin/reviews/${item.id}`);
+            load();
+          } catch (e: any) {
+            Alert.alert(
+              'Failed',
+              e?.response?.data?.message ?? 'Could not remove review.',
+            );
+          }
+        },
+      },
+    ]);
+  };
+
   const renderItem = ({ item }: { item: Review }) => (
     <View style={styles.card}>
       <View style={styles.topRow}>
@@ -61,9 +84,17 @@ const AdminReviewsScreen: React.FC = () => {
             />
           ))}
         </View>
-        <Text style={styles.time}>
-          {new Date(item.created_at).toLocaleDateString()}
-        </Text>
+        <View style={styles.topRight}>
+          <Text style={styles.time}>
+            {new Date(item.created_at).toLocaleDateString()}
+          </Text>
+          <Pressable
+            onPress={() => remove(item)}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            <MaterialIcons name="delete-outline" size={18} color={COLORS.rose} />
+          </Pressable>
+        </View>
       </View>
       <Text style={styles.comment}>{item.comment || '—'}</Text>
       <Text style={styles.meta} numberOfLines={1}>
@@ -148,6 +179,11 @@ const styles = StyleSheet.create({
   time: {
     fontSize: 11,
     color: COLORS.gray400,
+  },
+  topRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
   },
   comment: {
     fontSize: 13,

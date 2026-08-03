@@ -6,8 +6,11 @@ import {
   FlatList,
   ActivityIndicator,
   RefreshControl,
+  Alert,
+  Pressable,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import api from '../../api/client';
 import ScreenHeader from '../../components/ScreenHeader';
 import FilterChips from '../../components/FilterChips';
@@ -56,6 +59,27 @@ const AdminServicesScreen: React.FC = () => {
     }, [load]),
   );
 
+  const remove = (item: Service) => {
+    Alert.alert('Delete service', `Delete "${item.name}"? This cannot be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await api.delete(`/services/${item.id}`);
+            load();
+          } catch (e: any) {
+            Alert.alert(
+              'Failed',
+              e?.response?.data?.message ?? 'Could not delete service.',
+            );
+          }
+        },
+      },
+    ]);
+  };
+
   const renderItem = ({ item }: { item: Service }) => (
     <View style={styles.card}>
       <View style={styles.topRow}>
@@ -69,16 +93,24 @@ const AdminServicesScreen: React.FC = () => {
       </Text>
       <View style={styles.bottomRow}>
         <Text style={styles.price}>Rs {item.price}</Text>
-        <View style={styles.activeRow}>
-          <View
-            style={[
-              styles.dot,
-              { backgroundColor: item.is_active ? COLORS.successText : COLORS.gray400 },
-            ]}
-          />
-          <Text style={styles.activeText}>
-            {item.is_active ? 'live' : 'hidden'}
-          </Text>
+        <View style={styles.actions}>
+          <View style={styles.activeRow}>
+            <View
+              style={[
+                styles.dot,
+                { backgroundColor: item.is_active ? COLORS.successText : COLORS.gray400 },
+              ]}
+            />
+            <Text style={styles.activeText}>
+              {item.is_active ? 'live' : 'hidden'}
+            </Text>
+          </View>
+          <Pressable
+            onPress={() => remove(item)}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
+            <MaterialIcons name="delete-outline" size={18} color={COLORS.rose} />
+          </Pressable>
         </View>
       </View>
       <Text style={styles.time}>{item.pricing_type}</Text>
@@ -174,6 +206,11 @@ const styles = StyleSheet.create({
   activeRow: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
   },
   dot: {
     width: 6,

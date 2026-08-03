@@ -20,6 +20,7 @@ import { useAuth } from '../../context/AuthContext';
 import { COLORS, SPACING } from '../../theme';
 import ServiceCard, { Service } from '../../components/ServiceCard';
 import AppImage from '../../components/AppImage';
+import AppBanner from '../../components/AppBanner';
 import { CustomerTabParamList, MainStackParamList } from '../../navigation/types';
 
 type Nav = CompositeNavigationProp<
@@ -131,15 +132,18 @@ const HomeScreen: React.FC = () => {
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>Namaste,</Text>
-            <Text style={styles.userName}>
-              {user?.name?.split(' ')[0] ?? 'Guest'}
+            <Text style={styles.brand}>ToleMate</Text>
+            <Text style={styles.greeting}>
+              Namaste, {user?.name?.split(' ')[0] ?? 'Guest'}
             </Text>
           </View>
           <View style={styles.headerBadge}>
             <MaterialIcons name="handyman" size={22} color={COLORS.primary} />
           </View>
         </View>
+
+        {/* Hero banner */}
+        <AppBanner />
 
         {/* Search */}
         <View style={styles.searchContainer}>
@@ -231,14 +235,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
     paddingTop: SPACING.sm,
   },
-  greeting: {
-    fontSize: 14,
-    color: COLORS.slate500,
+  brand: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: COLORS.primary700,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
-  userName: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: COLORS.dark,
+  greeting: {
+    fontSize: 16,
+    color: COLORS.slate500,
+    marginTop: 1,
+    fontWeight: '600',
   },
   headerBadge: {
     width: 44,

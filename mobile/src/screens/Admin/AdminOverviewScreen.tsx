@@ -12,7 +12,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import api from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import StatCard from '../../components/StatCard';
-import { COLORS, SPACING, RADIUS, SHADOW, FONT_SIZE } from '../../theme';
+import AdminHeader from '../../components/AdminHeader';
+import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme';
 
 interface Stats {
   total_users: number;
@@ -109,14 +110,10 @@ const AdminOverviewScreen: React.FC = () => {
         />
       }
     >
-      <View style={styles.header}>
-        <Text style={styles.title}>Admin Overview</Text>
-        <View style={styles.rolePill}>
-          <Text style={styles.rolePillText}>
-            {isSuperAdmin ? 'Super Admin' : 'Admin'}
-          </Text>
-        </View>
-      </View>
+      <AdminHeader
+        title="Overview"
+        subtitle={isSuperAdmin ? 'Super Admin workspace' : 'Admin workspace'}
+      />
 
       {loading ? (
         <ActivityIndicator
@@ -234,29 +231,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.light,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.md,
-  },
-  title: {
-    fontSize: FONT_SIZE.xl,
-    fontWeight: '700',
-    color: COLORS.gray900,
-  },
-  rolePill: {
-    backgroundColor: COLORS.primary50,
-    borderRadius: RADIUS.pill,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.xs,
-  },
-  rolePillText: {
-    color: COLORS.primary700,
-    fontSize: 11,
-    fontWeight: '700',
   },
   loader: {
     marginTop: SPACING.xxl,

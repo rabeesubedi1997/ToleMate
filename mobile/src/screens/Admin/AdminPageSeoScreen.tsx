@@ -34,7 +34,15 @@ const AdminPageSeoScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [editing, setEditing] = useState<PageSeo | null>(null);
-  const [form, setForm] = useState({ title: '', description: '', keywords: '', og_image: '', no_index: false });
+  const [creating, setCreating] = useState(false);
+  const [form, setForm] = useState({
+    page: '',
+    title: '',
+    description: '',
+    keywords: '',
+    og_image: '',
+    no_index: false,
+  });
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -56,8 +64,10 @@ const AdminPageSeoScreen: React.FC = () => {
   );
 
   const openEdit = (item: PageSeo) => {
+    setCreating(false);
     setEditing(item);
     setForm({
+      page: item.page,
       title: item.title ?? '',
       description: item.description ?? '',
       keywords: item.keywords ?? '',
@@ -66,57 +76,117 @@ const AdminPageSeoScreen: React.FC = () => {
     });
   };
 
+  const openCreate = () => {
+    setEditing(null);
+    setCreating(true);
+    setForm({
+      page: '',
+      title: '',
+      description: '',
+      keywords: '',
+      og_image: '',
+      no_index: false,
+    });
+  };
+
+  const closeModal = () => {
+    setEditing(null);
+    setCreating(false);
+  };
+
   const save = async () => {
-    if (!editing) return;
+    const payload = {
+      page: form.page.trim(),
+      title: form.title,
+      description: form.description,
+      keywords: form.keywords,
+      og_image: form.og_image,
+      no_index: form.no_index,
+    };
+    if (!payload.page) {
+      Alert.alert('Missing route', 'The page route is required.');
+      return;
+    }
     setSaving(true);
     try {
-      await api.put(`/admin/page-seo/${editing.id}`, {
-        page: editing.page,
-        title: form.title,
-        description: form.description,
-        keywords: form.keywords,
-        og_image: form.og_image,
-        no_index: form.no_index,
-      });
-      setEditing(null);
+      if (editing) {
+        await api.put(`/admin/page-seo/${editing.id}`, payload);
+      } else {
+        await api.post('/admin/page-seo', payload);
+      }
+      closeModal();
       load();
-    } catch {
-      Alert.alert('Failed', 'Could not save page SEO.');
+    } catch (e: any) {
+      Alert.alert('Failed', e?.response?.data?.message ?? 'Could not save page SEO.');
     } finally {
       setSaving(false);
     }
   };
 
+  const remove = (item: PageSeo) => {
+    Alert.alert('Delete page SEO', `Delete SEO entry for "${item.page}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await api.delete(`/admin/page-seo/${item.id}`);
+            load();
+          } catch (e: any) {
+            Alert.alert(
+              'Failed',
+              e?.response?.data?.message ?? 'Could not delete page SEO.',
+            );
+          }
+        },
+      },
+    ]);
+  };
+
   const renderItem = ({ item }: { item: PageSeo }) => (
-    <Pressable style={styles.card} onPress={() => openEdit(item)}>
-      <View style={styles.topRow}>
-        <View style={styles.icon}>
-          <MaterialIcons name="description" size={16} color={COLORS.primary} />
-        </View>
-        <Text style={styles.page} numberOfLines={1}>
-          {item.page}
-        </Text>
-        {item.no_index ? (
-          <View style={styles.noIndexPill}>
-            <Text style={styles.noIndexText}>noindex</Text>
+    <View style={styles.card}>
+      <Pressable style={styles.cardBody} onPress={() => openEdit(item)}>
+        <View style={styles.topRow}>
+          <View style={styles.icon}>
+            <MaterialIcons name="description" size={16} color={COLORS.primary} />
           </View>
-        ) : null}
-      </View>
-      <Text style={styles.title} numberOfLines={1}>
-        {item.title || '(no title)'}
-      </Text>
-      <Text style={styles.desc} numberOfLines={2}>
-        {item.description || '—'}
-      </Text>
-      <Text style={styles.meta} numberOfLines={1}>
-        {item.keywords || 'no keywords'}
-      </Text>
-    </Pressable>
+          <Text style={styles.page} numberOfLines={1}>
+            {item.page}
+          </Text>
+          {item.no_index ? (
+            <View style={styles.noIndexPill}>
+              <Text style={styles.noIndexText}>noindex</Text>
+            </View>
+          ) : null}
+        </View>
+        <Text style={styles.title} numberOfLines={1}>
+          {item.title || '(no title)'}
+        </Text>
+        <Text style={styles.desc} numberOfLines={2}>
+          {item.description || '—'}
+        </Text>
+        <Text style={styles.meta} numberOfLines={1}>
+          {item.keywords || 'no keywords'}
+        </Text>
+      </Pressable>
+      <Pressable
+        style={styles.deleteBtn}
+        onPress={() => remove(item)}
+        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+      >
+        <MaterialIcons name="delete-outline" size={18} color={COLORS.rose} />
+      </Pressable>
+    </View>
   );
 
   return (
     <View style={styles.container}>
       <ScreenHeader title="Page SEO" subtitle="Meta settings per page" />
+      <Pressable style={styles.addBtn} onPress={openCreate}>
+        <MaterialIcons name="add" size={18} color={COLORS.white} />
+        <Text style={styles.addBtnText}>Add Page</Text>
+      </Pressable>
 
       {loading ? (
         <ActivityIndicator
@@ -147,17 +217,30 @@ const AdminPageSeoScreen: React.FC = () => {
       )}
 
       <Modal
-        visible={editing !== null}
+        visible={editing !== null || creating}
         transparent
         animationType="fade"
-        onRequestClose={() => setEditing(null)}
+        onRequestClose={closeModal}
       >
         <View style={styles.modalWrap}>
           <View style={styles.modal}>
             <Text style={styles.modalTitle}>
-              {editing ? `SEO for ${editing.page}` : ''}
+              {creating ? 'New page SEO' : editing ? `SEO for ${editing.page}` : ''}
             </Text>
             <ScrollView keyboardShouldPersistTaps="handled">
+              {creating ? (
+                <>
+                  <Text style={styles.label}>Page route *</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={form.page}
+                    onChangeText={v => setForm(p => ({ ...p, page: v }))}
+                    placeholder="/services"
+                    placeholderTextColor={COLORS.gray400}
+                    autoCapitalize="none"
+                  />
+                </>
+              ) : null}
               <Text style={styles.label}>Meta title</Text>
               <TextInput
                 style={styles.input}
@@ -203,7 +286,7 @@ const AdminPageSeoScreen: React.FC = () => {
             <View style={styles.modalRow}>
               <Pressable
                 style={[styles.modalBtn, styles.cancelBtn]}
-                onPress={() => setEditing(null)}
+                onPress={closeModal}
               >
                 <Text style={styles.cancelText}>Cancel</Text>
               </Pressable>
@@ -212,7 +295,9 @@ const AdminPageSeoScreen: React.FC = () => {
                 onPress={save}
                 disabled={saving}
               >
-                <Text style={styles.saveText}>{saving ? 'Saving...' : 'Save'}</Text>
+                <Text style={styles.saveText}>
+                  {saving ? 'Saving...' : creating ? 'Create' : 'Save'}
+                </Text>
               </Pressable>
             </View>
           </View>
@@ -227,6 +312,22 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.light,
   },
+  addBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.md,
+    paddingVertical: 10,
+    marginHorizontal: SPACING.md,
+    marginBottom: SPACING.sm,
+  },
+  addBtnText: {
+    color: COLORS.white,
+    fontSize: 13,
+    fontWeight: '700',
+    marginLeft: 4,
+  },
   loader: {
     marginTop: SPACING.xxl,
   },
@@ -235,6 +336,8 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING.xl,
   },
   card: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
@@ -242,6 +345,12 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     marginBottom: SPACING.sm,
     ...SHADOW.card,
+  },
+  cardBody: {
+    flex: 1,
+  },
+  deleteBtn: {
+    padding: 4,
   },
   topRow: {
     flexDirection: 'row',

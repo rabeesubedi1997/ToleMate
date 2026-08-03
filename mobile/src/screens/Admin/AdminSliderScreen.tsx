@@ -6,11 +6,16 @@ import {
   FlatList,
   ActivityIndicator,
   RefreshControl,
+  Alert,
+  Pressable,
+  TextInput,
+  Image,
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../../api/client';
 import ScreenHeader from '../../components/ScreenHeader';
+import Modal from '../../components/Modal';
 import EmptyState from '../../components/EmptyState';
 import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme';
 
@@ -21,11 +26,21 @@ interface Slide {
   enabled?: boolean;
 }
 
+const DEFAULT_SLIDES = [
+  { url: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=1200&q=80', title: 'Professional Home Repair Services', link: '/services', enabled: true },
+  { url: 'https://images.unsplash.com/photo-1563453392212-326f5e854473?w=1200&q=80', title: 'Trusted Cleaning Professionals', link: '/services', enabled: true },
+  { url: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200&q=80', title: 'Expert Tech Support at Your Door', link: '/services', enabled: true },
+  { url: 'https://images.unsplash.com/photo-1527529482837-4698179dc6ce?w=1200&q=80', title: 'Perfect Events, Every Time', link: '/services', enabled: true },
+];
+
 const AdminSliderScreen: React.FC = () => {
   const [slides, setSlides] = useState<Slide[]>([]);
   const [interval, setIntervalMs] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState<number | null>(null);
+  const [form, setForm] = useState({ title: '', link: '', enabled: true });
 
   const load = useCallback(async () => {
     try {
@@ -51,15 +66,84 @@ const AdminSliderScreen: React.FC = () => {
     }, [load]),
   );
 
-  const renderItem = ({ item }: { item: Slide }) => (
+  const saveSlides = async (next: Slide[]) => {
+    setSaving(true);
+    try {
+      await api.post('/admin/settings', {
+        settings: [
+          { key: 'slider_images', value: JSON.stringify(next) },
+        ],
+      });
+      setSlides(next);
+    } catch {
+      Alert.alert('Failed', 'Could not save slider.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openEdit = (idx: number) => {
+    setEditing(idx);
+    const s = slides[idx];
+    setForm({
+      title: s.title ?? '',
+      link: s.link ?? '',
+      enabled: s.enabled !== false,
+    });
+  };
+
+  const saveEdit = async () => {
+    if (editing === null) return;
+    const next = slides.map((s, i) =>
+      i === editing ? { ...s, title: form.title, link: form.link, enabled: form.enabled } : s,
+    );
+    setEditing(null);
+    await saveSlides(next);
+  };
+
+  const toggleEnabled = (idx: number) => {
+    const next = slides.map((s, i) =>
+      i === idx ? { ...s, enabled: s.enabled === false } : s,
+    );
+    saveSlides(next);
+  };
+
+  const move = (idx: number, dir: -1 | 1) => {
+    const to = idx + dir;
+    if (to < 0 || to >= slides.length) return;
+    const next = [...slides];
+    [next[idx], next[to]] = [next[to], next[idx]];
+    saveSlides(next);
+  };
+
+  const remove = (idx: number) => {
+    Alert.alert('Remove slide', 'Remove this slide from the banner?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: () => saveSlides(slides.filter((_, i) => i !== idx)),
+      },
+    ]);
+  };
+
+  const loadDefaults = () => {
+    Alert.alert(
+      'Load defaults',
+      'Replace the current slider with the 4 default images?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Load', onPress: () => saveSlides(DEFAULT_SLIDES) },
+      ],
+    );
+  };
+
+  const renderItem = ({ item, index }: { item: Slide; index: number }) => (
     <View style={styles.card}>
-      <View style={styles.icon}>
-        <MaterialIcons
-          name="layers"
-          size={18}
-          color={item.enabled === false ? COLORS.gray400 : COLORS.primary}
-        />
-      </View>
+      <Image
+        source={{ uri: item.url }}
+        style={[styles.thumb, item.enabled === false && styles.thumbOff]}
+      />
       <View style={styles.body}>
         <Text style={styles.title} numberOfLines={1}>
           {item.title || '(no title)'}
@@ -74,15 +158,27 @@ const AdminSliderScreen: React.FC = () => {
         ) : null}
       </View>
       <View style={styles.right}>
-        {item.enabled !== false ? (
-          <View style={styles.onPill}>
-            <Text style={styles.onText}>enabled</Text>
-          </View>
-        ) : (
-          <View style={styles.offPill}>
-            <Text style={styles.offText}>disabled</Text>
-          </View>
-        )}
+        <View style={styles.actions}>
+          <Pressable onPress={() => move(index, -1)} hitSlop={6}>
+            <MaterialIcons name="arrow-upward" size={18} color={COLORS.gray500} />
+          </Pressable>
+          <Pressable onPress={() => move(index, 1)} hitSlop={6}>
+            <MaterialIcons name="arrow-downward" size={18} color={COLORS.gray500} />
+          </Pressable>
+          <Pressable onPress={() => toggleEnabled(index)} hitSlop={6}>
+            <MaterialIcons
+              name={item.enabled !== false ? 'visibility' : 'visibility-off'}
+              size={18}
+              color={item.enabled !== false ? COLORS.primary : COLORS.gray400}
+            />
+          </Pressable>
+          <Pressable onPress={() => openEdit(index)} hitSlop={6}>
+            <MaterialIcons name="edit-outline" size={18} color={COLORS.primary700} />
+          </Pressable>
+          <Pressable onPress={() => remove(index)} hitSlop={6}>
+            <MaterialIcons name="delete-outline" size={18} color={COLORS.rose} />
+          </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -93,6 +189,20 @@ const AdminSliderScreen: React.FC = () => {
         title="Hero Slider"
         subtitle={interval ? `Interval ${(Number(interval) / 1000).toFixed(0)}s` : undefined}
       />
+
+      <View style={styles.topRow}>
+        <Pressable
+          style={[styles.defaultsBtn, saving && styles.btnDisabled]}
+          onPress={loadDefaults}
+          disabled={saving}
+        >
+          <MaterialIcons name="bolt" size={16} color={COLORS.primary700} />
+          <Text style={styles.defaultsBtnText}>Load defaults</Text>
+        </Pressable>
+        {saving ? (
+          <ActivityIndicator size="small" color={COLORS.primary} />
+        ) : null}
+      </View>
 
       {loading ? (
         <ActivityIndicator
@@ -117,10 +227,57 @@ const AdminSliderScreen: React.FC = () => {
             />
           }
           ListEmptyComponent={
-            <EmptyState title="No slides" message="Slider images will appear here." />
+            <EmptyState
+              title="No slides"
+              message="Load defaults or manage slides from the web admin."
+            />
           }
         />
       )}
+
+      <Modal
+        visible={editing !== null}
+        title="Edit slide"
+        onClose={() => setEditing(null)}
+      >
+        <Text style={styles.fieldLabel}>Title</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Slide title"
+          placeholderTextColor={COLORS.gray400}
+          value={form.title}
+          onChangeText={t => setForm(f => ({ ...f, title: t }))}
+        />
+        <Text style={styles.fieldLabel}>Link (optional)</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="/services"
+          placeholderTextColor={COLORS.gray400}
+          value={form.link}
+          onChangeText={t => setForm(f => ({ ...f, link: t }))}
+          autoCapitalize="none"
+        />
+        <Pressable
+          style={styles.enabledRow}
+          onPress={() => setForm(f => ({ ...f, enabled: !f.enabled }))}
+        >
+          <MaterialIcons
+            name={form.enabled ? 'check-box' : 'check-box-outline-blank'}
+            size={20}
+            color={form.enabled ? COLORS.primary : COLORS.gray400}
+          />
+          <Text style={styles.enabledLabel}>Enabled</Text>
+        </Pressable>
+        <Pressable
+          style={[styles.primaryBtn, saving && styles.btnDisabled]}
+          onPress={saveEdit}
+          disabled={saving}
+        >
+          <Text style={styles.primaryBtnText}>
+            {saving ? 'Saving...' : 'Save slide'}
+          </Text>
+        </Pressable>
+      </Modal>
     </View>
   );
 };
@@ -129,6 +286,27 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.light,
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.md,
+    marginBottom: SPACING.sm,
+  },
+  defaultsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: COLORS.primary100,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  defaultsBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.primary700,
   },
   loader: {
     marginTop: SPACING.xxl,
@@ -148,14 +326,14 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
     ...SHADOW.card,
   },
-  icon: {
-    width: 38,
-    height: 38,
+  thumb: {
+    width: 56,
+    height: 42,
     borderRadius: RADIUS.md,
-    backgroundColor: COLORS.primary50,
-    alignItems: 'center',
-    justifyContent: 'center',
     marginRight: SPACING.sm,
+  },
+  thumbOff: {
+    opacity: 0.4,
   },
   body: {
     flex: 1,
@@ -166,7 +344,7 @@ const styles = StyleSheet.create({
     color: COLORS.gray900,
   },
   url: {
-    fontSize: 11,
+    fontSize: 10,
     color: COLORS.gray500,
     marginTop: 1,
   },
@@ -178,27 +356,54 @@ const styles = StyleSheet.create({
   right: {
     marginLeft: SPACING.sm,
   },
-  onPill: {
-    backgroundColor: COLORS.successBg,
-    borderRadius: RADIUS.pill,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
   },
-  onText: {
-    fontSize: 9,
+  fieldLabel: {
+    fontSize: 12,
     fontWeight: '700',
-    color: COLORS.successText,
+    color: COLORS.gray600,
+    marginTop: SPACING.sm,
+    marginBottom: 4,
   },
-  offPill: {
-    backgroundColor: COLORS.neutralBg,
-    borderRadius: RADIUS.pill,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+  input: {
+    backgroundColor: COLORS.gray50,
+    borderWidth: 1,
+    borderColor: COLORS.gray200,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: SPACING.sm,
+    height: 42,
+    fontSize: 14,
+    color: COLORS.gray900,
   },
-  offText: {
-    fontSize: 9,
+  enabledRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: SPACING.md,
+  },
+  enabledLabel: {
+    fontSize: 13,
+    color: COLORS.gray700,
+    marginLeft: 6,
+    fontWeight: '500',
+  },
+  primaryBtn: {
+    marginTop: SPACING.md,
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.md,
+    height: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryBtnText: {
+    color: COLORS.white,
+    fontSize: 15,
     fontWeight: '700',
-    color: COLORS.neutralText,
+  },
+  btnDisabled: {
+    opacity: 0.6,
   },
 });
 

@@ -3,7 +3,8 @@ import { View, Text, StyleSheet, FlatList, Pressable } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useAuth } from '../../context/AuthContext';
-import { COLORS, SPACING, RADIUS, SHADOW, FONT_SIZE } from '../../theme';
+import AdminHeader from '../../components/AdminHeader';
+import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme';
 import { MainStackParamList } from '../../navigation/types';
 
 interface Section {
@@ -85,12 +86,10 @@ const AdminMenuScreen: React.FC = () => {
       keyExtractor={g => g.label}
       contentContainerStyle={styles.content}
       ListHeaderComponent={
-        <View style={styles.header}>
-          <Text style={styles.title}>Admin Menu</Text>
-          <Text style={styles.subtitle}>
-            Everything you can manage on the platform
-          </Text>
-        </View>
+        <AdminHeader
+          title="Admin Menu"
+          subtitle="Everything you can manage on the platform"
+        />
       }
       renderItem={({ item: group }) => (
         <View style={styles.group}>
@@ -129,20 +128,6 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: SPACING.md,
     paddingBottom: SPACING.xl,
-  },
-  header: {
-    paddingTop: SPACING.md,
-    marginBottom: SPACING.sm,
-  },
-  title: {
-    fontSize: FONT_SIZE.xl,
-    fontWeight: '700',
-    color: COLORS.gray900,
-  },
-  subtitle: {
-    fontSize: 12,
-    color: COLORS.gray500,
-    marginTop: 2,
   },
   group: {
     marginBottom: SPACING.lg,
