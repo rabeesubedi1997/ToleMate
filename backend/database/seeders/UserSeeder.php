@@ -17,6 +17,10 @@ class UserSeeder extends Seeder
      */
     public function run(): void
     {
+        if (User::query()->count() > 0) {
+            $this->command->info('Users already exist, skipping UserSeeder.');
+            return;
+        }
         // Create super admin user
         User::create([
             'name' => 'Super Admin',
