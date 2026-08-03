@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 import { useToast } from '../context/ToastContext';
@@ -16,6 +16,11 @@ const SuperAdminDashboard: React.FC = () => {
   const { user, token } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<OverviewTab>('overview');
+  const mainRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    mainRef.current?.scrollTo(0, 0);
+  }, [activeTab]);
   const [overview, setOverview] = useState<any>(null);
   const [pendingServices, setPendingServices] = useState<any[]>([]);
   const [allServices, setAllServices] = useState<any[]>([]);
@@ -197,7 +202,7 @@ const SuperAdminDashboard: React.FC = () => {
         </aside>
 
         {/* Main */}
-        <main className="flex-1 p-6 overflow-auto">
+        <main ref={mainRef} data-scroll-top className="flex-1 p-6 overflow-auto">
           {/* ═══ OVERVIEW ═══ */}
           {activeTab === 'overview' && (
             <div>

@@ -6,6 +6,7 @@ export default function ScrollToTop() {
 
   useEffect(() => {
     window.scrollTo(0, 0);
+    document.querySelectorAll<HTMLElement>('[data-scroll-top]').forEach(el => el.scrollTo(0, 0));
   }, [pathname]);
 
   return null;

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
@@ -33,6 +33,11 @@ const AdminDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [loading, setLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const mainRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    mainRef.current?.scrollTo(0, 0);
+  }, [activeTab]);
 
   // Data state
   const [stats, setStats] = useState<any>(null);
@@ -661,7 +666,7 @@ const AdminDashboard: React.FC = () => {
       </aside>
 
       {/* Main */}
-      <main className="flex-1 p-4 md:p-8 overflow-y-auto min-w-0">
+      <main ref={mainRef} data-scroll-top className="flex-1 p-4 md:p-8 overflow-y-auto min-w-0">
         <div className="max-w-6xl mx-auto animate-fade-in">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">

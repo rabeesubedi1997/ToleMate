@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { LayoutDashboard, Briefcase, Inbox, CalendarDays, ShoppingBag, Plus, DollarSign, Star, TrendingUp, Menu, X, Clock, MessageSquare, Lock, Camera, BarChart3 } from 'lucide-react';
@@ -29,6 +29,11 @@ const VendorDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'services' | 'requests' | 'bookings' | 'availability' | 'bundles' | 'portfolio' | 'reviews' | 'analytics'>('overview');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const mainRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    mainRef.current?.scrollTo(0, 0);
+  }, [activeTab]);
   const [bookingFilter, setBookingFilter] = useState<'all' | 'pending' | 'active' | 'completed' | 'cancelled'>('all');
 
   // Availability state
@@ -227,7 +232,7 @@ const VendorDashboard: React.FC = () => {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 p-6 md:p-8 overflow-y-auto">
+      <main ref={mainRef} data-scroll-top className="flex-1 p-6 md:p-8 overflow-y-auto">
         <div className="max-w-5xl mx-auto animate-fade-in">
           <div className="flex items-center justify-between mb-6">
             <div>
