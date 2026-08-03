@@ -6,6 +6,7 @@ import { FALLBACK_IMAGE, assetUrl } from '../utils/config';
 import api from '../utils/api';
 import { DashboardSkeleton } from '../components/Skeleton';
 import SeoHead from '../components/SeoHead';
+import Footer from '../components/Layout/Footer';
 import VendorAnalytics from '../components/VendorAnalytics';
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -811,6 +812,7 @@ const VendorDashboard: React.FC = () => {
 
           {activeTab === 'analytics' && <VendorAnalytics vendorId={vendor?.id} allBookings={allBookings} />}
         </div>
+        <Footer />
       </main>
     </div>
     </>
