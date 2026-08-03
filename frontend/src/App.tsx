@@ -57,7 +57,7 @@ const PageLoader = () => (
   </div>
 );
 
-function AppContent() {
+function AppLayout() {
   const { pathname } = useLocation();
   const isDashboardRoute =
     pathname.startsWith('/admin-dashboard') ||
@@ -65,15 +65,11 @@ function AppContent() {
     pathname.startsWith('/super-admin');
 
   return (
-    <SettingsProvider>
-      <Router>
-        <ScrollToTop />
-        <DefaultSeo />
-        <div className="min-h-screen flex flex-col bg-gray-50">
-          <Header />
-          <main className="flex-grow pb-16 md:pb-0">
-            <Suspense fallback={<PageLoader />}>
-              <Routes>
+    <div className="min-h-screen flex flex-col bg-gray-50">
+      <Header />
+      <main className="flex-grow pb-16 md:pb-0">
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
                 {/* Public routes */}
                 <Route path="/" element={<Home />} />
                 <Route path="/login" element={<Login />} />
@@ -118,6 +114,18 @@ function AppContent() {
           {!isDashboardRoute && <Footer />}
           <MobileBottomNav />
         </div>
+      </Router>
+    </SettingsProvider>
+  );
+}
+
+function AppContent() {
+  return (
+    <SettingsProvider>
+      <Router>
+        <ScrollToTop />
+        <DefaultSeo />
+        <AppLayout />
       </Router>
     </SettingsProvider>
   );
