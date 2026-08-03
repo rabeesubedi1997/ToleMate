@@ -33,6 +33,25 @@ interface AdminVendor {
 
 const PLANS = ['free', 'basic', 'pro'];
 
+const FEATURE_LABELS: Record<string, string> = {
+  bookings: 'Bookings',
+  messaging: 'Messaging',
+  services: 'Services',
+  availability_edit: 'Edit own availability',
+  social_links: 'Social links',
+  reviews: 'Reviews',
+  whatsapp: 'WhatsApp number',
+};
+
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+interface DaySlot {
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  is_available: boolean;
+}
+
 const AdminVendorsScreen: React.FC = () => {
   const { isSuperAdmin } = useAuth();
   const [vendors, setVendors] = useState<AdminVendor[]>([]);
@@ -41,6 +60,11 @@ const AdminVendorsScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [selected, setSelected] = useState<AdminVendor | null>(null);
   const [busy, setBusy] = useState(false);
+  const [showFeatures, setShowFeatures] = useState(false);
+  const [features, setFeatures] = useState<Record<string, boolean>>({});
+  const [showAvailability, setShowAvailability] = useState(false);
+  const [availDraft, setAvailDraft] = useState<DaySlot[]>([]);
+  const [loadingDetail, setLoadingDetail] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -123,6 +147,86 @@ const AdminVendorsScreen: React.FC = () => {
         },
       ],
     );
+  };
+
+  const openFeatures = async () => {
+    if (!selected) return;
+    setShowFeatures(true);
+    setLoadingDetail(true);
+    try {
+      const res = await api.get(`/admin/vendors/${selected.id}/features`);
+      setFeatures(res.data?.features ?? {});
+    } catch {
+      Alert.alert('Failed', 'Could not load feature settings.');
+      setShowFeatures(false);
+    } finally {
+      setLoadingDetail(false);
+    }
+  };
+
+  const toggleFeatureFlag = (key: string) =>
+    setFeatures(f => ({ ...f, [key]: !f[key] }));
+
+  const saveFeatures = async () => {
+    if (!selected) return;
+    setBusy(true);
+    try {
+      await api.put(`/admin/vendors/${selected.id}/features`, {
+        features,
+      });
+      setShowFeatures(false);
+      Alert.alert('Saved', 'Feature settings updated.');
+    } catch (e: any) {
+      Alert.alert('Failed', e?.response?.data?.message ?? 'Could not save features.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const openAvailability = async () => {
+    if (!selected) return;
+    setShowAvailability(true);
+    setLoadingDetail(true);
+    try {
+      const res = await api.get(`/admin/vendors/${selected.id}/availability`);
+      const list: DaySlot[] = res.data?.availability ?? [];
+      setAvailDraft(
+        list.map(d => ({
+          day_of_week: d.day_of_week,
+          start_time: d.start_time,
+          end_time: d.end_time,
+          is_available: d.is_available,
+        })),
+      );
+    } catch {
+      Alert.alert('Failed', 'Could not load availability.');
+      setShowAvailability(false);
+    } finally {
+      setLoadingDetail(false);
+    }
+  };
+
+  const saveAvailability = async () => {
+    if (!selected) return;
+    const bad = availDraft.find(
+      d => !/^\d{2}:\d{2}$/.test(d.start_time) || !/^\d{2}:\d{2}$/.test(d.end_time),
+    );
+    if (bad) {
+      Alert.alert('Invalid time', 'Times must be in HH:MM format (e.g. 09:00).');
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.put(`/admin/vendors/${selected.id}/availability`, {
+        availability: availDraft,
+      });
+      setShowAvailability(false);
+      Alert.alert('Saved', 'Availability updated.');
+    } catch (e: any) {
+      Alert.alert('Failed', e?.response?.data?.message ?? 'Could not save availability.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const renderVendor = ({ item }: { item: AdminVendor }) => (
@@ -307,6 +411,25 @@ const AdminVendorsScreen: React.FC = () => {
           </>
         ) : null}
 
+        <View style={styles.detailRow}>
+          <TouchableOpacity
+            style={[styles.detailBtn, busy && styles.btnDisabled]}
+            onPress={openFeatures}
+            disabled={busy}
+          >
+            <MaterialIcons name="tune" size={16} color={COLORS.primary700} />
+            <Text style={styles.detailBtnText}>Feature settings</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.detailBtn, busy && styles.btnDisabled]}
+            onPress={openAvailability}
+            disabled={busy}
+          >
+            <MaterialIcons name="schedule" size={16} color={COLORS.primary700} />
+            <Text style={styles.detailBtnText}>Availability</Text>
+          </TouchableOpacity>
+        </View>
+
         <TouchableOpacity
           style={[styles.dangerBtn, busy && styles.btnDisabled]}
           onPress={removeVendor}
@@ -315,6 +438,127 @@ const AdminVendorsScreen: React.FC = () => {
           <MaterialIcons name="delete-outline" size={16} color={COLORS.white} />
           <Text style={styles.dangerBtnText}>Delete vendor</Text>
         </TouchableOpacity>
+      </Modal>
+
+      <Modal
+        visible={showFeatures}
+        title={`Feature settings · ${selected?.business_name ?? ''}`}
+        onClose={() => setShowFeatures(false)}
+      >
+        {loadingDetail ? (
+          <ActivityIndicator style={styles.loader} size="large" color={COLORS.primary} />
+        ) : (
+          <>
+            {Object.keys(FEATURE_LABELS).map(key => (
+              <TouchableOpacity
+                key={key}
+                style={styles.featureRow}
+                onPress={() => toggleFeatureFlag(key)}
+                disabled={busy}
+              >
+                <Text style={styles.featureLabel}>{FEATURE_LABELS[key]}</Text>
+                <MaterialIcons
+                  name={features[key] ? 'toggle-on' : 'toggle-off'}
+                  size={30}
+                  color={features[key] ? COLORS.primary : COLORS.gray400}
+                />
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity
+              style={[styles.primaryBtn, busy && styles.btnDisabled]}
+              onPress={saveFeatures}
+              disabled={busy}
+            >
+              <Text style={styles.primaryBtnText}>
+                {busy ? 'Saving...' : 'Save feature settings'}
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </Modal>
+
+      <Modal
+        visible={showAvailability}
+        title={`Availability · ${selected?.business_name ?? ''}`}
+        onClose={() => setShowAvailability(false)}
+      >
+        {loadingDetail ? (
+          <ActivityIndicator style={styles.loader} size="large" color={COLORS.primary} />
+        ) : (
+          <>
+            {availDraft.map((d, i) => (
+              <View key={d.day_of_week} style={styles.dayRow}>
+                <TouchableOpacity
+                  style={styles.dayToggle}
+                  onPress={() =>
+                    setAvailDraft(prev =>
+                      prev.map((x, idx) =>
+                        idx === i ? { ...x, is_available: !x.is_available } : x,
+                      ),
+                    )
+                  }
+                  disabled={busy}
+                >
+                  <MaterialIcons
+                    name={d.is_available ? 'check-box' : 'check-box-outline-blank'}
+                    size={20}
+                    color={d.is_available ? COLORS.primary : COLORS.gray400}
+                  />
+                  <Text
+                    style={[
+                      styles.dayLabel,
+                      !d.is_available && styles.dayLabelOff,
+                    ]}
+                  >
+                    {DAY_LABELS[d.day_of_week]}
+                  </Text>
+                </TouchableOpacity>
+                <TextInput
+                  style={[styles.timeInput, !d.is_available && styles.timeInputOff]}
+                  value={d.start_time}
+                  onChangeText={t =>
+                    setAvailDraft(prev =>
+                      prev.map((x, idx) =>
+                        idx === i ? { ...x, start_time: t } : x,
+                      ),
+                    )
+                  }
+                  placeholder="09:00"
+                  placeholderTextColor={COLORS.gray400}
+                  autoCapitalize="none"
+                  editable={d.is_available && !busy}
+                  maxLength={5}
+                />
+                <Text style={styles.dash}>–</Text>
+                <TextInput
+                  style={[styles.timeInput, !d.is_available && styles.timeInputOff]}
+                  value={d.end_time}
+                  onChangeText={t =>
+                    setAvailDraft(prev =>
+                      prev.map((x, idx) =>
+                        idx === i ? { ...x, end_time: t } : x,
+                      ),
+                    )
+                  }
+                  placeholder="17:00"
+                  placeholderTextColor={COLORS.gray400}
+                  autoCapitalize="none"
+                  editable={d.is_available && !busy}
+                  maxLength={5}
+                />
+              </View>
+            ))}
+            <TouchableOpacity
+              style={[styles.primaryBtn, busy && styles.btnDisabled]}
+              onPress={saveAvailability}
+              disabled={busy}
+            >
+              <Text style={styles.primaryBtnText}>
+                {busy ? 'Saving...' : 'Save availability'}
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
       </Modal>
     </View>
   );
@@ -470,6 +714,91 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: COLORS.gray600,
     marginTop: 2,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    marginTop: SPACING.md,
+  },
+  detailBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: COLORS.primary100,
+    borderRadius: RADIUS.md,
+    height: 44,
+  },
+  detailBtnText: {
+    color: COLORS.primary700,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  featureRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: SPACING.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.gray100,
+  },
+  featureLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.gray800,
+  },
+  primaryBtn: {
+    marginTop: SPACING.md,
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.md,
+    height: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryBtnText: {
+    color: COLORS.white,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  dayRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    gap: SPACING.xs,
+  },
+  dayToggle: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  dayLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.gray800,
+  },
+  dayLabelOff: {
+    color: COLORS.gray400,
+  },
+  timeInput: {
+    width: 62,
+    borderWidth: 1,
+    borderColor: COLORS.gray200,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.gray50,
+    paddingHorizontal: 6,
+    height: 36,
+    fontSize: 13,
+    color: COLORS.gray900,
+    textAlign: 'center',
+  },
+  timeInputOff: {
+    opacity: 0.4,
+  },
+  dash: {
+    fontSize: 14,
+    color: COLORS.gray400,
   },
 });
 

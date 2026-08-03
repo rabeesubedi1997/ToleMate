@@ -6,6 +6,7 @@ import AdminTabs from './AdminTabs';
 import ServiceDetailScreen from '../screens/Customer/ServiceDetailScreen';
 import VendorPublicProfileScreen from '../screens/Customer/VendorPublicProfileScreen';
 import FavoritesScreen from '../screens/Customer/FavoritesScreen';
+import AdminChatScreen from '../screens/Admin/AdminChatScreen';
 import AdminBookingsScreen from '../screens/Admin/AdminBookingsScreen';
 import AdminServicesScreen from '../screens/Admin/AdminServicesScreen';
 import AdminCategoriesScreen from '../screens/Admin/AdminCategoriesScreen';
@@ -51,6 +52,11 @@ const MainStack: React.FC<{ role: string }> = ({ role }) => (
     <Stack.Screen
       name="Favorites"
       component={FavoritesScreen}
+      options={{ animation: 'slide_from_right' }}
+    />
+    <Stack.Screen
+      name="AdminChat"
+      component={AdminChatScreen}
       options={{ animation: 'slide_from_right' }}
     />
     <Stack.Screen

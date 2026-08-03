@@ -6,8 +6,12 @@ import {
   FlatList,
   ActivityIndicator,
   RefreshControl,
+  Alert,
+  Pressable,
+  Image,
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import { launchImageLibrary } from 'react-native-image-picker';
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../../api/client';
 import ScreenHeader from '../../components/ScreenHeader';
@@ -30,10 +34,16 @@ const fmtSize = (bytes: number) =>
       ? `${(bytes / 1024).toFixed(0)} KB`
       : `${bytes} B`;
 
+const mediaUrl = (path: string) => {
+  if (path.startsWith('http')) return path;
+  return `${api.defaults.baseURL?.replace(/\/api\/?$/, '')}${path}`;
+};
+
 const AdminMediaScreen: React.FC = () => {
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -53,11 +63,59 @@ const AdminMediaScreen: React.FC = () => {
     }, [load]),
   );
 
+  const pickAndUpload = async () => {
+    const result = await launchImageLibrary({
+      mediaType: 'photo',
+      quality: 0.8,
+      selectionLimit: 1,
+    });
+    const asset = result.assets?.[0];
+    if (!asset?.uri) return;
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', {
+        uri: asset.uri,
+        name: asset.fileName ?? `photo_${Date.now()}.jpg`,
+        type: asset.type ?? 'image/jpeg',
+      } as any);
+      await api.post('/admin/media', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      load();
+      Alert.alert('Uploaded', 'Image added to the media library.');
+    } catch (e: any) {
+      Alert.alert('Failed', e?.response?.data?.message ?? 'Could not upload image.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const remove = (item: MediaItem) => {
+    Alert.alert('Delete asset', `Delete "${item.file_name}"? This cannot be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await api.delete(`/admin/media/${item.id}`);
+            load();
+          } catch (e: any) {
+            Alert.alert('Failed', e?.response?.data?.message ?? 'Could not delete asset.');
+          }
+        },
+      },
+    ]);
+  };
+
   const renderItem = ({ item }: { item: MediaItem }) => (
     <View style={styles.card}>
-      <View style={styles.icon}>
-        <MaterialIcons name="image" size={18} color={COLORS.primary} />
-      </View>
+      <Image
+        source={{ uri: mediaUrl(item.file_path) }}
+        style={styles.thumb}
+      />
       <View style={styles.body}>
         <Text style={styles.name} numberOfLines={1}>
           {item.file_name}
@@ -65,16 +123,34 @@ const AdminMediaScreen: React.FC = () => {
         <Text style={styles.meta} numberOfLines={1}>
           {item.mime_type} · {fmtSize(item.size)}
         </Text>
-        <Text style={styles.path} numberOfLines={1}>
-          {item.file_path}
-        </Text>
       </View>
+      <Pressable
+        onPress={() => remove(item)}
+        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+        style={styles.deleteBtn}
+      >
+        <MaterialIcons name="delete-outline" size={20} color={COLORS.rose} />
+      </Pressable>
     </View>
   );
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="Media Library" subtitle="Uploaded files" />
+      <ScreenHeader title="Media Library" subtitle="Images used across the site" />
+      <Pressable
+        style={[styles.addBtn, uploading && styles.btnDisabled]}
+        onPress={pickAndUpload}
+        disabled={uploading}
+      >
+        {uploading ? (
+          <ActivityIndicator size="small" color={COLORS.white} />
+        ) : (
+          <MaterialIcons name="add-photo-alternate" size={18} color={COLORS.white} />
+        )}
+        <Text style={styles.addBtnText}>
+          {uploading ? 'Uploading...' : 'Upload Image'}
+        </Text>
+      </Pressable>
 
       {loading ? (
         <ActivityIndicator
@@ -99,7 +175,10 @@ const AdminMediaScreen: React.FC = () => {
             />
           }
           ListEmptyComponent={
-            <EmptyState title="No media" message="Uploads will appear here." />
+            <EmptyState
+              title="No media"
+              message="Upload your first image to get started."
+            />
           }
         />
       )}
@@ -111,6 +190,22 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.light,
+  },
+  addBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.md,
+    paddingVertical: 10,
+    marginHorizontal: SPACING.md,
+    marginBottom: SPACING.sm,
+  },
+  addBtnText: {
+    color: COLORS.white,
+    fontSize: 13,
+    fontWeight: '700',
   },
   loader: {
     marginTop: SPACING.xxl,
@@ -130,14 +225,12 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
     ...SHADOW.card,
   },
-  icon: {
-    width: 40,
-    height: 40,
+  thumb: {
+    width: 52,
+    height: 52,
     borderRadius: RADIUS.md,
-    backgroundColor: COLORS.primary50,
-    alignItems: 'center',
-    justifyContent: 'center',
     marginRight: SPACING.sm,
+    backgroundColor: COLORS.gray100,
   },
   body: {
     flex: 1,
@@ -152,10 +245,11 @@ const styles = StyleSheet.create({
     color: COLORS.gray500,
     marginTop: 1,
   },
-  path: {
-    fontSize: 10,
-    color: COLORS.gray400,
-    marginTop: 1,
+  deleteBtn: {
+    padding: 4,
+  },
+  btnDisabled: {
+    opacity: 0.6,
   },
 });
 

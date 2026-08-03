@@ -12,6 +12,7 @@ import {
   Image,
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import { launchImageLibrary } from 'react-native-image-picker';
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../../api/client';
 import ScreenHeader from '../../components/ScreenHeader';
@@ -25,6 +26,11 @@ interface Slide {
   link?: string;
   enabled?: boolean;
 }
+
+const mediaUrl = (path: string) => {
+  if (path.startsWith('http')) return path;
+  return `${api.defaults.baseURL?.replace(/\/api\/?$/, '')}${path}`;
+};
 
 const DEFAULT_SLIDES = [
   { url: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=1200&q=80', title: 'Professional Home Repair Services', link: '/services', enabled: true },
@@ -138,6 +144,48 @@ const AdminSliderScreen: React.FC = () => {
     );
   };
 
+  const pickAndAdd = async () => {
+    const result = await launchImageLibrary({
+      mediaType: 'photo',
+      quality: 0.8,
+      selectionLimit: 1,
+    });
+    const asset = result.assets?.[0];
+    if (!asset?.uri) return;
+
+    setSaving(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', {
+        uri: asset.uri,
+        name: asset.fileName ?? `slide_${Date.now()}.jpg`,
+        type: asset.type ?? 'image/jpeg',
+      } as any);
+      const res = await api.post('/admin/media', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      const uploaded = res.data?.media;
+      if (uploaded?.file_path) {
+        await saveSlides([
+          ...slides,
+          {
+            url: mediaUrl(uploaded.file_path),
+            title: '',
+            link: '/services',
+            enabled: true,
+          },
+        ]);
+        Alert.alert('Added', 'Slide added. Tap edit to set a title.');
+      } else {
+        Alert.alert('Failed', 'Upload did not return an image.');
+      }
+    } catch (e: any) {
+      Alert.alert('Failed', e?.response?.data?.message ?? 'Could not upload image.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const renderItem = ({ item, index }: { item: Slide; index: number }) => (
     <View style={styles.card}>
       <Image
@@ -199,9 +247,14 @@ const AdminSliderScreen: React.FC = () => {
           <MaterialIcons name="bolt" size={16} color={COLORS.primary700} />
           <Text style={styles.defaultsBtnText}>Load defaults</Text>
         </Pressable>
-        {saving ? (
-          <ActivityIndicator size="small" color={COLORS.primary} />
-        ) : null}
+        <Pressable
+          style={[styles.uploadBtn, saving && styles.btnDisabled]}
+          onPress={pickAndAdd}
+          disabled={saving}
+        >
+          <MaterialIcons name="add-photo-alternate" size={16} color={COLORS.white} />
+          <Text style={styles.uploadBtnText}>Add slide</Text>
+        </Pressable>
       </View>
 
       {loading ? (
@@ -307,6 +360,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: COLORS.primary700,
+  },
+  uploadBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  uploadBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.white,
   },
   loader: {
     marginTop: SPACING.xxl,
