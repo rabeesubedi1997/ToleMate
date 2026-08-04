@@ -17,6 +17,7 @@ import EmptyState from '../../components/EmptyState';
 import Modal from '../../components/Modal';
 import AdminHeader from '../../components/AdminHeader';
 import { useAuth } from '../../context/AuthContext';
+import { validateEmail, validatePhone, validatePasswordStrength } from '../../utils/security';
 import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme';
 
 interface AdminVendor {
@@ -81,8 +82,17 @@ const AdminVendorsScreen: React.FC = () => {
       Alert.alert('Missing fields', 'Name, email and password are required.');
       return;
     }
-    if (newVendor.password.length < 6) {
-      Alert.alert('Weak password', 'Password must be at least 6 characters.');
+    if (!validateEmail(newVendor.email)) {
+      Alert.alert('Invalid email', 'Please enter a valid email address.');
+      return;
+    }
+    const pwd = validatePasswordStrength(newVendor.password);
+    if (!pwd.valid) {
+      Alert.alert('Weak password', pwd.errors.join('\n'));
+      return;
+    }
+    if (newVendor.phone && !validatePhone(newVendor.phone)) {
+      Alert.alert('Invalid phone', 'Phone must be a valid Nepali number (e.g. 98XXXXXXXX).');
       return;
     }
     setCreating(true);
@@ -646,7 +656,7 @@ const AdminVendorsScreen: React.FC = () => {
         <Text style={styles.fieldLabel}>Password</Text>
         <TextInput
           style={styles.input}
-          placeholder="Min 6 characters"
+          placeholder="8+ chars, upper/lower, number, symbol"
           placeholderTextColor={COLORS.gray400}
           value={newVendor.password}
           onChangeText={t => setNewVendor(v => ({ ...v, password: t }))}

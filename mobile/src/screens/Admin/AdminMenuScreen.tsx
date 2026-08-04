@@ -1,17 +1,18 @@
 import React from 'react';
 import { View, Text, StyleSheet, FlatList, Pressable } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, NavigationProp } from '@react-navigation/native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useAuth } from '../../context/AuthContext';
 import AdminHeader from '../../components/AdminHeader';
 import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme';
-import { MainStackParamList } from '../../navigation/types';
+import { MainStackParamList, AdminTabParamList } from '../../navigation/types';
 
 interface Section {
   label: string;
   icon: string;
-  target: keyof MainStackParamList | 'Overview' | 'Users' | 'Vendors';
+  target: keyof MainStackParamList | keyof AdminTabParamList;
   superOnly?: boolean;
+  isTab?: boolean;
 }
 
 interface Group {
@@ -24,9 +25,9 @@ const GROUPS: Group[] = [
   {
     label: 'Management',
     items: [
-      { label: 'Overview', icon: 'dashboard', target: 'Overview' },
-      { label: 'Users', icon: 'people', target: 'Users' },
-      { label: 'Vendors', icon: 'storefront', target: 'Vendors' },
+      { label: 'Overview', icon: 'dashboard', target: 'Overview', isTab: true },
+      { label: 'Users', icon: 'people', target: 'Users', isTab: true },
+      { label: 'Vendors', icon: 'storefront', target: 'Vendors', isTab: true },
       { label: 'Bookings', icon: 'event-note', target: 'AdminBookings' },
       { label: 'Services', icon: 'build', target: 'AdminServices' },
       { label: 'Categories', icon: 'category', target: 'AdminCategories' },
@@ -84,14 +85,18 @@ const GROUPS: Group[] = [
 
 const AdminMenuScreen: React.FC = () => {
   const { isSuperAdmin } = useAuth();
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationProp<MainStackParamList>>();
 
   const groups = GROUPS.filter(
     g => !g.superOnly || isSuperAdmin,
   );
 
-  const go = (target: Section['target']) => {
-    navigation.navigate(target as never);
+  const go = (target: string, isTab?: boolean) => {
+    if (isTab) {
+      navigation.navigate('Tabs', { screen: target } as any);
+    } else {
+      navigation.navigate(target as any);
+    }
   };
 
   return (
@@ -114,7 +119,7 @@ const AdminMenuScreen: React.FC = () => {
               <Pressable
                 key={item.label}
                 style={styles.card}
-                onPress={() => go(item.target)}
+                onPress={() => go(item.target, item.isTab)}
               >
                 <View style={styles.icon}>
                   <MaterialIcons
@@ -159,14 +164,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: SPACING.sm,
+    justifyContent: 'space-between',
   },
   card: {
-    width: '30.5%',
+    width: '48%',
+    minWidth: 140,
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
     borderColor: COLORS.gray200,
     paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.sm,
     alignItems: 'center',
     ...SHADOW.card,
   },

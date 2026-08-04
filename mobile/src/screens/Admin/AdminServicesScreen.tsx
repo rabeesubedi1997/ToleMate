@@ -130,6 +130,22 @@ const AdminServicesScreen: React.FC = () => {
       Alert.alert('Missing fields', 'Please enter a price.');
       return;
     }
+    if (form.price && (isNaN(Number(form.price)) || Number(form.price) <= 0)) {
+      Alert.alert('Invalid price', 'Price must be a positive number.');
+      return;
+    }
+    if (form.sale_price && (isNaN(Number(form.sale_price)) || Number(form.sale_price) <= 0)) {
+      Alert.alert('Invalid sale price', 'Sale price must be a positive number.');
+      return;
+    }
+    if (
+      form.price &&
+      form.sale_price &&
+      Number(form.sale_price) >= Number(form.price)
+    ) {
+      Alert.alert('Invalid prices', 'Sale price must be lower than the regular price.');
+      return;
+    }
     setCreating(true);
     try {
       await api.post('/services', {

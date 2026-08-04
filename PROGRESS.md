@@ -1,5 +1,19 @@
 # ToleMate — Session Tracking
 
+## Session 5 (Aug 4) — Security hardening, input validation, test fixes
+- **API client hardening** (`mobile/src/api/client.ts`): cert-pinning placeholders (dev-disabled), request header sanitization (Authorization redacted), response structure validation (shallow `Object.freeze` — verified no screen mutates `res.data`), `X-Client-Version`/`X-Platform`/`X-Request-Time` headers, normalized errors (`.status`/`.code`/`.originalError` preserved)
+- **New `mobile/src/utils/security.ts`** wired into real flows:
+  - `validateEmail` on LoginScreen (blocks invalid email before hitting server)
+  - `validatePasswordStrength` (8+ chars, upper/lower/digit/symbol) + `validateEmail` + `validatePhone` (Nepali format) on Admin create-vendor modal; password placeholder updated
+  - `validateFile`/`checkRateLimit`/`generateSecureToken`/`sanitizeUrl` available for future use
+  - **BUG FIXED**: `sanitizeHtml` replaced `&` with `&` (no-op) — XSS chain was broken; now properly escapes `&amp; &lt; &gt; &quot; &#039;`
+- **BUG FIXED (pagination)**: `NotificationsScreen` `load` depended on `page` state → `useFocusEffect` re-ran after each page load and reset to page 1; switched to `pageRef`/`hasMoreRef`, removed stale eslint-disable
+- **AdminMenuScreen**: tab items (Overview/Users/Vendors) now navigate via `Tabs` route properly; grid cards widened to 48% (2-up)
+- **AdminHeader**: logout button (confirm dialog) added for admin/vendor dashboards
+- **New icons**: `mobile/generate-icons.js` (sharp) regenerated Android mipmaps + web favicons/logo/manifest with green ToleMate branding; `manifest.json` theme_color → `#16a34a`
+- **Lint/test fixes**: `/* eslint-env node */` for generate-icons.js (7 Buffer no-undef errors); regex escape cleanup in security.ts; `jest.config.js` `transformIgnorePatterns` for ESM react-navigation; App.test.tsx wrapped in `act()` — jest now passes with zero warnings
+- **Verified**: mobile `tsc` 0 errors, eslint 0 errors (5 pre-existing inline-style warnings), jest 1/1 pass; frontend `react-scripts build` succeeds (pre-existing warnings only)
+
 ## Session 4 (Aug 3) — Full web admin menu set ported to mobile, role-gated
 - **AdminTabs restructured**: Activity tab replaced by **Menu** tab → `AdminMenuScreen` (grid of all sections, mirrors web sidebar groups: Management / Media / Commerce / Super Admin / System)
 - **Role gating**: Super Admin group (Moderation, Commissions, KYC Review, Activity Log) + System group (SEO, Page SEO, Settings) only render for `isSuperAdmin`; regular admin sees Management + Media + Commerce only. Backend 403s still protect the APIs

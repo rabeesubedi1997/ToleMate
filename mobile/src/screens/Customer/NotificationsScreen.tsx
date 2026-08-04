@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -39,20 +39,20 @@ const NotificationsScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
+  const pageRef = useRef(1);
+  const hasMoreRef = useRef(false);
   const [markingAll, setMarkingAll] = useState(false);
 
   const load = useCallback(async (reset = false) => {
     try {
-      const nextPage = reset ? 1 : page;
+      const nextPage = reset ? 1 : pageRef.current;
       const res = await api.get('/notifications', {
         params: { page: nextPage, per_page: 20 },
       });
       const rows: NotificationItem[] = res.data.data ?? res.data ?? [];
       setItems(prev => (reset ? rows : [...prev, ...rows]));
-      setPage(nextPage + 1);
-      setHasMore((res.data?.next_page_url ?? null) !== null && rows.length > 0);
+      pageRef.current = nextPage + 1;
+      hasMoreRef.current = (res.data?.next_page_url ?? null) !== null && rows.length > 0;
     } catch (e) {
       console.warn('notifications load failed', e);
     } finally {
@@ -60,8 +60,7 @@ const NotificationsScreen: React.FC = () => {
       setRefreshing(false);
       setLoadingMore(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -204,7 +203,7 @@ const NotificationsScreen: React.FC = () => {
             />
           }
           onEndReached={() => {
-            if (hasMore && !loadingMore) {
+            if (hasMoreRef.current && !loadingMore) {
               setLoadingMore(true);
               load();
             }

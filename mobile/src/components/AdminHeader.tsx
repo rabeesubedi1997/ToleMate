@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useAuth } from '../context/AuthContext';
@@ -13,8 +13,16 @@ interface Props {
 
 const AdminHeader: React.FC<Props> = ({ title, subtitle, brand = 'ToleMate Admin' }) => {
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const initial = (user?.name ?? '?').split(' ')[0]?.[0] ?? '?';
+
+  const handleLogout = () => {
+    Alert.alert('Logout', 'Are you sure you want to logout?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Logout', style: 'destructive', onPress: logout },
+    ]);
+  };
+
   return (
     <View style={[styles.header, { paddingTop: insets.top + SPACING.md }]}>
       <View style={styles.brandRow}>
@@ -34,6 +42,13 @@ const AdminHeader: React.FC<Props> = ({ title, subtitle, brand = 'ToleMate Admin
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>{initial.toUpperCase()}</Text>
             </View>
+            <TouchableOpacity
+              style={styles.logoutBtn}
+              onPress={handleLogout}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <MaterialIcons name="logout" size={20} color={COLORS.rose} />
+            </TouchableOpacity>
           </View>
         ) : null}
       </View>
@@ -103,6 +118,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
     color: COLORS.primary700,
+  },
+  logoutBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.roseBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: SPACING.xs,
   },
 });
 

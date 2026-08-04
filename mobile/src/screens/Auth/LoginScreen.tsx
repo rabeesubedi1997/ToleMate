@@ -13,6 +13,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, SPACING } from '../../theme';
 import { useAuth } from '../../context/AuthContext';
+import { validateEmail } from '../../utils/security';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { AuthStackParamList } from '../../navigation/types';
 
@@ -29,6 +30,11 @@ const LoginScreen = ({ navigation }: Props) => {
   const handleLogin = async () => {
     if (!email || !password) {
       setError('Please fill in all fields');
+      return;
+    }
+
+    if (!validateEmail(email)) {
+      setError('Please enter a valid email address');
       return;
     }
 
