@@ -96,7 +96,7 @@ const FavoritesScreen: React.FC<Props> = ({ navigation }) => {
           <MaterialIcons name="arrow-back" size={24} color={COLORS.dark} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Favorites</Text>
-        <View style={{ width: 24 }} />
+        <View style={styles.headerSpacer} />
       </View>
 
       <View style={styles.tabsRow}>
@@ -166,7 +166,7 @@ const FavoritesScreen: React.FC<Props> = ({ navigation }) => {
               }
             >
               <AppImage uri={item.avatar} style={styles.vendorAvatar} />
-              <View style={{ flex: 1, marginLeft: SPACING.sm }}>
+              <View style={styles.vendorInfo}>
                 <Text style={styles.vendorName}>{item.business_name}</Text>
                 <Text style={styles.vendorRating}>
                   ★ {item.rating ? Number(item.rating).toFixed(1) : 'New'}
@@ -199,6 +199,9 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     color: COLORS.dark,
+  },
+  headerSpacer: {
+    width: 24,
   },
   tabsRow: {
     flexDirection: 'row',
@@ -266,6 +269,10 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
+  },
+  vendorInfo: {
+    flex: 1,
+    marginLeft: SPACING.sm,
   },
   vendorName: {
     fontSize: 15,

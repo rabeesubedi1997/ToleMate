@@ -164,6 +164,22 @@ const HomeScreen: React.FC = () => {
           ) : null}
         </View>
 
+        {/* Post a request */}
+        <TouchableOpacity
+          style={styles.postReq}
+          activeOpacity={0.85}
+          onPress={() => navigation.navigate('PostRequest')}
+        >
+          <View style={styles.postReqIcon}>
+            <MaterialIcons name="campaign" size={20} color={COLORS.primary} />
+          </View>
+          <View style={styles.postReqBody}>
+            <Text style={styles.postReqTitle}>Need something special?</Text>
+            <Text style={styles.postReqSub}>Post a request and let vendors quote</Text>
+          </View>
+          <MaterialIcons name="chevron-right" size={20} color={COLORS.primary} />
+        </TouchableOpacity>
+
         {loading ? (
           <ActivityIndicator
             style={styles.loader}
@@ -281,7 +297,39 @@ const styles = StyleSheet.create({
     marginLeft: SPACING.sm,
     fontSize: 15,
     color: COLORS.dark,
-    paddingVertical: 0,
+  },
+  postReq: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: SPACING.md,
+    marginTop: SPACING.md,
+    backgroundColor: COLORS.primary50,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.primary100,
+    padding: SPACING.md,
+    gap: SPACING.sm,
+  },
+  postReqIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: COLORS.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  postReqBody: {
+    flex: 1,
+  },
+  postReqTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.gray900,
+  },
+  postReqSub: {
+    fontSize: 12,
+    color: COLORS.gray500,
+    marginTop: 1,
   },
   searchGo: {
     color: COLORS.primary,

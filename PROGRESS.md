@@ -1,5 +1,18 @@
 # ToleMate — Session Tracking
 
+## Session 6 (Aug 4) — Web ↔ mobile feature parity (part 1: flows)
+- **Auth parity**: real `RegisterScreen` (role toggle customer/vendor, email/phone/password-strength validation, confirmed password → POST /register), `ForgotPasswordScreen` (POST /forgot-password + sent state), `ResetPasswordScreen` (POST /reset-password); "Forgot password?" link added to Login
+- **Booking flow**: `BookingFormScreen` (14-day date strip from GET /vendors/{id}/availability, generated time slots, instant/quote type, price + message → POST /bookings); ServiceDetail "Book Now" navigates there (Alert stub removed)
+- **Customer**: `MyBookingsScreen` (status filter chips, detail modal, cancel via PUT /bookings/{id}, reschedule via POST /bookings/{id}/reschedule, review via POST /reviews on completed bookings); `PostRequestScreen` (title/desc/category chips/budget/preferred date/urgency → POST /booking-requests); Profile menu wired (MyBookings/Notifications/PostRequest) + "Post a Request" banner on Home
+- **Vendor**: `VendorRequestsScreen` (feed + respond modal w/ own services + quote price → POST /booking-requests/{id}/respond); `VendorBookingsScreen` (accept→in_progress→completed workflow, cancel, quote price on accept, reschedule accept/decline via POST /bookings/{id}/reschedule-respond); Work Tools menu on VendorProfile (Requests/Bookings/Edit Business Profile); `VendorEditModal` (business info + socials + weekly availability via GET/PUT /vendor/availability)
+- **Vendor services CRUD**: `VendorServicesScreen` rewritten — add/edit modal (category chips, pricing model, price/sale price, tags, cancellation policy, active toggle → POST/PUT /services/{id}), toggle active, delete, thumbnails via AppImage
+- **Customer profile editing**: `CustomerEditModal` (name/phone/saved address → PUT /user/profile, syncs AuthContext) + Edit profile button on ProfileScreen
+- **Reviews & favorites**: Reviews section on ServiceDetail (avg score, star distribution count, up to 5 reviews w/ vendor replies, GET /vendors/{id}/reviews); vendor favorite heart toggle on VendorPublicProfile (AsyncStorage `tolemate_fav_vendors`, matches web key; FavoritesScreen already had the Vendors tab)
+- **Admin**: AdminServicesScreen edit mode (pencil → pre-filled modal → PUT /services/{id}, incl. vendor reassignment). Coupons/KYC confirmed at parity (web has no edit/preview either)
+- **Verified**: mobile tsc 0 errors, eslint 0 errors (3 pre-existing inline-style warnings in FavoritesScreen/ServiceDetail — remaining cosmetic), jest 1/1 pass. Fixes during cycle: duplicate `title` style keys (TS1117), FilterChips string[] contract, stale `categories` dep (reworked load to fetch cats first), missing VendorEditModal import, DAY_LABELS unused, slot shadow rename
+- **Routes added**: `BookingForm`, `MyBookings`, `PostRequest`, `VendorRequests`, `VendorBookings` in `MainStack` + `types.ts` (slide_from_right)
+- **Remaining known gaps** (out of scope this session): vendor service image upload (backend accepts `image` file on POST /services/{id}/uploadImage, replaces all), packages/bundles UI, notifications preference toggles, payment screens (Payments tab placeholder)
+
 ## Session 5 (Aug 4) — Security hardening, input validation, test fixes
 - **API client hardening** (`mobile/src/api/client.ts`): cert-pinning placeholders (dev-disabled), request header sanitization (Authorization redacted), response structure validation (shallow `Object.freeze` — verified no screen mutates `res.data`), `X-Client-Version`/`X-Platform`/`X-Request-Time` headers, normalized errors (`.status`/`.code`/`.originalError` preserved)
 - **New `mobile/src/utils/security.ts`** wired into real flows:

@@ -6,12 +6,23 @@ import {
   ScrollView,
   ActivityIndicator,
   RefreshControl,
+  TouchableOpacity,
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import type { CompositeNavigationProp } from '@react-navigation/native';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import api from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { COLORS, SPACING, RADIUS, SHADOW, FONT_SIZE } from '../../theme';
+import { VendorTabParamList, MainStackParamList } from '../../navigation/types';
+import VendorEditModal from './VendorEditModal';
+
+type Nav = CompositeNavigationProp<
+  BottomTabNavigationProp<VendorTabParamList, 'Profile'>,
+  NativeStackNavigationProp<MainStackParamList>
+>;
 
 interface VendorProfile {
   business_name: string;
@@ -30,9 +41,11 @@ interface VendorProfile {
 
 const VendorProfileScreen: React.FC = () => {
   const { user } = useAuth();
+  const navigation = useNavigation<Nav>();
   const [profile, setProfile] = useState<VendorProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -106,21 +119,21 @@ const VendorProfileScreen: React.FC = () => {
         <Row
           label="Subscription plan"
           value={profile?.subscription_plan ?? 'free'}
-          valueStyle={{
-            color:
-              profile?.subscription_plan === 'pro' ? COLORS.purple : COLORS.gray600,
-            fontWeight: '700',
-            textTransform: 'capitalize',
-          }}
+          valueStyle={[
+            styles.valueStrong,
+            {
+              color:
+                profile?.subscription_plan === 'pro' ? COLORS.purple : COLORS.gray600,
+            },
+          ]}
         />
         <Row
           label="KYC status"
           value={kyc.replace('_', ' ')}
-          valueStyle={{
-            color: kyc === 'approved' ? COLORS.successText : COLORS.warningText,
-            fontWeight: '700',
-            textTransform: 'capitalize',
-          }}
+          valueStyle={[
+            styles.valueStrong,
+            { color: kyc === 'approved' ? COLORS.successText : COLORS.warningText },
+          ]}
         />
         <Row
           label="WhatsApp"
@@ -140,6 +153,38 @@ const VendorProfileScreen: React.FC = () => {
         <Row label="Name" value={user?.name ?? '—'} />
         <Row label="Email" value={user?.email ?? '—'} />
       </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Work Tools</Text>
+        <MenuRow
+          icon="assignment"
+          color={COLORS.primary}
+          label="Requests & Quotes"
+          onPress={() => navigation.navigate('VendorRequests')}
+        />
+        <MenuRow
+          icon="event-note"
+          color={COLORS.infoText}
+          label="My Bookings"
+          onPress={() => navigation.navigate('VendorBookings')}
+        />
+        <MenuRow
+          icon="edit"
+          color={COLORS.purple}
+          label="Edit Business Profile"
+          onPress={() => setShowEdit(true)}
+        />
+      </View>
+
+      <VendorEditModal
+        visible={showEdit}
+        profile={profile}
+        onClose={() => setShowEdit(false)}
+        onSaved={() => {
+          setShowEdit(false);
+          load();
+        }}
+      />
     </ScrollView>
   );
 };
@@ -159,6 +204,19 @@ const Row: React.FC<{
       {value}
     </Text>
   </View>
+);
+
+const MenuRow: React.FC<{
+  icon: string;
+  color: string;
+  label: string;
+  onPress: () => void;
+}> = ({ icon, color, label, onPress }) => (
+  <TouchableOpacity style={styles.menuRow} onPress={onPress}>
+    <MaterialIcons name={icon} size={20} color={color} />
+    <Text style={styles.menuLabel}>{label}</Text>
+    <MaterialIcons name="chevron-right" size={20} color={COLORS.gray300} />
+  </TouchableOpacity>
 );
 
 const styles = StyleSheet.create({
@@ -245,8 +303,26 @@ const styles = StyleSheet.create({
     color: COLORS.gray800,
     fontWeight: '500',
   },
+  valueStrong: {
+    fontWeight: '700',
+    textTransform: 'capitalize',
+  },
   rowValueMultiline: {
     lineHeight: 20,
+  },
+  menuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    paddingVertical: SPACING.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.gray100,
+  },
+  menuLabel: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.gray800,
   },
 });
 

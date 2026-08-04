@@ -112,6 +112,13 @@ const LoginScreen = ({ navigation }: Props) => {
             </LinearGradient>
           </TouchableOpacity>
 
+          <TouchableOpacity
+            style={styles.forgotRow}
+            onPress={() => navigation.navigate('ForgotPassword')}
+          >
+            <Text style={styles.forgotText}>Forgot password?</Text>
+          </TouchableOpacity>
+
           <View style={styles.footer}>
             <Text style={styles.footerText}>Don't have an account? </Text>
             <TouchableOpacity onPress={() => navigation.navigate('Register')}>
@@ -224,6 +231,16 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: SPACING.md,
     textAlign: 'center',
+  },
+  forgotRow: {
+    alignItems: 'flex-end',
+    marginTop: -SPACING.sm,
+    marginBottom: SPACING.sm,
+  },
+  forgotText: {
+    color: COLORS.primary,
+    fontSize: 12,
+    fontWeight: '700',
   },
   footer: {
     flexDirection: 'row',

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../../context/AuthContext';
 import { COLORS, SPACING } from '../../theme';
 import { CustomerTabParamList, MainStackParamList } from '../../navigation/types';
+import CustomerEditModal from './CustomerEditModal';
 
 type Props = BottomTabScreenProps<CustomerTabParamList, 'Profile'>;
 
@@ -26,6 +27,7 @@ type Nav = CompositeNavigationProp<
 const ProfileScreen: React.FC = () => {
   const { user, logout } = useAuth();
   const navigation = useNavigation<Nav>();
+  const [showEdit, setShowEdit] = useState(false);
 
   const handleLogout = () => {
     Alert.alert('Log out', 'Are you sure you want to log out?', [
@@ -55,6 +57,11 @@ const ProfileScreen: React.FC = () => {
           </View>
           <Text style={styles.name}>{user?.name}</Text>
           <Text style={styles.email}>{user?.email}</Text>
+          {user?.phone ? <Text style={styles.phone}>{user.phone}</Text> : null}
+          <TouchableOpacity style={styles.editBtn} onPress={() => setShowEdit(true)}>
+            <MaterialIcons name="edit" size={16} color={COLORS.primary} />
+            <Text style={styles.editBtnText}>Edit profile</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Menu */}
@@ -68,19 +75,38 @@ const ProfileScreen: React.FC = () => {
             <MaterialIcons name="chevron-right" size={20} color={COLORS.slate400} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem} onPress={() => {}}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => navigation.navigate('MyBookings')}
+          >
             <MaterialIcons name="receipt-long" size={20} color={COLORS.primary} />
             <Text style={styles.menuLabel}>My Bookings</Text>
             <MaterialIcons name="chevron-right" size={20} color={COLORS.slate400} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem} onPress={() => {}}>
+          <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('Notifications')}>
             <MaterialIcons name="notifications-none" size={20} color={COLORS.accent} />
             <Text style={styles.menuLabel}>Notifications</Text>
             <MaterialIcons name="chevron-right" size={20} color={COLORS.slate400} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem} onPress={() => {}}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() =>
+              navigation.navigate('PostRequest')
+            }
+          >
+            <MaterialIcons name="campaign" size={20} color={COLORS.primary} />
+            <Text style={styles.menuLabel}>Post a Request</Text>
+            <MaterialIcons name="chevron-right" size={20} color={COLORS.slate400} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() =>
+              Alert.alert('Help & Support', 'Contact support at support@tolemate.com')
+            }
+          >
             <MaterialIcons name="help-outline" size={20} color={COLORS.slate500} />
             <Text style={styles.menuLabel}>Help & Support</Text>
             <MaterialIcons name="chevron-right" size={20} color={COLORS.slate400} />
@@ -92,6 +118,8 @@ const ProfileScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      <CustomerEditModal visible={showEdit} onClose={() => setShowEdit(false)} />
     </SafeAreaView>
   );
 };
@@ -137,6 +165,27 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontSize: 14,
     color: COLORS.slate500,
+  },
+  phone: {
+    marginTop: 2,
+    fontSize: 13,
+    color: COLORS.slate500,
+  },
+  editBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: SPACING.sm,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+  },
+  editBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.primary,
   },
   menu: {
     marginHorizontal: SPACING.md,

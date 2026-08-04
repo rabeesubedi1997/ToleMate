@@ -25,6 +25,8 @@ import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme';
 interface Service {
   id: number;
   name: string;
+  description?: string | null;
+  cancellation_policy?: string | null;
   price: string;
   sale_price?: string | null;
   pricing_type: string;
@@ -72,6 +74,7 @@ const AdminServicesScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
+  const [editing, setEditing] = useState<Service | null>(null);
   const [creating, setCreating] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [vendors, setVendors] = useState<VendorOption[]>([]);
@@ -98,6 +101,7 @@ const AdminServicesScreen: React.FC = () => {
   );
 
   const openCreate = useCallback(async () => {
+    setEditing(null);
     setShowCreate(true);
     setForm(EMPTY_FORM);
     try {
@@ -112,6 +116,33 @@ const AdminServicesScreen: React.FC = () => {
       setVendors([]);
     }
   }, []);
+
+  const openEdit = async (item: Service) => {
+    setEditing(item);
+    setShowCreate(true);
+    setForm({
+      name: item.name,
+      vendor_id: item.vendor?.id ? String(item.vendor.id) : '',
+      category_id: item.category?.id ? String(item.category.id) : '',
+      pricing_type: item.pricing_type ?? 'fixed',
+      price: item.price != null ? String(item.price) : '',
+      sale_price: item.sale_price != null ? String(item.sale_price) : '',
+      description: item.description ?? '',
+      cancellation_policy: item.cancellation_policy ?? '',
+      is_active: item.is_active,
+    });
+    try {
+      const [catRes, vendorRes] = await Promise.all([
+        api.get('/categories'),
+        api.get('/admin/vendors', { params: { per_page: 100 } }),
+      ]);
+      setCategories(catRes.data ?? []);
+      setVendors(vendorRes.data.data ?? vendorRes.data ?? []);
+    } catch {
+      setCategories([]);
+      setVendors([]);
+    }
+  };
 
   const createService = async () => {
     if (!form.name.trim() || !form.description.trim()) {
@@ -148,7 +179,7 @@ const AdminServicesScreen: React.FC = () => {
     }
     setCreating(true);
     try {
-      await api.post('/services', {
+      const payload = {
         name: form.name.trim(),
         description: form.description.trim(),
         category_id: Number(form.category_id),
@@ -158,9 +189,15 @@ const AdminServicesScreen: React.FC = () => {
         sale_price: form.sale_price ? Number(form.sale_price) : undefined,
         cancellation_policy: form.cancellation_policy || undefined,
         is_active: form.is_active,
-      });
+      };
+      if (editing) {
+        await api.put(`/services/${editing.id}`, payload);
+        Alert.alert('Saved', 'Service updated.');
+      } else {
+        await api.post('/services', payload);
+        Alert.alert('Service created', 'The service is live and approved.');
+      }
       setShowCreate(false);
-      Alert.alert('Service created', 'The service is live and approved.');
       load();
     } catch (e: any) {
       Alert.alert(
@@ -208,25 +245,31 @@ const AdminServicesScreen: React.FC = () => {
       </Text>
       <View style={styles.bottomRow}>
         <Text style={styles.price}>Rs {item.price}</Text>
-        <View style={styles.actions}>
-          <View style={styles.activeRow}>
-            <View
-              style={[
-                styles.dot,
-                { backgroundColor: item.is_active ? COLORS.successText : COLORS.gray400 },
-              ]}
-            />
-            <Text style={styles.activeText}>
-              {item.is_active ? 'live' : 'hidden'}
-            </Text>
+          <View style={styles.actions}>
+            <View style={styles.activeRow}>
+              <View
+                style={[
+                  styles.dot,
+                  { backgroundColor: item.is_active ? COLORS.successText : COLORS.gray400 },
+                ]}
+              />
+              <Text style={styles.activeText}>
+                {item.is_active ? 'live' : 'hidden'}
+              </Text>
+            </View>
+            <Pressable
+              onPress={() => openEdit(item)}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
+              <MaterialIcons name="edit-outline" size={18} color={COLORS.primary700} />
+            </Pressable>
+            <Pressable
+              onPress={() => remove(item)}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
+              <MaterialIcons name="delete-outline" size={18} color={COLORS.rose} />
+            </Pressable>
           </View>
-          <Pressable
-            onPress={() => remove(item)}
-            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-          >
-            <MaterialIcons name="delete-outline" size={18} color={COLORS.rose} />
-          </Pressable>
-        </View>
       </View>
       <Text style={styles.time}>{item.pricing_type}</Text>
     </View>
@@ -271,7 +314,7 @@ const AdminServicesScreen: React.FC = () => {
 
       <Modal
         visible={showCreate}
-        title="Add New Service"
+        title={editing ? 'Edit Service' : 'Add New Service'}
         onClose={() => setShowCreate(false)}
       >
         <Text style={styles.fieldLabel}>Service title</Text>
@@ -420,7 +463,7 @@ const AdminServicesScreen: React.FC = () => {
           disabled={creating}
         >
           <Text style={styles.saveBtnText}>
-            {creating ? 'Creating...' : 'Create service'}
+            {creating ? 'Saving...' : editing ? 'Save changes' : 'Create service'}
           </Text>
         </TouchableOpacity>
       </Modal>

@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import api from '../../api/client';
 import { COLORS, SPACING } from '../../theme';
@@ -18,6 +19,8 @@ import ServiceCard, { Service } from '../../components/ServiceCard';
 import { MainStackParamList } from '../../navigation/types';
 
 type Props = NativeStackScreenProps<MainStackParamList, 'VendorPublic'>;
+
+const FAV_VENDORS = 'tolemate_fav_vendors';
 
 interface VendorData {
   vendor: {
@@ -66,6 +69,29 @@ const VendorPublicProfileScreen: React.FC<Props> = ({ route, navigation }) => {
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<'services' | 'reviews'>('services');
+  const [isFav, setIsFav] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem(FAV_VENDORS).then(raw => {
+      if (raw) {
+        const ids: number[] = JSON.parse(raw);
+        setIsFav(ids.includes(id));
+      }
+    });
+  }, [id]);
+
+  const toggleFav = useCallback(async () => {
+    const next = !isFav;
+    setIsFav(next);
+    try {
+      const raw = await AsyncStorage.getItem(FAV_VENDORS);
+      const ids: number[] = raw ? JSON.parse(raw) : [];
+      const updated = next ? [...ids, id] : ids.filter(x => x !== id);
+      await AsyncStorage.setItem(FAV_VENDORS, JSON.stringify(updated));
+    } catch {
+      setIsFav(!next);
+    }
+  }, [isFav, id]);
 
   useEffect(() => {
     let mounted = true;
@@ -162,6 +188,13 @@ const VendorPublicProfileScreen: React.FC<Props> = ({ route, navigation }) => {
             onPress={() => navigation.goBack()}
           >
             <MaterialIcons name="arrow-back" size={22} color={COLORS.white} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.favBtn} onPress={toggleFav}>
+            <MaterialIcons
+              name={isFav ? 'favorite' : 'favorite-border'}
+              size={22}
+              color={isFav ? COLORS.rose : COLORS.white}
+            />
           </TouchableOpacity>
           <AppImage
             uri={vendor.avatar}
@@ -291,6 +324,17 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: SPACING.md,
     left: SPACING.md,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  favBtn: {
+    position: 'absolute',
+    top: SPACING.md,
+    right: SPACING.md,
     width: 40,
     height: 40,
     borderRadius: 20,

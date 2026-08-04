@@ -44,9 +44,19 @@ interface ServiceDetail {
   } | null;
 }
 
+interface Review {
+  id: number;
+  rating: number;
+  comment?: string | null;
+  vendor_reply?: string | null;
+  created_at: string;
+  customer?: { id: number; name?: string } | null;
+}
+
 const ServiceDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const { id } = route.params;
   const [service, setService] = useState<ServiceDetail | null>(null);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [fav, setFav] = useState(false);
 
@@ -56,7 +66,16 @@ const ServiceDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       .get(`/services/${id}`)
       .then(res => {
         if (mounted) {
-          setService(res.data.service);
+          const svc = res.data.service;
+          setService(svc);
+          if (svc?.vendor?.id) {
+            api
+              .get(`/vendors/${svc.vendor.id}/reviews`)
+              .then(r => {
+                if (mounted) setReviews(r.data.data ?? r.data ?? []);
+              })
+              .catch(() => {});
+          }
         }
       })
       .catch(() => {
@@ -91,8 +110,8 @@ const ServiceDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   }, [id]);
 
   const onBook = useCallback(() => {
-    Alert.alert('Coming soon', 'Booking flow arrives in Phase 2.');
-  }, []);
+    navigation.navigate('BookingForm', { id });
+  }, [navigation, id]);
 
   if (loading) {
     return (
@@ -139,7 +158,7 @@ const ServiceDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
         <View style={styles.body}>
           <View style={styles.titleRow}>
-            <View style={{ flex: 1 }}>
+            <View style={styles.titleFlex}>
               {service.category ? (
                 <Text style={styles.category}>{service.category.name}</Text>
               ) : null}
@@ -209,6 +228,79 @@ const ServiceDetailScreen: React.FC<Props> = ({ route, navigation }) => {
               <Text style={styles.description}>{service.description}</Text>
             </View>
           ) : null}
+
+          {/* Reviews */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>
+              Reviews ({reviews.length})
+            </Text>
+            {reviews.length === 0 ? (
+              <Text style={styles.noReviews}>No reviews yet.</Text>
+            ) : (
+              <>
+                <View style={styles.avgRow}>
+                  <Text style={styles.avgScore}>
+                    {(
+                      reviews.reduce((s, r) => s + r.rating, 0) / reviews.length
+                    ).toFixed(1)}
+                  </Text>
+                  <View>
+                    <Text style={styles.avgStars}>
+                      {'★'.repeat(Math.round(
+                        reviews.reduce((s, r) => s + r.rating, 0) /
+                          reviews.length,
+                      ))}
+                      {'☆'.repeat(
+                        5 -
+                          Math.round(
+                            reviews.reduce((s, r) => s + r.rating, 0) /
+                              reviews.length,
+                          ),
+                      )}
+                    </Text>
+                    <Text style={styles.avgCount}>
+                      {reviews.length} review{reviews.length !== 1 ? 's' : ''}
+                    </Text>
+                  </View>
+                </View>
+                {reviews.slice(0, 5).map(r => (
+                  <View key={r.id} style={styles.reviewItem}>
+                    <View style={styles.reviewTop}>
+                      <View style={styles.reviewAvatar}>
+                        <Text style={styles.reviewAvatarText}>
+                          {(r.customer?.name ?? 'U').charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                      <View style={styles.reviewInfo}>
+                        <Text style={styles.reviewName}>
+                          {r.customer?.name ?? 'Customer'}
+                        </Text>
+                        <Text style={styles.reviewStars}>
+                          {'★'.repeat(r.rating)}
+                          {'☆'.repeat(5 - r.rating)}
+                        </Text>
+                      </View>
+                      <Text style={styles.reviewDate}>
+                        {new Date(r.created_at).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                        })}
+                      </Text>
+                    </View>
+                    {r.comment ? (
+                      <Text style={styles.reviewComment}>{r.comment}</Text>
+                    ) : null}
+                    {r.vendor_reply ? (
+                      <View style={styles.replyBox}>
+                        <Text style={styles.replyLabel}>Vendor reply</Text>
+                        <Text style={styles.replyText}>{r.vendor_reply}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                ))}
+              </>
+            )}
+          </View>
         </View>
       </ScrollView>
 
@@ -273,6 +365,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+  },
+  titleFlex: {
+    flex: 1,
   },
   category: {
     fontSize: 13,
@@ -371,6 +466,99 @@ const styles = StyleSheet.create({
     marginTop: SPACING.sm,
     fontSize: 14,
     lineHeight: 22,
+    color: COLORS.slate600,
+  },
+  noReviews: {
+    marginTop: SPACING.sm,
+    fontSize: 13,
+    color: COLORS.slate500,
+  },
+  avgRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+    marginTop: SPACING.sm,
+  },
+  avgScore: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: COLORS.dark,
+  },
+  avgStars: {
+    fontSize: 14,
+    color: COLORS.accent,
+    letterSpacing: 2,
+  },
+  avgCount: {
+    marginTop: 2,
+    fontSize: 12,
+    color: COLORS.slate500,
+  },
+  reviewItem: {
+    marginTop: SPACING.md,
+    paddingTop: SPACING.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: COLORS.gray200,
+  },
+  reviewTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  reviewAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.primary50,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reviewAvatarText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.primary,
+  },
+  reviewInfo: {
+    flex: 1,
+    marginLeft: SPACING.sm,
+  },
+  reviewName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.dark,
+  },
+  reviewStars: {
+    marginTop: 1,
+    fontSize: 12,
+    color: COLORS.accent,
+    letterSpacing: 1,
+  },
+  reviewDate: {
+    fontSize: 11,
+    color: COLORS.slate400,
+  },
+  reviewComment: {
+    marginTop: 6,
+    fontSize: 13,
+    lineHeight: 19,
+    color: COLORS.slate600,
+  },
+  replyBox: {
+    marginTop: SPACING.sm,
+    backgroundColor: COLORS.gray50,
+    borderRadius: 10,
+    padding: SPACING.sm,
+  },
+  replyLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.primary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  replyText: {
+    marginTop: 3,
+    fontSize: 13,
+    lineHeight: 19,
     color: COLORS.slate600,
   },
   ctaBar: {
