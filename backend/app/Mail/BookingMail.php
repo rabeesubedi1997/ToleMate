@@ -14,7 +14,7 @@ class BookingMail extends Mailable
 
     public function __construct(
         public readonly string $recipientName,
-        public readonly string $subject,
+        public $subject,
         public readonly string $heading,
         public readonly string $body,
         public readonly ?string $actionUrl = null,

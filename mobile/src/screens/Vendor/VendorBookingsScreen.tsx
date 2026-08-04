@@ -31,6 +31,7 @@ interface Booking {
   reschedule_status?: string | null;
   customer?: { id: number; name?: string; phone?: string } | null;
   service?: { id: number; name?: string } | null;
+  package?: { id: number; name?: string } | null;
 }
 
 const STATUSES = ['all', 'pending', 'accepted', 'in_progress', 'completed', 'cancelled'];
@@ -246,6 +247,13 @@ const VendorBookingsScreen: React.FC = () => {
 
               <Text style={styles.detailLabel}>SCHEDULED</Text>
               <Text style={styles.detailValue}>{formatDate(selected.scheduled_time)}</Text>
+
+              {selected.package?.name ? (
+                <>
+                  <Text style={styles.detailLabel}>PACKAGE</Text>
+                  <Text style={styles.detailValue}>{selected.package.name}</Text>
+                </>
+              ) : null}
 
               <Text style={styles.detailLabel}>PRICE</Text>
               <Text style={styles.detailPrice}>

@@ -1,4 +1,4 @@
-import axios, { AxiosError, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
+import axios, { AxiosError, AxiosResponse } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL } from '../config';
 
@@ -16,15 +16,6 @@ export const onAuthExpired = (fn: AuthExpiredHandler) => {
 // In production, add the SHA-256 fingerprint of your server's certificate
 const CERT_PINNING_ENABLED = __DEV__ ? false : true;
 const EXPECTED_CERT_FINGERPRINT = 'sha256/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='; // Replace with actual fingerprint
-
-// Security: Sanitize sensitive data from logs
-const sanitizeConfig = (config: InternalAxiosRequestConfig): InternalAxiosRequestConfig => {
-  const sanitized = { ...config };
-  if (sanitized.headers?.Authorization) {
-    sanitized.headers.Authorization = 'Bearer [REDACTED]';
-  }
-  return sanitized;
-};
 
 // Security: Validate response structure
 const validateResponse = (response: AxiosResponse): AxiosResponse => {
@@ -56,7 +47,7 @@ api.interceptors.request.use(
     }
     // Add request timestamp for replay attack prevention
     config.headers['X-Request-Time'] = Date.now().toString();
-    return sanitizeConfig(config);
+    return config;
   },
   error => Promise.reject(error),
 );

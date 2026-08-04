@@ -18,7 +18,7 @@ class BookingController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $query = Booking::with(['service.category', 'vendor', 'customer', 'review']);
+        $query = Booking::with(['service.category', 'vendor', 'customer', 'review', 'package']);
 
         if ($user->role !== 'admin') {
             if ($user->role === 'customer') {
@@ -45,7 +45,7 @@ class BookingController extends Controller
     public function show($id)
     {
         $user = request()->user();
-        $query = Booking::with(['service.category', 'service.vendor', 'customer', 'messages'])
+        $query = Booking::with(['service.category', 'service.vendor', 'customer', 'messages', 'package'])
             ->where('id', $id);
 
         if ($user->role !== 'admin') {
@@ -113,6 +113,7 @@ class BookingController extends Controller
             'customer_id' => $user->id,
             'vendor_id' => $service->vendor_id,
             'service_id' => $service->id,
+            'package_id' => $request->package_id,
             'booking_type' => $request->booking_type,
             'status' => 'pending',
             'price' => $price,

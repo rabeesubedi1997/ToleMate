@@ -45,6 +45,7 @@ interface Booking {
     user?: { name?: string } | null;
   } | null;
   review?: { id: number; rating: number; comment?: string | null } | null;
+  package?: { id: number; name?: string } | null;
 }
 
 const STATUSES = ['all', 'pending', 'accepted', 'in_progress', 'completed', 'cancelled'];
@@ -284,6 +285,13 @@ const MyBookingsScreen: React.FC = () => {
 
               <Text style={styles.detailLabel}>SCHEDULED</Text>
               <Text style={styles.detailValue}>{formatDate(selected.scheduled_time)}</Text>
+
+              {selected.package?.name ? (
+                <>
+                  <Text style={styles.detailLabel}>PACKAGE</Text>
+                  <Text style={styles.detailValue}>{selected.package.name}</Text>
+                </>
+              ) : null}
 
               {selected.reschedule_status ? (
                 <>

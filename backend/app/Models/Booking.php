@@ -14,6 +14,7 @@ class Booking extends Model
         'customer_id',
         'vendor_id',
         'service_id',
+        'package_id',
         'booking_type',
         'status',
         'price',
@@ -49,6 +50,11 @@ class Booking extends Model
     public function service(): BelongsTo
     {
         return $this->belongsTo(Service::class);
+    }
+
+    public function package(): BelongsTo
+    {
+        return $this->belongsTo(ServicePackage::class, 'package_id');
     }
 
     public function messages(): HasMany
