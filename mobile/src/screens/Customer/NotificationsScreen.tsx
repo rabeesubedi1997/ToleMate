@@ -7,12 +7,15 @@ import {
   ActivityIndicator,
   RefreshControl,
   TouchableOpacity,
+  Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../../api/client';
 import EmptyState from '../../components/EmptyState';
+import FilterChips from '../../components/FilterChips';
 import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme';
 
 interface NotificationItem {
@@ -34,6 +37,12 @@ const TYPE_ICONS: Record<string, string> = {
   vendor: 'storefront',
 };
 
+const FILTERS = ['all', 'unread', 'booking', 'message', 'payment', 'review', 'system'];
+
+const PREF_KEY = 'tolemate_notif_prefs';
+const SMS_PREF_KEY = 'tolemate_sms_pref';
+const DEFAULT_PREFS = { booking: true, message: true, payment: true, review: true, system: true };
+
 const NotificationsScreen: React.FC = () => {
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,31 +51,75 @@ const NotificationsScreen: React.FC = () => {
   const pageRef = useRef(1);
   const hasMoreRef = useRef(false);
   const [markingAll, setMarkingAll] = useState(false);
+  const [filter, setFilter] = useState('all');
+  const [showPrefs, setShowPrefs] = useState(false);
+  const [prefs, setPrefs] = useState<Record<string, boolean>>(DEFAULT_PREFS);
+  const [smsEnabled, setSmsEnabled] = useState(false);
 
-  const load = useCallback(async (reset = false) => {
-    try {
-      const nextPage = reset ? 1 : pageRef.current;
-      const res = await api.get('/notifications', {
-        params: { page: nextPage, per_page: 20 },
-      });
-      const rows: NotificationItem[] = res.data.data ?? res.data ?? [];
-      setItems(prev => (reset ? rows : [...prev, ...rows]));
-      pageRef.current = nextPage + 1;
-      hasMoreRef.current = (res.data?.next_page_url ?? null) !== null && rows.length > 0;
-    } catch (e) {
-      console.warn('notifications load failed', e);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-      setLoadingMore(false);
-    }
+  React.useEffect(() => {
+    AsyncStorage.getItem(PREF_KEY).then(raw => {
+      if (raw) {
+        try {
+          setPrefs(prev => ({ ...prev, ...JSON.parse(raw) }));
+        } catch {}
+      }
+    });
+    AsyncStorage.getItem(SMS_PREF_KEY).then(raw => {
+      if (raw) {
+        try {
+          setSmsEnabled(JSON.parse(raw) === true);
+        } catch {}
+      }
+    });
   }, []);
+
+  const load = useCallback(
+    async (reset = false) => {
+      try {
+        const nextPage = reset ? 1 : pageRef.current;
+        const params: Record<string, string> = { page: String(nextPage), per_page: '20' };
+        if (filter === 'unread') params.unread_only = '1';
+        else if (filter !== 'all') params.type = filter;
+        const res = await api.get('/notifications', { params });
+        const rows: NotificationItem[] = res.data.data ?? res.data ?? [];
+        setItems(prev => (reset ? rows : [...prev, ...rows]));
+        pageRef.current = nextPage + 1;
+        hasMoreRef.current = (res.data?.next_page_url ?? null) !== null && rows.length > 0;
+      } catch (e) {
+        console.warn('notifications load failed', e);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+        setLoadingMore(false);
+      }
+    },
+    [filter],
+  );
 
   useFocusEffect(
     useCallback(() => {
       load(true);
     }, [load]),
   );
+
+  const togglePref = (key: string) => {
+    setPrefs(prev => {
+      const next = { ...prev, [key]: !prev[key] };
+      AsyncStorage.setItem(PREF_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  };
+
+  const toggleSms = async () => {
+    const next = !smsEnabled;
+    setSmsEnabled(next);
+    AsyncStorage.setItem(SMS_PREF_KEY, JSON.stringify(next)).catch(() => {});
+    try {
+      await api.put('/user/profile', { sms_notifications: next });
+    } catch {
+      // ignore — preference stays local
+    }
+  };
 
   const markRead = async (item: NotificationItem) => {
     if (item.is_read) return;
@@ -180,6 +233,8 @@ const NotificationsScreen: React.FC = () => {
         </View>
       </View>
 
+      <FilterChips options={FILTERS} selected={filter} onSelect={setFilter} />
+
       {loading ? (
         <ActivityIndicator
           style={styles.loader}
@@ -192,6 +247,58 @@ const NotificationsScreen: React.FC = () => {
           keyExtractor={item => String(item.id)}
           renderItem={renderItem}
           contentContainerStyle={styles.list}
+          ListHeaderComponent={
+            <>
+              <View style={styles.prefsCard}>
+                <TouchableOpacity
+                  style={styles.prefsHeader}
+                  activeOpacity={0.7}
+                  onPress={() => setShowPrefs(s => !s)}
+                >
+                  <View style={styles.prefsTitleRow}>
+                    <MaterialIcons name="settings" size={16} color={COLORS.gray500} />
+                    <Text style={styles.prefsTitle}>Notification preferences</Text>
+                  </View>
+                  <MaterialIcons
+                    name={showPrefs ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
+                    size={20}
+                    color={COLORS.gray400}
+                  />
+                </TouchableOpacity>
+                {showPrefs ? (
+                  <View style={styles.prefsBody}>
+                    {Object.entries(prefs).map(([key, val]) => (
+                      <View key={key} style={styles.prefRow}>
+                        <Text style={styles.prefLabel}>
+                          {key.charAt(0).toUpperCase() + key.slice(1)}
+                        </Text>
+                        <Switch
+                          value={val}
+                          onValueChange={() => togglePref(key)}
+                          trackColor={{ true: COLORS.primary, false: COLORS.gray300 }}
+                          thumbColor={COLORS.white}
+                        />
+                      </View>
+                    ))}
+                    <View style={[styles.prefRow, styles.prefRowSms]}>
+                      <View>
+                        <Text style={styles.prefLabel}>SMS Notifications</Text>
+                        <Text style={styles.prefHint}>
+                          Receive booking updates via SMS
+                        </Text>
+                      </View>
+                      <Switch
+                        value={smsEnabled}
+                        onValueChange={toggleSms}
+                        trackColor={{ true: COLORS.primary, false: COLORS.gray300 }}
+                        thumbColor={COLORS.white}
+                      />
+                    </View>
+                  </View>
+                ) : null}
+              </View>
+            </>
+          }
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -305,7 +412,56 @@ const styles = StyleSheet.create({
     color: COLORS.white,
   },
   loader: {
-    marginTop: SPACING.xxl,
+    marginTop: SPACING.xxl * 2,
+  },
+  prefsCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.gray200,
+    paddingHorizontal: SPACING.md,
+    marginBottom: SPACING.sm,
+    ...SHADOW.card,
+  },
+  prefsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: SPACING.md,
+  },
+  prefsTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  prefsTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.dark,
+  },
+  prefsBody: {
+    paddingBottom: SPACING.sm,
+  },
+  prefRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.gray100,
+  },
+  prefRowSms: {
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  prefLabel: {
+    fontSize: 14,
+    color: COLORS.dark,
+  },
+  prefHint: {
+    fontSize: 11,
+    color: COLORS.gray500,
+    marginTop: 1,
   },
   footerLoader: {
     paddingVertical: SPACING.md,

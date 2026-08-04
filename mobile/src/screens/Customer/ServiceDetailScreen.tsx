@@ -42,6 +42,16 @@ interface ServiceDetail {
     avatar?: string | null;
     user?: { id: number; name?: string; phone?: string } | null;
   } | null;
+  packages?: ServicePackage[];
+}
+
+interface ServicePackage {
+  id: number;
+  name: string;
+  description?: string | null;
+  price: number | string;
+  delivery_days?: number | null;
+  features?: string[] | null;
 }
 
 interface Review {
@@ -226,6 +236,59 @@ const ServiceDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>About this service</Text>
               <Text style={styles.description}>{service.description}</Text>
+            </View>
+          ) : null}
+
+          {/* Packages */}
+          {service.packages && service.packages.length > 0 ? (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Choose a package</Text>
+              {service.packages.map(pkg => (
+                <View key={pkg.id} style={styles.pkgCard}>
+                  <View style={styles.pkgTop}>
+                    <Text style={styles.pkgName}>{pkg.name}</Text>
+                    <Text style={styles.pkgPrice}>Rs {pkg.price}</Text>
+                  </View>
+                  {pkg.description ? (
+                    <Text style={styles.pkgDesc}>{pkg.description}</Text>
+                  ) : null}
+                  {(pkg.features ?? []).length > 0 ? (
+                    <View style={styles.pkgFeatures}>
+                      {pkg.features!.map((f, i) => (
+                        <View key={i} style={styles.pkgFeatureRow}>
+                          <MaterialIcons
+                            name="check"
+                            size={14}
+                            color={COLORS.primary}
+                          />
+                          <Text style={styles.pkgFeatureText}>{f}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  ) : null}
+                  <View style={styles.pkgBottom}>
+                    {pkg.delivery_days ? (
+                      <Text style={styles.pkgDelivery}>
+                        {pkg.delivery_days}d delivery
+                      </Text>
+                    ) : null}
+                    <TouchableOpacity
+                      style={styles.pkgBookBtn}
+                      activeOpacity={0.85}
+                      onPress={() =>
+                        navigation.navigate('BookingForm', {
+                          id,
+                          packageId: pkg.id,
+                          packageName: pkg.name,
+                          packagePrice: Number(pkg.price),
+                        })
+                      }
+                    >
+                      <Text style={styles.pkgBookText}>Book {pkg.name}</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
             </View>
           ) : null}
 
@@ -472,6 +535,71 @@ const styles = StyleSheet.create({
     marginTop: SPACING.sm,
     fontSize: 13,
     color: COLORS.slate500,
+  },
+  pkgCard: {
+    marginTop: SPACING.sm,
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.gray200,
+    padding: SPACING.md,
+  },
+  pkgTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  pkgName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.dark,
+  },
+  pkgPrice: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.primary,
+  },
+  pkgDesc: {
+    marginTop: 4,
+    fontSize: 13,
+    color: COLORS.slate500,
+    lineHeight: 18,
+  },
+  pkgFeatures: {
+    marginTop: SPACING.sm,
+    gap: 4,
+  },
+  pkgFeatureRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  pkgFeatureText: {
+    flex: 1,
+    fontSize: 13,
+    color: COLORS.slate600,
+  },
+  pkgBottom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: SPACING.sm,
+  },
+  pkgDelivery: {
+    fontSize: 12,
+    color: COLORS.slate500,
+    fontWeight: '600',
+  },
+  pkgBookBtn: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  pkgBookText: {
+    color: COLORS.white,
+    fontSize: 13,
+    fontWeight: '700',
   },
   avgRow: {
     flexDirection: 'row',

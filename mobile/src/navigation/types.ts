@@ -35,11 +35,18 @@ export type MainStackParamList = {
   ServiceDetail: { id: number };
   VendorPublic: { id: number };
   Favorites: undefined;
-  BookingForm: { id: number };
+  BookingForm: {
+    id: number;
+    packageId?: number;
+    packageName?: string;
+    packagePrice?: number;
+  };
   MyBookings: undefined;
   PostRequest: undefined;
   VendorRequests: undefined;
   VendorBookings: undefined;
+  VendorBundles: undefined;
+  Checkout: { bookingId: number };
   Chat: { title: string; subtitle?: string; bookingId?: number; withId?: number };
   AdminChat: { title: string; subtitle?: string; bookingId?: number; withId?: number };
   AdminBookings: undefined;

@@ -78,7 +78,7 @@ function buildTimeSlots(start: string, end: string): string[] {
 }
 
 const BookingFormScreen: React.FC<Props> = ({ route, navigation }) => {
-  const { id } = route.params;
+  const { id, packageId, packageName, packagePrice } = route.params;
   const [service, setService] = useState<ServiceInfo | null>(null);
   const [availability, setAvailability] = useState<Slot[]>([]);
   const [loading, setLoading] = useState(true);
@@ -152,15 +152,17 @@ const BookingFormScreen: React.FC<Props> = ({ route, navigation }) => {
 
     setSubmitting(true);
     try {
+      const basePrice =
+        packagePrice ??
+        (service.sale_price != null ? Number(service.sale_price) : Number(service.price ?? 0));
       await api.post('/bookings', {
         service_id: service.id,
+        package_id: packageId,
         booking_type: bookingType,
         price:
           bookingType === 'quote'
             ? Number(price)
-            : service.sale_price != null
-              ? Number(service.sale_price)
-              : Number(service.price ?? 0),
+            : basePrice,
         scheduled_time: scheduled.toISOString(),
         message: message.trim() || undefined,
       });
@@ -216,8 +218,16 @@ const BookingFormScreen: React.FC<Props> = ({ route, navigation }) => {
             <Text style={styles.summaryVendor}>
               {service.vendor?.business_name ?? 'Vendor'}
             </Text>
+            {packageName ? (
+              <View style={styles.pkgChip}>
+                <MaterialIcons name="layers" size={12} color={COLORS.primary700} />
+                <Text style={styles.pkgChipText}>{packageName}</Text>
+              </View>
+            ) : null}
             {priceLabel !== null && priceLabel !== undefined ? (
-              <Text style={styles.summaryPrice}>Rs {priceLabel}</Text>
+              <Text style={styles.summaryPrice}>
+                Rs {packagePrice ?? priceLabel}
+              </Text>
             ) : null}
           </View>
         </View>
@@ -398,6 +408,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.gray500,
     marginTop: 2,
+  },
+  pkgChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 4,
+    backgroundColor: COLORS.primary100,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginTop: 4,
+  },
+  pkgChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.primary700,
   },
   summaryPrice: {
     fontSize: 14,

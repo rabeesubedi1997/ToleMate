@@ -174,6 +174,12 @@ const VendorProfileScreen: React.FC = () => {
           label="Edit Business Profile"
           onPress={() => setShowEdit(true)}
         />
+        <MenuRow
+          icon="shopping-bag"
+          color={COLORS.teal}
+          label="Bundles"
+          onPress={() => navigation.navigate('VendorBundles')}
+        />
       </View>
 
       <VendorEditModal

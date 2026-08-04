@@ -10,7 +10,9 @@ import {
   Alert,
   TextInput,
   ScrollView,
+  Image,
 } from 'react-native';
+import { launchImageLibrary } from 'react-native-image-picker';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
@@ -20,6 +22,7 @@ import EmptyState from '../../components/EmptyState';
 import Modal from '../../components/Modal';
 import AppImage from '../../components/AppImage';
 import { COLORS, SPACING, RADIUS, SHADOW, FONT_SIZE } from '../../theme';
+import { validateFile } from '../../utils/security';
 
 interface VendorService {
   id: number;
@@ -36,6 +39,17 @@ interface VendorService {
   images?: { id: number; file_path: string }[];
   cancellation_policy?: string | null;
   tags?: string[] | null;
+  packages?: ServicePackage[];
+}
+
+interface ServicePackage {
+  id: number;
+  name: string;
+  description?: string | null;
+  price: number | string;
+  delivery_days?: number | null;
+  features?: string[] | null;
+  is_active?: boolean;
 }
 
 interface Category {
@@ -61,6 +75,14 @@ const EMPTY_FORM = {
   is_active: true,
 };
 
+const EMPTY_PKG = {
+  name: '',
+  price: '',
+  delivery_days: '',
+  description: '',
+  features: '',
+};
+
 const VendorServicesScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const [services, setServices] = useState<VendorService[]>([]);
@@ -71,6 +93,13 @@ const VendorServicesScreen: React.FC = () => {
   const [editing, setEditing] = useState<VendorService | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [coverUri, setCoverUri] = useState<string | null>(null);
+  const [coverLocal, setCoverLocal] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [packages, setPackages] = useState<ServicePackage[]>([]);
+  const [pkgForm, setPkgForm] = useState(EMPTY_PKG);
+  const [editingPkg, setEditingPkg] = useState<ServicePackage | null>(null);
+  const [pkgBusy, setPkgBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -93,6 +122,9 @@ const VendorServicesScreen: React.FC = () => {
   const openCreate = async () => {
     setEditing(null);
     setForm(EMPTY_FORM);
+    setCoverUri(null);
+    setCoverLocal(null);
+    setPackages([]);
     setShowForm(true);
     try {
       const res = await api.get('/categories');
@@ -102,7 +134,7 @@ const VendorServicesScreen: React.FC = () => {
     }
   };
 
-  const openEdit = (item: VendorService) => {
+  const openEdit = async (item: VendorService) => {
     setEditing(item);
     setForm({
       name: item.name,
@@ -115,7 +147,134 @@ const VendorServicesScreen: React.FC = () => {
       tags: (item.tags ?? []).join(', '),
       is_active: item.is_active,
     });
+    setCoverUri(item.images?.[0]?.file_path ?? null);
+    setCoverLocal(null);
+    setPackages(item.packages ?? []);
     setShowForm(true);
+    api
+      .get(`/services/${item.id}`)
+      .then(res => {
+        const svc = res.data.service ?? res.data ?? {};
+        setPackages(svc.packages ?? []);
+      })
+      .catch(() => {});
+  };
+
+  const uploadCover = async () => {
+    if (!editing) {
+      Alert.alert('Save first', 'Create the service, then upload a cover photo.');
+      return;
+    }
+    const result = await launchImageLibrary({
+      mediaType: 'photo',
+      quality: 0.8,
+      selectionLimit: 1,
+    });
+    const asset = result.assets?.[0];
+    if (!asset?.uri) return;
+    const check = validateFile(
+      { name: asset.fileName ?? '', size: asset.fileSize ?? 0, type: asset.type ?? '' },
+      ['image/jpeg', 'image/png', 'image/webp'],
+      4,
+    );
+    if (!check.valid) {
+      Alert.alert('Invalid image', check.error ?? 'File not allowed');
+      return;
+    }
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('image', {
+        uri: asset.uri,
+        name: asset.fileName ?? `photo_${Date.now()}.jpg`,
+        type: asset.type ?? 'image/jpeg',
+      } as any);
+      await api.post(`/services/${editing.id}/image`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setCoverLocal(asset.uri);
+      Alert.alert('Uploaded', 'Cover photo updated.');
+      load();
+    } catch (e: any) {
+      Alert.alert('Failed', e?.response?.data?.message ?? 'Could not upload image.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const savePkg = async () => {
+    if (!editing) return;
+    if (!pkgForm.name.trim()) {
+      Alert.alert('Missing', 'Tier name is required.');
+      return;
+    }
+    if (!pkgForm.price || Number(pkgForm.price) <= 0) {
+      Alert.alert('Missing', 'Enter a tier price.');
+      return;
+    }
+    setPkgBusy(true);
+    try {
+      const payload = {
+        name: pkgForm.name.trim(),
+        price: Number(pkgForm.price),
+        delivery_days: pkgForm.delivery_days
+          ? Number(pkgForm.delivery_days)
+          : undefined,
+        description: pkgForm.description.trim() || undefined,
+        features: pkgForm.features
+          ? pkgForm.features.split('\n').map(f => f.trim()).filter(Boolean)
+          : undefined,
+        sort_order: editingPkg ? packages.indexOf(editingPkg) : packages.length,
+      };
+      if (editingPkg) {
+        await api.put(`/services/${editing.id}/packages/${editingPkg.id}`, payload);
+      } else {
+        await api.post(`/services/${editing.id}/packages`, payload);
+      }
+      setPkgForm(EMPTY_PKG);
+      setEditingPkg(null);
+      const res = await api.get(`/services/${editing.id}`);
+      setPackages(res.data.service?.packages ?? []);
+    } catch (e: any) {
+      Alert.alert(
+        'Failed',
+        e?.response?.data?.message ??
+          Object.values(e?.response?.data?.errors ?? {}).flat()[0] ??
+          'Could not save tier.',
+      );
+    } finally {
+      setPkgBusy(false);
+    }
+  };
+
+  const startEditPkg = (pkg: ServicePackage) => {
+    setEditingPkg(pkg);
+    setPkgForm({
+      name: pkg.name,
+      price: String(pkg.price ?? ''),
+      delivery_days: pkg.delivery_days != null ? String(pkg.delivery_days) : '',
+      description: pkg.description ?? '',
+      features: (pkg.features ?? []).join('\n'),
+    });
+  };
+
+  const removePkg = (pkg: ServicePackage) => {
+    if (!editing) return;
+    Alert.alert('Delete tier', `Delete "${pkg.name}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await api.delete(`/services/${editing.id}/packages/${pkg.id}`);
+            setPackages(prev => prev.filter(p => p.id !== pkg.id));
+          } catch (e: any) {
+            Alert.alert('Failed', e?.response?.data?.message ?? 'Could not delete tier.');
+          }
+        },
+      },
+    ]);
   };
 
   const save = async () => {
@@ -319,6 +478,36 @@ const VendorServicesScreen: React.FC = () => {
             onChangeText={t => setForm(f => ({ ...f, name: t }))}
           />
 
+          <Text style={styles.fieldLabel}>Cover photo</Text>
+          <View style={styles.coverRow}>
+            {coverLocal ? (
+              <Image source={{ uri: coverLocal }} style={styles.coverPreview} />
+            ) : (
+              <AppImage uri={coverUri} style={styles.coverPreview} />
+            )}
+            <TouchableOpacity
+              style={[styles.coverBtn, uploading && styles.btnDisabled]}
+              onPress={uploadCover}
+              disabled={uploading}
+            >
+              {uploading ? (
+                <ActivityIndicator size="small" color={COLORS.primary} />
+              ) : (
+                <>
+                  <MaterialIcons name="photo-camera" size={18} color={COLORS.primary} />
+                  <Text style={styles.coverBtnText}>
+                    {coverUri || coverLocal ? 'Change photo' : 'Upload photo'}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+          {!editing ? (
+            <Text style={styles.hint}>
+              Save the service first, then tap edit to upload a cover photo.
+            </Text>
+          ) : null}
+
           <Text style={styles.fieldLabel}>Category *</Text>
           <View style={styles.chipsRow}>
             {categories.map(c => {
@@ -427,6 +616,136 @@ const VendorServicesScreen: React.FC = () => {
               {form.is_active ? 'Active & visible' : 'Hidden'}
             </Text>
           </TouchableOpacity>
+
+          {/* Pricing tiers */}
+          {editing ? (
+            <View style={styles.pkgsBlock}>
+              <Text style={styles.fieldLabel}>PRICING TIERS ({packages.length}/3)</Text>
+              {packages.map(pkg => (
+                <View key={pkg.id} style={styles.pkgRow}>
+                  <View style={styles.pkgBody}>
+                    <Text style={styles.pkgName} numberOfLines={1}>
+                      {pkg.name}
+                    </Text>
+                    <Text style={styles.pkgMeta}>
+                      Rs {pkg.price}
+                      {pkg.delivery_days ? ` · ${pkg.delivery_days}d delivery` : ''}
+                    </Text>
+                    {(pkg.features ?? []).slice(0, 2).map((f, i) => (
+                      <Text key={i} style={styles.pkgFeature} numberOfLines={1}>
+                        • {f}
+                      </Text>
+                    ))}
+                  </View>
+                  <View style={styles.pkgActions}>
+                    <TouchableOpacity onPress={() => startEditPkg(pkg)} hitSlop={6}>
+                      <MaterialIcons name="edit-outline" size={18} color={COLORS.primary700} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => removePkg(pkg)} hitSlop={6}>
+                      <MaterialIcons name="delete-outline" size={18} color={COLORS.rose} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+
+              {packages.length < 3 ? (
+                <>
+                  <Text style={styles.fieldLabel}>
+                    {editingPkg ? `Edit "${editingPkg.name}"` : 'New tier'}
+                  </Text>
+                  <View style={styles.row2}>
+                    <View style={styles.row2Item}>
+                      <Text style={styles.fieldLabel}>Tier name</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder={
+                          packages.length === 0
+                            ? 'Basic'
+                            : packages.length === 1
+                              ? 'Standard'
+                              : 'Premium'
+                        }
+                        placeholderTextColor={COLORS.gray400}
+                        value={pkgForm.name}
+                        onChangeText={t => setPkgForm(f => ({ ...f, name: t }))}
+                      />
+                    </View>
+                    <View style={styles.row2Item}>
+                      <Text style={styles.fieldLabel}>Price (Rs.)</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="0.00"
+                        placeholderTextColor={COLORS.gray400}
+                        value={pkgForm.price}
+                        onChangeText={t => setPkgForm(f => ({ ...f, price: t }))}
+                        keyboardType="numeric"
+                      />
+                    </View>
+                  </View>
+                  <View style={styles.row2}>
+                    <View style={styles.row2Item}>
+                      <Text style={styles.fieldLabel}>Delivery days</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Optional"
+                        placeholderTextColor={COLORS.gray400}
+                        value={pkgForm.delivery_days}
+                        onChangeText={t => setPkgForm(f => ({ ...f, delivery_days: t }))}
+                        keyboardType="number-pad"
+                      />
+                    </View>
+                    <View style={styles.row2Item}>
+                      <Text style={styles.fieldLabel}>Short description</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Optional"
+                        placeholderTextColor={COLORS.gray400}
+                        value={pkgForm.description}
+                        onChangeText={t => setPkgForm(f => ({ ...f, description: t }))}
+                      />
+                    </View>
+                  </View>
+                  <Text style={styles.fieldLabel}>Features (one per line)</Text>
+                  <TextInput
+                    style={[styles.input, styles.inputMultiline]}
+                    placeholder={'Deep clean\nStain removal\nFree touch-up'}
+                    placeholderTextColor={COLORS.gray400}
+                    value={pkgForm.features}
+                    onChangeText={t => setPkgForm(f => ({ ...f, features: t }))}
+                    multiline
+                    numberOfLines={3}
+                  />
+                  <View style={styles.pkgFormActions}>
+                    {editingPkg ? (
+                      <TouchableOpacity
+                        style={[styles.pkgCancelBtn, pkgBusy && styles.btnDisabled]}
+                        disabled={pkgBusy}
+                        onPress={() => {
+                          setEditingPkg(null);
+                          setPkgForm(EMPTY_PKG);
+                        }}
+                      >
+                        <Text style={styles.pkgCancelText}>Cancel</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                    <TouchableOpacity
+                      style={[styles.pkgAddBtn, pkgBusy && styles.btnDisabled]}
+                      disabled={pkgBusy}
+                      onPress={savePkg}
+                    >
+                      {pkgBusy ? (
+                        <ActivityIndicator size="small" color={COLORS.white} />
+                      ) : (
+                        <Text style={styles.pkgAddText}>
+                          {editingPkg ? 'Update tier' : 'Add tier'}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </>
+              ) : null}
+            </View>
+          ) : null}
 
           <TouchableOpacity
             style={[styles.saveBtn, saving && styles.btnDisabled]}
@@ -574,6 +893,109 @@ const styles = StyleSheet.create({
     height: 84,
     textAlignVertical: 'top',
     paddingTop: SPACING.sm,
+  },
+  hint: {
+    marginTop: 4,
+    fontSize: 11,
+    color: COLORS.gray500,
+  },
+  coverRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  coverPreview: {
+    width: 64,
+    height: 64,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.gray100,
+  },
+  coverBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: 14,
+    height: 40,
+  },
+  coverBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.primary,
+  },
+  pkgsBlock: {
+    marginTop: SPACING.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: COLORS.gray200,
+    paddingTop: SPACING.sm,
+  },
+  pkgRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.gray50,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.gray200,
+    padding: SPACING.sm,
+    marginBottom: SPACING.xs,
+  },
+  pkgBody: {
+    flex: 1,
+    marginRight: SPACING.sm,
+  },
+  pkgName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.gray900,
+  },
+  pkgMeta: {
+    marginTop: 2,
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.primary,
+  },
+  pkgFeature: {
+    marginTop: 1,
+    fontSize: 11,
+    color: COLORS.gray500,
+  },
+  pkgActions: {
+    flexDirection: 'row',
+    gap: SPACING.md,
+  },
+  pkgFormActions: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    marginTop: SPACING.sm,
+  },
+  pkgAddBtn: {
+    flex: 1,
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.md,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pkgAddText: {
+    color: COLORS.white,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  pkgCancelBtn: {
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.gray300,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  pkgCancelText: {
+    color: COLORS.gray600,
+    fontSize: 13,
+    fontWeight: '600',
   },
   chipsRow: {
     flexDirection: 'row',

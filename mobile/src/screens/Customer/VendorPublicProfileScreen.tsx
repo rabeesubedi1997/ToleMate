@@ -60,11 +60,21 @@ interface PortfolioItem {
   image_path?: string | null;
 }
 
+interface BundleItem {
+  id: number;
+  name: string;
+  description?: string | null;
+  bundle_price: number | string;
+  discount_percent?: number | null;
+  services?: { id: number; name: string }[];
+}
+
 const VendorPublicProfileScreen: React.FC<Props> = ({ route, navigation }) => {
   const { id } = route.params;
   const [data, setData] = useState<VendorData | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
+  const [bundles, setBundles] = useState<BundleItem[]>([]);
   const [reviewPage, setReviewPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -97,13 +107,15 @@ const VendorPublicProfileScreen: React.FC<Props> = ({ route, navigation }) => {
     let mounted = true;
     (async () => {
       try {
-        const [vendorRes, portfolioRes] = await Promise.all([
+        const [vendorRes, portfolioRes, bundleRes] = await Promise.all([
           api.get(`/vendors/${id}`),
           api.get(`/vendors/${id}/portfolio`),
+          api.get(`/vendors/${id}/bundles`).catch(() => null),
         ]);
         if (mounted) {
           setData(vendorRes.data);
           setPortfolio(portfolioRes.data.portfolio ?? []);
+          setBundles(bundleRes?.data?.bundles ?? bundleRes?.data ?? []);
         }
       } catch (e) {
         console.warn('vendor load failed', e);
@@ -242,6 +254,39 @@ const VendorPublicProfileScreen: React.FC<Props> = ({ route, navigation }) => {
               contentContainerStyle={styles.portfolioList}
               nestedScrollEnabled
             />
+          </View>
+        ) : null}
+
+        {/* Bundles */}
+        {bundles.length > 0 ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Service Bundles</Text>
+            {bundles.map(b => (
+              <View key={b.id} style={styles.bundleCard}>
+                <View style={styles.bundleTop}>
+                  <Text style={styles.bundleName} numberOfLines={1}>
+                    {b.name}
+                  </Text>
+                  <Text style={styles.bundlePrice}>Rs {b.bundle_price}</Text>
+                </View>
+                {b.description ? (
+                  <Text style={styles.bundleDesc} numberOfLines={2}>
+                    {b.description}
+                  </Text>
+                ) : null}
+                {b.services && b.services.length > 0 ? (
+                  <View style={styles.bundleServices}>
+                    {b.services.map(s => (
+                      <View key={s.id} style={styles.bundleServiceChip}>
+                        <Text style={styles.bundleServiceText} numberOfLines={1}>
+                          {s.name}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+              </View>
+            ))}
           </View>
         ) : null}
 
@@ -415,6 +460,60 @@ const styles = StyleSheet.create({
     width: 120,
     height: 90,
     borderRadius: 10,
+  },
+  bundleCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.gray200,
+    padding: SPACING.md,
+    marginTop: SPACING.sm,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 1,
+  },
+  bundleTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  bundleName: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.dark,
+    marginRight: SPACING.sm,
+  },
+  bundlePrice: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.primary,
+  },
+  bundleDesc: {
+    marginTop: 4,
+    fontSize: 12,
+    color: COLORS.slate500,
+    lineHeight: 17,
+  },
+  bundleServices: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: SPACING.sm,
+  },
+  bundleServiceChip: {
+    backgroundColor: COLORS.gray100,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  bundleServiceText: {
+    fontSize: 11,
+    color: COLORS.slate600,
+    fontWeight: '600',
+    maxWidth: 150,
   },
   tabsRow: {
     flexDirection: 'row',

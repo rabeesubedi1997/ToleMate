@@ -13,13 +13,15 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import api from '../../api/client';
 import FilterChips from '../../components/FilterChips';
 import EmptyState from '../../components/EmptyState';
 import Modal from '../../components/Modal';
 import StatusBadge from '../../components/StatusBadge';
 import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme';
+import { MainStackParamList } from '../../navigation/types';
 
 interface Booking {
   id: number;
@@ -64,6 +66,7 @@ const STATUS_TINTS: Record<string, string> = {
 };
 
 const MyBookingsScreen: React.FC = () => {
+  const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
   const [items, setItems] = useState<Booking[]>([]);
   const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(true);
@@ -297,6 +300,23 @@ const MyBookingsScreen: React.FC = () => {
                   ? `Rs ${selected.price}`
                   : 'Price on request'}
               </Text>
+
+              {selectedStatus === 'accepted' &&
+              selected.payment_status === 'pending' ? (
+                <TouchableOpacity
+                  style={[styles.payBtn, busy && styles.btnDisabled]}
+                  disabled={busy}
+                  onPress={() => {
+                    setSelected(null);
+                    navigation.navigate('Checkout', {
+                      bookingId: selected.id,
+                    });
+                  }}
+                >
+                  <MaterialIcons name="lock" size={16} color={COLORS.white} />
+                  <Text style={styles.payBtnText}>Pay now</Text>
+                </TouchableOpacity>
+              ) : null}
 
               {selected.review ? (
                 <>
@@ -581,6 +601,21 @@ const styles = StyleSheet.create({
   cancelBtnText: {
     color: COLORS.white,
     fontSize: 13,
+    fontWeight: '700',
+  },
+  payBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: SPACING.lg,
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.md,
+    height: 46,
+  },
+  payBtnText: {
+    color: COLORS.white,
+    fontSize: 14,
     fontWeight: '700',
   },
   reviewBtn: {
