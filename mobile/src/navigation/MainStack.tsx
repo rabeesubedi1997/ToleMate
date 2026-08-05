@@ -9,10 +9,9 @@ import FavoritesScreen from '../screens/Customer/FavoritesScreen';
 import BookingFormScreen from '../screens/Customer/BookingFormScreen';
 import MyBookingsScreen from '../screens/Customer/MyBookingsScreen';
 import PostRequestScreen from '../screens/Customer/PostRequestScreen';
-import VendorRequestsScreen from '../screens/Vendor/VendorRequestsScreen';
-import VendorBookingsScreen from '../screens/Vendor/VendorBookingsScreen';
-import VendorBundlesScreen from '../screens/Vendor/VendorBundlesScreen';
 import CheckoutScreen from '../screens/Customer/CheckoutScreen';
+import VendorRequestsScreen from '../screens/Vendor/VendorRequestsScreen';
+import VendorBundlesScreen from '../screens/Vendor/VendorBundlesScreen';
 import AdminChatScreen from '../screens/Admin/AdminChatScreen';
 import AdminBookingsScreen from '../screens/Admin/AdminBookingsScreen';
 import AdminServicesScreen from '../screens/Admin/AdminServicesScreen';
@@ -84,11 +83,6 @@ const MainStack: React.FC<{ role: string }> = ({ role }) => (
     <Stack.Screen
       name="VendorRequests"
       component={VendorRequestsScreen}
-      options={{ animation: 'slide_from_right' }}
-    />
-    <Stack.Screen
-      name="VendorBookings"
-      component={VendorBookingsScreen}
       options={{ animation: 'slide_from_right' }}
     />
     <Stack.Screen

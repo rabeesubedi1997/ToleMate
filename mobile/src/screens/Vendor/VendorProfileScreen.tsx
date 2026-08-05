@@ -166,7 +166,7 @@ const VendorProfileScreen: React.FC = () => {
           icon="event-note"
           color={COLORS.infoText}
           label="My Bookings"
-          onPress={() => navigation.navigate('VendorBookings')}
+          onPress={() => navigation.navigate('Tabs', { screen: 'Bookings' } as any)}
         />
         <MenuRow
           icon="edit"

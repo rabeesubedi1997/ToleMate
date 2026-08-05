@@ -3,6 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import VendorDashboardScreen from '../screens/Vendor/VendorDashboardScreen';
 import VendorServicesScreen from '../screens/Vendor/VendorServicesScreen';
+import VendorBookingsScreen from '../screens/Vendor/VendorBookingsScreen';
 import ChatsScreen from '../screens/Customer/ChatsScreen';
 import VendorProfileScreen from '../screens/Vendor/VendorProfileScreen';
 import { COLORS } from '../theme';
@@ -13,6 +14,7 @@ const Tab = createBottomTabNavigator<VendorTabParamList>();
 const TAB_ICONS: Record<keyof VendorTabParamList, string> = {
   Dashboard: 'dashboard',
   Services: 'handyman',
+  Bookings: 'event-note',
   Messages: 'chat-bubble',
   Profile: 'person',
 };
@@ -34,6 +36,7 @@ const VendorTabs: React.FC = () => (
   >
     <Tab.Screen name="Dashboard" component={VendorDashboardScreen} />
     <Tab.Screen name="Services" component={VendorServicesScreen} />
+    <Tab.Screen name="Bookings" component={VendorBookingsScreen} />
     <Tab.Screen name="Messages" component={ChatsScreen} />
     <Tab.Screen name="Profile" component={VendorProfileScreen} />
   </Tab.Navigator>

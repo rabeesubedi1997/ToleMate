@@ -5,14 +5,15 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useAuth } from '../../context/AuthContext';
 import AdminHeader from '../../components/AdminHeader';
 import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme';
-import { MainStackParamList, AdminTabParamList } from '../../navigation/types';
+import { MainStackParamList } from '../../navigation/types';
 
 interface Section {
   label: string;
   icon: string;
-  target: keyof MainStackParamList | keyof AdminTabParamList;
+  target: keyof MainStackParamList;
   superOnly?: boolean;
   isTab?: boolean;
+  tab?: string;
 }
 
 interface Group {
@@ -25,9 +26,9 @@ const GROUPS: Group[] = [
   {
     label: 'Management',
     items: [
-      { label: 'Overview', icon: 'dashboard', target: 'Overview', isTab: true },
-      { label: 'Users', icon: 'people', target: 'Users', isTab: true },
-      { label: 'Vendors', icon: 'storefront', target: 'Vendors', isTab: true },
+      { label: 'Overview', icon: 'dashboard', target: 'Tabs', isTab: true, tab: 'Overview' },
+      { label: 'Users', icon: 'people', target: 'Tabs', isTab: true, tab: 'Users' },
+      { label: 'Vendors', icon: 'storefront', target: 'Tabs', isTab: true, tab: 'Vendors' },
       { label: 'Bookings', icon: 'event-note', target: 'AdminBookings' },
       { label: 'Services', icon: 'build', target: 'AdminServices' },
       { label: 'Categories', icon: 'category', target: 'AdminCategories' },
@@ -91,11 +92,11 @@ const AdminMenuScreen: React.FC = () => {
     g => !g.superOnly || isSuperAdmin,
   );
 
-  const go = (target: string, isTab?: boolean) => {
-    if (isTab) {
-      navigation.navigate('Tabs', { screen: target } as any);
+  const go = (item: Section) => {
+    if (item.isTab) {
+      navigation.navigate('Tabs', { screen: item.tab } as any);
     } else {
-      navigation.navigate(target as any);
+      navigation.navigate(item.target as any);
     }
   };
 
@@ -119,7 +120,7 @@ const AdminMenuScreen: React.FC = () => {
               <Pressable
                 key={item.label}
                 style={styles.card}
-                onPress={() => go(item.target, item.isTab)}
+                onPress={() => go(item)}
               >
                 <View style={styles.icon}>
                   <MaterialIcons

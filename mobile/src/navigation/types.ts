@@ -18,6 +18,7 @@ export type CustomerTabParamList = {
 export type VendorTabParamList = {
   Dashboard: undefined;
   Services: undefined;
+  Bookings: undefined;
   Messages: undefined;
   Profile: undefined;
 };
@@ -44,7 +45,6 @@ export type MainStackParamList = {
   MyBookings: undefined;
   PostRequest: undefined;
   VendorRequests: undefined;
-  VendorBookings: undefined;
   VendorBundles: undefined;
   Checkout: { bookingId: number };
   Chat: { title: string; subtitle?: string; bookingId?: number; withId?: number };
