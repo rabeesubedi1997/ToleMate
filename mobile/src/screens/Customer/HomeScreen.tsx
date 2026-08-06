@@ -7,7 +7,7 @@ import {
   TextInput,
   TouchableOpacity,
   FlatList,
-  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
@@ -21,6 +21,10 @@ import { COLORS, SPACING } from '../../theme';
 import ServiceCard, { Service } from '../../components/ServiceCard';
 import AppImage from '../../components/AppImage';
 import AppBanner from '../../components/AppBanner';
+import {
+  CategoryRowSkeleton,
+  ServiceGridSkeleton,
+} from '../../components/Skeleton';
 import { CustomerTabParamList, MainStackParamList } from '../../navigation/types';
 
 type Nav = CompositeNavigationProp<
@@ -51,29 +55,42 @@ const HomeScreen: React.FC = () => {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [fromCache, setFromCache] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const [catRes, vendorRes, serviceRes]: any[] = await Promise.all([
+        api.get('/categories'),
+        api.get('/featured-vendors'),
+        api.get('/services', { params: { per_page: 8 } }),
+      ]);
+      setCategories(catRes.data);
+      setVendors(vendorRes.data);
+      const svc = Array.isArray(serviceRes.data)
+        ? serviceRes.data
+        : serviceRes.data.data ?? [];
+      setServices(svc);
+      setFromCache(
+        catRes.source === 'cache' ||
+          vendorRes.source === 'cache' ||
+          serviceRes.source === 'cache',
+      );
+    } catch (e) {
+      console.warn('home load failed', e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        const [catRes, vendorRes, serviceRes] = await Promise.all([
-          api.get('/categories'),
-          api.get('/featured-vendors'),
-          api.get('/services', { params: { per_page: 8 } }),
-        ]);
-        setCategories(catRes.data);
-        setVendors(vendorRes.data);
-        const svc = Array.isArray(serviceRes.data)
-          ? serviceRes.data
-          : serviceRes.data.data ?? [];
-        setServices(svc);
-      } catch (e) {
-        console.warn('home load failed', e);
-      } finally {
-        setLoading(false);
-      }
-    };
     load();
-  }, []);
+  }, [load]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    load().finally(() => setRefreshing(false));
+  }, [load]);
 
   const openSearch = useCallback(() => {
     navigation.navigate('Marketplace', { search: search.trim() || undefined });
@@ -168,7 +185,17 @@ const HomeScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={COLORS.primary}
+            colors={[COLORS.primary]}
+          />
+        }
+      >
         {/* Header */}
         <View style={styles.header}>
           <View>
@@ -189,6 +216,15 @@ const HomeScreen: React.FC = () => {
 
         {/* Hero banner */}
         <AppBanner onPressSlide={openBannerLink} />
+
+        {fromCache ? (
+          <View style={styles.offlineRow}>
+            <MaterialIcons name="cloud-off" size={13} color={COLORS.warningText} />
+            <Text style={styles.offlineText}>
+              Offline — showing saved results. Pull to retry.
+            </Text>
+          </View>
+        ) : null}
 
         {/* Search */}
         <View style={styles.searchContainer}>
@@ -226,11 +262,16 @@ const HomeScreen: React.FC = () => {
         </TouchableOpacity>
 
         {loading ? (
-          <ActivityIndicator
-            style={styles.loader}
-            size="large"
-            color={COLORS.primary}
-          />
+          <>
+            <View style={styles.sectionHead}>
+              <Text style={styles.sectionTitle}>Categories</Text>
+            </View>
+            <CategoryRowSkeleton />
+            <View style={styles.sectionHead}>
+              <Text style={styles.sectionTitle}>Popular Services</Text>
+            </View>
+            <ServiceGridSkeleton count={4} />
+          </>
         ) : (
           <>
             {/* Categories */}
@@ -407,6 +448,22 @@ const styles = StyleSheet.create({
   },
   loader: {
     marginTop: SPACING.xxl,
+  },
+  offlineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginHorizontal: SPACING.md,
+    marginTop: SPACING.sm,
+    paddingVertical: 5,
+    paddingHorizontal: SPACING.sm,
+    backgroundColor: COLORS.warningBg,
+    borderRadius: 6,
+  },
+  offlineText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.warningText,
   },
   sectionHead: {
     marginTop: SPACING.lg,

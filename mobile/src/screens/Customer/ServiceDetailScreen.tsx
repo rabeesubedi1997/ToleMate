@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
   Dimensions,
   Alert,
 } from 'react-native';
@@ -16,6 +15,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import api from '../../api/client';
 import { COLORS, SPACING } from '../../theme';
 import AppImage from '../../components/AppImage';
+import { ServiceDetailSkeleton } from '../../components/Skeleton';
 import { MainStackParamList } from '../../navigation/types';
 
 type Props = NativeStackScreenProps<MainStackParamList, 'ServiceDetail'>;
@@ -125,8 +125,8 @@ const ServiceDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+      <View style={styles.container}>
+        <ServiceDetailSkeleton />
       </View>
     );
   }

@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   ScrollView,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
@@ -20,6 +21,7 @@ import api from '../../api/client';
 import { COLORS, SPACING, RADIUS } from '../../theme';
 import ServiceCard, { Service } from '../../components/ServiceCard';
 import EmptyState from '../../components/EmptyState';
+import { ServiceGridSkeleton } from '../../components/Skeleton';
 import {
   CustomerTabParamList,
   MainStackParamList,
@@ -47,6 +49,8 @@ const MarketplaceScreen: React.FC = () => {
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [fromCache, setFromCache] = useState(false);
   const [total, setTotal] = useState(0);
 
   // Sync params coming from the Home screen (category / search deep-links)
@@ -71,7 +75,7 @@ const MarketplaceScreen: React.FC = () => {
   const fetchServices = useCallback(
     async (pageNum: number, catId?: number, query?: string, reset = false) => {
       try {
-        const res = await api.get('/services', {
+        const res: any = await api.get('/services', {
           params: {
             page: pageNum,
             per_page: 10,
@@ -88,6 +92,7 @@ const MarketplaceScreen: React.FC = () => {
         setTotal(res.data.total ?? items.length);
         setPage(current);
         setHasMore(current < last);
+        setFromCache(res.source === 'cache');
       } catch (e) {
         console.warn('marketplace load failed', e);
       }
@@ -130,6 +135,13 @@ const MarketplaceScreen: React.FC = () => {
     setLoading(true);
     fetchServices(1, undefined, undefined, true).finally(() => setLoading(false));
   }, [fetchServices]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchServices(1, categoryId, search || undefined, true).finally(() =>
+      setRefreshing(false),
+    );
+  }, [categoryId, search, fetchServices]);
 
   const toggleCategory = useCallback(
     (id: number) => {
@@ -238,6 +250,16 @@ const MarketplaceScreen: React.FC = () => {
         </View>
       )}
 
+      {/* Offline notice */}
+      {fromCache ? (
+        <View style={styles.offlineRow}>
+          <MaterialIcons name="cloud-off" size={13} color={COLORS.warningText} />
+          <Text style={styles.offlineText}>
+            Offline — showing saved results. Pull to retry.
+          </Text>
+        </View>
+      ) : null}
+
       {/* Results */}
       <FlatList
         data={services}
@@ -248,13 +270,17 @@ const MarketplaceScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
         onEndReached={onEndReached}
         onEndReachedThreshold={0.4}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={COLORS.primary}
+            colors={[COLORS.primary]}
+          />
+        }
         ListHeaderComponent={
-          loading ? (
-            <ActivityIndicator
-              style={styles.loader}
-              size="large"
-              color={COLORS.primary}
-            />
+          loading && services.length === 0 ? (
+            <ServiceGridSkeleton count={6} />
           ) : null
         }
         ListEmptyComponent={
@@ -397,6 +423,22 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.primary,
     textDecorationLine: 'underline',
+  },
+  offlineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginHorizontal: SPACING.md,
+    marginTop: SPACING.sm,
+    paddingVertical: 5,
+    paddingHorizontal: SPACING.sm,
+    backgroundColor: COLORS.warningBg,
+    borderRadius: RADIUS.sm,
+  },
+  offlineText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.warningText,
   },
   loader: {
     marginVertical: SPACING.xl,
