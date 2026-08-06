@@ -24,10 +24,10 @@ class ServiceController extends Controller
             } elseif ($user->role === 'vendor') {
                 $query->where('vendor_id', $user->vendor->id);
             } else {
-                $query->where('status', 'approved')->where('is_active', true);
+                $query->where('is_active', true);
             }
         } else {
-            $query->where('status', 'approved')->where('is_active', true);
+            $query->where('is_active', true);
         }
 
         if ($request->category_id) {
@@ -83,7 +83,7 @@ class ServiceController extends Controller
                   ->orWhere('vendor_id', $user->vendor->id);
             });
         } else {
-            $query->where('status', 'approved')->where('is_active', true);
+            $query->where('is_active', true);
         }
 
         $service = $query->first();
