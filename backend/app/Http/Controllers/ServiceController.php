@@ -49,12 +49,18 @@ class ServiceController extends Controller
             $query->where('price', '<=', $request->max_price);
         }
 
-        if ($request->lat && $request->lng && $request->radius) {
-            $query->whereHas('vendor', function ($q) use ($request) {
-                $q->whereRaw(
-                    '(6371 * acos(cos(radians(?)) * cos(radians(lat)) * cos(radians(lng) - radians(?)) + sin(radians(?)) * sin(radians(lat)))) <= ?',
-                    [$request->lat, $request->lng, $request->lat, $request->radius]
-                );
+        $lat    = is_numeric($request->lat)    ? (float) $request->lat    : null;
+        $lng    = is_numeric($request->lng)    ? (float) $request->lng    : null;
+        $radius = is_numeric($request->radius) ? (float) $request->radius : null;
+
+        if ($lat !== null && $lng !== null && $radius !== null && $radius > 0) {
+            $query->whereHas('vendor', function ($q) use ($lat, $lng, $radius) {
+                $q->whereNotNull('lat')
+                    ->whereNotNull('lng')
+                    ->whereRaw(
+                        '(6371 * acos(cos(radians(?)) * cos(radians(lat)) * cos(radians(lng) - radians(?)) + sin(radians(?)) * sin(radians(lat)))) <= ?',
+                        [$lat, $lng, $lat, $radius]
+                    );
             });
         }
 
@@ -435,12 +441,18 @@ class ServiceController extends Controller
             });
         }
 
-        if ($request->lat && $request->lng && $request->radius) {
-            $query->whereHas('vendor.user', function ($q) use ($request) {
-                $q->whereRaw(
-                    '(6371 * acos(cos(radians(?)) * cos(radians(lat)) * cos(radians(lng) - radians(?)) + sin(radians(?)) * sin(radians(lat)))) <= ?',
-                    [$request->lat, $request->lng, $request->lat, $request->radius]
-                );
+        $lat    = is_numeric($request->lat)    ? (float) $request->lat    : null;
+        $lng    = is_numeric($request->lng)    ? (float) $request->lng    : null;
+        $radius = is_numeric($request->radius) ? (float) $request->radius : null;
+
+        if ($lat !== null && $lng !== null && $radius !== null && $radius > 0) {
+            $query->whereHas('vendor.user', function ($q) use ($lat, $lng, $radius) {
+                $q->whereNotNull('lat')
+                    ->whereNotNull('lng')
+                    ->whereRaw(
+                        '(6371 * acos(cos(radians(?)) * cos(radians(lat)) * cos(radians(lng) - radians(?)) + sin(radians(?)) * sin(radians(lat)))) <= ?',
+                        [$lat, $lng, $lat, $radius]
+                    );
             });
         }
 

@@ -75,15 +75,11 @@ const Services: React.FC = () => {
   });
   const [showHistory, setShowHistory] = useState(false);
   const autocompleteRef = useRef<HTMLDivElement>(null);
+  const coordsRef = useRef<{ lat: number; lng: number } | null>(null);
+  useEffect(() => { coordsRef.current = coords; }, [coords]);
 
-  // ── Geolocation (once) ────────────────────────────────────────────────────
+  // ── Categories (with sessionStorage cache) ────────────────────────────────
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        pos => setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        () => {}
-      );
-    }
     // Categories with sessionStorage cache
     const cacheKey = 'tolemate_categories';
     const cached = sessionStorage.getItem(cacheKey);
@@ -112,14 +108,6 @@ const Services: React.FC = () => {
     fetchServices(params, 1, false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.search]);
-
-  // Re-fetch when geo coords arrive (they weren't available on first load)
-  const coordsRef = useRef(coords);
-  useEffect(() => {
-    coordsRef.current = coords;
-    if (coords) fetchServices(new URLSearchParams(location.search), 1, false);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [coords]);
 
   // Re-fetch when switching to/from map mode (pagination changes)
   useEffect(() => {
@@ -229,13 +217,22 @@ const Services: React.FC = () => {
     });
   }, []);
 
-  // ── Near me handler ───────────────────────────────────────────────────────
+  // ── Near me handler (explicit user action, toggleable) ────────────────────
   const handleNearMe = () => {
+    if (nearMeActive) {
+      coordsRef.current = null;
+      setCoords(null);
+      setNearMeActive(false);
+      fetchServices(new URLSearchParams(location.search), 1, false);
+      return;
+    }
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(pos => {
       const c = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      coordsRef.current = c;
       setCoords(c);
       setNearMeActive(true);
+      fetchServices(new URLSearchParams(location.search), 1, false);
     }, () => {});
   };
 
@@ -245,7 +242,12 @@ const Services: React.FC = () => {
     navigate(`/services?${params.toString()}`);
   };
 
-  const clearAll = () => navigate('/services');
+  const clearAll = () => {
+    coordsRef.current = null;
+    setCoords(null);
+    setNearMeActive(false);
+    navigate('/services');
+  };
 
   // ── Active filter chips ────────────────────────────────────────────────────
   const activeChips: { key: string; label: string }[] = [];
@@ -587,9 +589,18 @@ const Services: React.FC = () => {
             <Search className="w-12 h-12 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No services found</h3>
             <p className="text-gray-500 text-sm mb-6 max-w-sm mx-auto">
-              Try adjusting your filters, search term, or increasing the radius.
+              {nearMeActive
+                ? 'No services found near your location. Try increasing the radius or turning off Near me to browse all services.'
+                : 'Try adjusting your filters, search term, or increasing the radius.'}
             </p>
-            <button onClick={clearAll} className="btn-primary">Clear all filters</button>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {nearMeActive && (
+                <button onClick={handleNearMe} className="btn-outline">
+                  Turn off Near me
+                </button>
+              )}
+              <button onClick={clearAll} className="btn-primary">Clear all filters</button>
+            </div>
           </div>
         ) : viewMode === 'map' ? (
           <ServiceMapView services={services} userCoords={coords} radius={radius} />
