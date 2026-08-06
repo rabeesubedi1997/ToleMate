@@ -121,6 +121,8 @@ const RegisterScreen = ({ navigation }: Props) => {
               <Text style={styles.label}>FULL NAME</Text>
               <TextInput
                 style={styles.input}
+                placeholderTextColor={COLORS.gray400}
+                selectionColor={COLORS.primary}
                 placeholder="e.g. Ram Shrestha"
                 value={name}
                 onChangeText={setName}
@@ -132,6 +134,8 @@ const RegisterScreen = ({ navigation }: Props) => {
               <Text style={styles.label}>EMAIL ADDRESS</Text>
               <TextInput
                 style={styles.input}
+                placeholderTextColor={COLORS.gray400}
+                selectionColor={COLORS.primary}
                 placeholder="john@example.com"
                 value={email}
                 onChangeText={setEmail}
@@ -144,6 +148,8 @@ const RegisterScreen = ({ navigation }: Props) => {
               <Text style={styles.label}>PHONE (OPTIONAL)</Text>
               <TextInput
                 style={styles.input}
+                placeholderTextColor={COLORS.gray400}
+                selectionColor={COLORS.primary}
                 placeholder="98XXXXXXXX"
                 value={phone}
                 onChangeText={setPhone}
@@ -155,6 +161,8 @@ const RegisterScreen = ({ navigation }: Props) => {
               <Text style={styles.label}>PASSWORD</Text>
               <TextInput
                 style={styles.input}
+                placeholderTextColor={COLORS.gray400}
+                selectionColor={COLORS.primary}
                 placeholder="8+ chars, upper/lower, number, symbol"
                 value={password}
                 onChangeText={setPassword}
@@ -166,6 +174,8 @@ const RegisterScreen = ({ navigation }: Props) => {
               <Text style={styles.label}>CONFIRM PASSWORD</Text>
               <TextInput
                 style={styles.input}
+                placeholderTextColor={COLORS.gray400}
+                selectionColor={COLORS.primary}
                 placeholder="Repeat password"
                 value={confirm}
                 onChangeText={setConfirm}

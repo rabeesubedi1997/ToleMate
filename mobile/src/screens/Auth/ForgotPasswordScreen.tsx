@@ -76,6 +76,8 @@ const ForgotPasswordScreen = ({ navigation }: Props) => {
                 <Text style={styles.label}>EMAIL ADDRESS</Text>
                 <TextInput
                   style={styles.input}
+                  placeholderTextColor={COLORS.gray400}
+                  selectionColor={COLORS.primary}
                   placeholder="john@example.com"
                   value={email}
                   onChangeText={setEmail}

@@ -77,22 +77,30 @@ const LoginScreen = ({ navigation }: Props) => {
           
           <View style={styles.inputContainer}>
             <Text style={styles.label}>EMAIL ADDRESS</Text>
-            <TextInput 
-              style={styles.input}
-              placeholder="john@example.com"
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-            />
+            <View style={styles.inputWrap}>
+              <TextInput
+                style={styles.input}
+                placeholder="john@example.com"
+                placeholderTextColor={COLORS.gray400}
+                selectionColor={COLORS.primary}
+                autoComplete="email"
+                textContentType="emailAddress"
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+              />
+            </View>
           </View>
 
           <View style={styles.inputContainer}>
             <Text style={styles.label}>PASSWORD</Text>
             <View style={styles.inputWrap}>
-              <TextInput 
+              <TextInput
                 style={styles.input}
                 placeholder="Enter your password"
+                placeholderTextColor={COLORS.gray400}
+                selectionColor={COLORS.primary}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
