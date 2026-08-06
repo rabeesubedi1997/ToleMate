@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,15 +7,17 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
+import type { RouteProp } from '@react-navigation/native';
 import type { CompositeNavigationProp } from '@react-navigation/native';
+import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import api from '../../api/client';
-import { COLORS, SPACING } from '../../theme';
+import { COLORS, SPACING, RADIUS } from '../../theme';
 import ServiceCard, { Service } from '../../components/ServiceCard';
 import EmptyState from '../../components/EmptyState';
 import {
@@ -35,6 +37,8 @@ interface Category {
 
 const MarketplaceScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
+  const route = useRoute<RouteProp<CustomerTabParamList, 'Marketplace'>>();
+
   const [categories, setCategories] = useState<Category[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [search, setSearch] = useState('');
@@ -43,6 +47,19 @@ const MarketplaceScreen: React.FC = () => {
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [total, setTotal] = useState(0);
+
+  // Sync params coming from the Home screen (category / search deep-links)
+  useEffect(() => {
+    const catId = route.params?.categoryId;
+    const q = route.params?.search;
+    if (catId !== undefined) setCategoryId(catId);
+    if (q !== undefined) {
+      setSearch(q);
+      fetchServices(1, catId ?? categoryId, q || undefined, true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route.params?.categoryId, route.params?.search]);
 
   useFocusEffect(
     useCallback(() => {
@@ -52,7 +69,7 @@ const MarketplaceScreen: React.FC = () => {
   );
 
   const fetchServices = useCallback(
-    async (pageNum: number, catId?: number, query?: string) => {
+    async (pageNum: number, catId?: number, query?: string, reset = false) => {
       try {
         const res = await api.get('/services', {
           params: {
@@ -66,8 +83,9 @@ const MarketplaceScreen: React.FC = () => {
         const current = res.data.current_page ?? pageNum;
         const last = res.data.last_page ?? 1;
         setServices(prev =>
-          current === 1 ? items : [...prev, ...items],
+          reset || current === 1 ? items : [...prev, ...items],
         );
+        setTotal(res.data.total ?? items.length);
         setPage(current);
         setHasMore(current < last);
       } catch (e) {
@@ -80,7 +98,7 @@ const MarketplaceScreen: React.FC = () => {
   useFocusEffect(
     useCallback(() => {
       setLoading(true);
-      fetchServices(1, categoryId, search || undefined).finally(() =>
+      fetchServices(1, categoryId, search || undefined, true).finally(() =>
         setLoading(false),
       );
       // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -88,9 +106,7 @@ const MarketplaceScreen: React.FC = () => {
   );
 
   const onEndReached = useCallback(() => {
-    if (!hasMore || loading || loadingMore) {
-      return;
-    }
+    if (!hasMore || loading || loadingMore) return;
     setLoadingMore(true);
     fetchServices(page + 1, categoryId, search || undefined).finally(() =>
       setLoadingMore(false),
@@ -101,29 +117,48 @@ const MarketplaceScreen: React.FC = () => {
     (query: string) => {
       setSearch(query);
       setLoading(true);
-      fetchServices(1, categoryId, query || undefined).finally(() =>
+      fetchServices(1, categoryId, query || undefined, true).finally(() =>
         setLoading(false),
       );
     },
     [categoryId, fetchServices],
   );
 
-  const toggleCategory = useCallback((id: number) => {
-    setCategoryId(prev => {
-      const next = prev === id ? undefined : id;
-      setLoading(true);
-      fetchServices(1, next, search || undefined).finally(() =>
-        setLoading(false),
-      );
-      return next;
-    });
-  }, [search, fetchServices]);
+  const clearAllFilters = useCallback(() => {
+    setCategoryId(undefined);
+    setSearch('');
+    setLoading(true);
+    fetchServices(1, undefined, undefined, true).finally(() => setLoading(false));
+  }, [fetchServices]);
+
+  const toggleCategory = useCallback(
+    (id: number) => {
+      setCategoryId(prev => (prev === id ? undefined : id));
+    },
+    [],
+  );
+
+  const activeCategory = categories.find(c => c.id === categoryId);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Marketplace</Text>
+        <View style={styles.headerRow}>
+          <Text style={styles.headerTitle}>Browse Services</Text>
+          {loading ? (
+            <ActivityIndicator size="small" color={COLORS.primary} />
+          ) : (
+            <Text style={styles.headerCount}>
+              {total > 0 ? `${total} service${total !== 1 ? 's' : ''}` : ''}
+            </Text>
+          )}
+        </View>
+        <Text style={styles.headerSub}>
+          {activeCategory
+            ? `Showing services in “${activeCategory.name}”`
+            : 'Find trusted professionals near you'}
+        </Text>
       </View>
 
       {/* Search */}
@@ -146,29 +181,62 @@ const MarketplaceScreen: React.FC = () => {
       </View>
 
       {/* Category filter chips */}
-      <FlatList
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        data={categories}
-        keyExtractor={item => String(item.id)}
-        contentContainerStyle={styles.chips}
-        nestedScrollEnabled
-        renderItem={({ item }) => {
-          const active = categoryId === item.id;
-          return (
-            <TouchableOpacity
-              style={[styles.chip, active && styles.chipActive]}
-              onPress={() => toggleCategory(item.id)}
+      <View style={styles.chipsWrap}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chips}
+        >
+          <TouchableOpacity
+            style={[styles.chip, categoryId === undefined && styles.chipActive]}
+            activeOpacity={0.8}
+            onPress={() => setCategoryId(undefined)}
+          >
+            <MaterialIcons
+              name="apps"
+              size={14}
+              color={categoryId === undefined ? COLORS.white : COLORS.slate500}
+            />
+            <Text
+              style={[
+                styles.chipText,
+                categoryId === undefined && styles.chipTextActive,
+              ]}
             >
-              <Text
-                style={[styles.chipText, active && styles.chipTextActive]}
+              All
+            </Text>
+          </TouchableOpacity>
+          {categories.map(item => {
+            const active = categoryId === item.id;
+            return (
+              <TouchableOpacity
+                key={item.id}
+                style={[styles.chip, active && styles.chipActive]}
+                activeOpacity={0.8}
+                onPress={() => toggleCategory(item.id)}
               >
-                {item.name}
-              </Text>
-            </TouchableOpacity>
-          );
-        }}
-      />
+                <Text
+                  style={[styles.chipText, active && styles.chipTextActive]}
+                >
+                  {item.name}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      {/* Active filter hint / clear */}
+      {(categoryId !== undefined || search.length > 0) && (
+        <View style={styles.activeRow}>
+          <Text style={styles.activeText}>
+            {activeCategory ? activeCategory.name : 'Search'} filter active
+          </Text>
+          <TouchableOpacity onPress={clearAllFilters}>
+            <Text style={styles.clearText}>Clear</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Results */}
       <FlatList
@@ -192,8 +260,16 @@ const MarketplaceScreen: React.FC = () => {
         ListEmptyComponent={
           !loading ? (
             <EmptyState
-              title="No services found"
-              message="Try a different search or category."
+              title={
+                categoryId !== undefined || search.length > 0
+                  ? 'No matching services'
+                  : 'No services found'
+              }
+              message={
+                categoryId !== undefined || search.length > 0
+                  ? 'Try a different category or search term.'
+                  : 'Try a different search or category.'
+              }
             />
           ) : null
         }
@@ -205,7 +281,9 @@ const MarketplaceScreen: React.FC = () => {
         renderItem={({ item }) => (
           <ServiceCard
             service={item}
-            onPress={service => navigation.navigate('ServiceDetail', { id: service.id })}
+            onPress={service =>
+              navigation.navigate('ServiceDetail', { id: service.id })
+            }
           />
         )}
       />
@@ -222,19 +300,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
     paddingTop: SPACING.sm,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   headerTitle: {
     fontSize: 24,
     fontWeight: '700',
     color: COLORS.dark,
   },
+  headerCount: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.primary,
+  },
+  headerSub: {
+    marginTop: 2,
+    fontSize: 13,
+    color: COLORS.slate500,
+  },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: SPACING.md,
-    marginTop: SPACING.sm,
+    marginTop: SPACING.md,
     paddingHorizontal: SPACING.md,
     backgroundColor: COLORS.white,
-    borderRadius: 12,
+    borderRadius: RADIUS.lg,
     height: 44,
     shadowColor: '#000',
     shadowOpacity: 0.05,
@@ -249,18 +342,24 @@ const styles = StyleSheet.create({
     color: COLORS.dark,
     paddingVertical: 0,
   },
+  chipsWrap: {
+    marginTop: SPACING.md,
+  },
   chips: {
     paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
     gap: SPACING.sm,
+    alignItems: 'center',
   },
   chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 999,
-    backgroundColor: COLORS.white,
+    height: 34,
+    borderRadius: RADIUS.pill,
     borderWidth: 1,
-    borderColor: COLORS.gray200,
+    borderColor: COLORS.gray300,
+    backgroundColor: COLORS.white,
   },
   chipActive: {
     backgroundColor: COLORS.primary,
@@ -273,6 +372,31 @@ const styles = StyleSheet.create({
   },
   chipTextActive: {
     color: COLORS.white,
+    fontWeight: '700',
+  },
+  activeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: SPACING.md,
+    marginTop: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 6,
+    backgroundColor: COLORS.primary50,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.primary100,
+  },
+  activeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.primaryDark,
+  },
+  clearText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.primary,
+    textDecorationLine: 'underline',
   },
   loader: {
     marginVertical: SPACING.xl,

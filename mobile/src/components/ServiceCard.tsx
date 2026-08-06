@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Dimensions,
 } from 'react-native';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import AppImage from './AppImage';
 import { COLORS, SPACING } from '../theme';
 
@@ -19,7 +20,15 @@ export interface Service {
   rating?: number | null;
   reviews_count?: number | null;
   images?: { id: number; file_path: string }[];
-  vendor?: { id: number; business_name?: string; name?: string; avatar?: string | null } | null;
+  vendor?: {
+    id: number;
+    business_name?: string;
+    name?: string;
+    avatar?: string | null;
+    rating?: string | number | null;
+    is_verified?: boolean;
+    available_today?: boolean;
+  } | null;
 }
 
 interface Props {
@@ -41,13 +50,23 @@ const ServiceCard: React.FC<Props> = ({ service, onPress }) => {
       onPress={() => onPress?.(service)}
     >
       <AppImage uri={image} style={styles.image} />
+      {service.vendor?.available_today ? (
+        <View style={styles.availableBadge}>
+          <Text style={styles.availableText}>✓ Available today</Text>
+        </View>
+      ) : null}
       <View style={styles.body}>
         <Text style={styles.name} numberOfLines={2}>
           {service.name}
         </Text>
-        <Text style={styles.vendor} numberOfLines={1}>
-          {service.vendor?.business_name ?? service.vendor?.name ?? ''}
-        </Text>
+        <View style={styles.vendorRow}>
+          <Text style={styles.vendor} numberOfLines={1}>
+            {service.vendor?.business_name ?? service.vendor?.name ?? ''}
+          </Text>
+          {service.vendor?.is_verified ? (
+            <MaterialIcons name="verified" size={13} color={COLORS.infoText} />
+          ) : null}
+        </View>
         <View style={styles.bottomRow}>
           {service.rating ? (
             <Text style={styles.rating}>★ {Number(service.rating).toFixed(1)}</Text>
@@ -80,6 +99,20 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 110,
   },
+  availableBadge: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    backgroundColor: COLORS.emerald,
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 999,
+  },
+  availableText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: COLORS.white,
+  },
   body: {
     padding: SPACING.sm,
   },
@@ -88,10 +121,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.dark,
   },
-  vendor: {
+  vendorRow: {
     marginTop: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  vendor: {
     fontSize: 12,
     color: COLORS.slate500,
+    flexShrink: 1,
   },
   bottomRow: {
     marginTop: SPACING.sm,

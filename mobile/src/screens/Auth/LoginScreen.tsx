@@ -7,9 +7,11 @@ import {
   TouchableOpacity, 
   KeyboardAvoidingView, 
   Platform,
-  ActivityIndicator
+  ActivityIndicator,
+  Pressable,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, SPACING } from '../../theme';
 import { useAuth } from '../../context/AuthContext';
@@ -22,8 +24,9 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 const LoginScreen = ({ navigation }: Props) => {
   const { login } = useAuth();
   const insets = useSafeAreaInsets();
-  const [email, setEmail] = useState('superadmin@tolemate.com');
-  const [password, setPassword] = useState('password');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -86,14 +89,35 @@ const LoginScreen = ({ navigation }: Props) => {
 
           <View style={styles.inputContainer}>
             <Text style={styles.label}>PASSWORD</Text>
-            <TextInput 
-              style={styles.input}
-              placeholder="••••••••"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-            />
+            <View style={styles.inputWrap}>
+              <TextInput 
+                style={styles.input}
+                placeholder="Enter your password"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+              />
+              <Pressable
+                style={styles.eyeToggle}
+                onPress={() => setShowPassword(v => !v)}
+                hitSlop={8}
+              >
+                <MaterialIcons
+                  name={showPassword ? 'visibility-off' : 'visibility'}
+                  size={20}
+                  color={COLORS.slate400}
+                />
+              </Pressable>
+            </View>
           </View>
+
+          <TouchableOpacity
+            style={styles.forgotRow}
+            onPress={() => navigation.navigate('ForgotPassword')}
+          >
+            <Text style={styles.forgotText}>Forgot password?</Text>
+          </TouchableOpacity>
 
           <TouchableOpacity 
             style={styles.loginButton}
@@ -110,13 +134,6 @@ const LoginScreen = ({ navigation }: Props) => {
                 <Text style={styles.buttonText}>SIGN IN</Text>
               )}
             </LinearGradient>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.forgotRow}
-            onPress={() => navigation.navigate('ForgotPassword')}
-          >
-            <Text style={styles.forgotText}>Forgot password?</Text>
           </TouchableOpacity>
 
           <View style={styles.footer}>
@@ -198,11 +215,23 @@ const styles = StyleSheet.create({
   inputContainer: {
     marginBottom: SPACING.lg,
   },
+  inputWrap: {
+    position: 'relative',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  eyeToggle: {
+    position: 'absolute',
+    right: 12,
+    padding: 4,
+  },
   input: {
+    flex: 1,
     backgroundColor: COLORS.white,
     borderRadius: 8,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.md,
+    paddingRight: 44,
     fontSize: 15,
     color: COLORS.dark,
     fontWeight: '500',
@@ -233,14 +262,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   forgotRow: {
-    alignItems: 'flex-end',
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
     marginTop: -SPACING.sm,
     marginBottom: SPACING.sm,
+    paddingHorizontal: 2,
   },
   forgotText: {
     color: COLORS.primary,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
+    textDecorationLine: 'underline',
   },
   footer: {
     flexDirection: 'row',

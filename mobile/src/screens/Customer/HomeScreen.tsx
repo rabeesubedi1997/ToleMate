@@ -95,6 +95,46 @@ const HomeScreen: React.FC = () => {
     [navigation],
   );
 
+  // Banner/tile links come from CMS as web-style paths, map them to app routes
+  const openBannerLink = useCallback(
+    (link: string) => {
+      const qsIndex = link.indexOf('?');
+      const path = (qsIndex >= 0 ? link.slice(0, qsIndex) : link) || '/';
+      const query = qsIndex >= 0 ? link.slice(qsIndex + 1) : '';
+      const findBy = (key: string) => {
+        const m = query.match(new RegExp(`(?:^|[&])${key}\\s*\\=\\s*([^&]+)`));
+        return m ? decodeURIComponent(m[1]) : undefined;
+      };
+
+      const serviceMatch = path.match(/^\/services\/(\d+)/);
+      if (serviceMatch) {
+        navigation.navigate('ServiceDetail', { id: Number(serviceMatch[1]) });
+        return;
+      }
+      const vendorMatch = path.match(/^\/vendors\/(\d+)/);
+      if (vendorMatch) {
+        navigation.navigate('VendorPublic', { id: Number(vendorMatch[1]) });
+        return;
+      }
+      if (path === '/marketplace') {
+        navigation.navigate('Marketplace', undefined);
+        return;
+      }
+
+      const categoryId = findBy('category') ?? findBy('category_id');
+      const bannerSearch = findBy('search');
+      navigation.navigate(
+        'Marketplace',
+        categoryId
+          ? { categoryId: Number(categoryId) }
+          : bannerSearch
+            ? { search: bannerSearch }
+            : undefined,
+      );
+    },
+    [navigation],
+  );
+
   const renderCategory = ({ item }: { item: Category }) => (
     <TouchableOpacity
       style={styles.categoryItem}
@@ -137,13 +177,18 @@ const HomeScreen: React.FC = () => {
               Namaste, {user?.name?.split(' ')[0] ?? 'Guest'}
             </Text>
           </View>
-          <View style={styles.headerBadge}>
-            <MaterialIcons name="handyman" size={22} color={COLORS.primary} />
-          </View>
+          <TouchableOpacity
+            style={styles.headerBadge}
+            activeOpacity={0.8}
+            onPress={() => navigation.navigate('Notifications')}
+          >
+            <MaterialIcons name="notifications-none" size={22} color={COLORS.primary} />
+            <View style={styles.badgeDot} />
+          </TouchableOpacity>
         </View>
 
         {/* Hero banner */}
-        <AppBanner />
+        <AppBanner onPressSlide={openBannerLink} />
 
         {/* Search */}
         <View style={styles.searchContainer}>
@@ -189,7 +234,12 @@ const HomeScreen: React.FC = () => {
         ) : (
           <>
             {/* Categories */}
-            <Text style={styles.sectionTitle}>Categories</Text>
+            <View style={styles.sectionHead}>
+              <Text style={styles.sectionTitle}>Categories</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('Marketplace', undefined)}>
+                <Text style={styles.seeAll}>See all</Text>
+              </TouchableOpacity>
+            </View>
             <FlatList
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -203,7 +253,9 @@ const HomeScreen: React.FC = () => {
             {/* Featured vendors */}
             {vendors.length > 0 ? (
               <>
-                <Text style={styles.sectionTitle}>Featured Professionals</Text>
+                <View style={styles.sectionHead}>
+                  <Text style={styles.sectionTitle}>Featured Professionals</Text>
+                </View>
                 <FlatList
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -217,7 +269,12 @@ const HomeScreen: React.FC = () => {
             ) : null}
 
             {/* Services */}
-            <Text style={styles.sectionTitle}>Popular Services</Text>
+            <View style={styles.sectionHead}>
+              <Text style={styles.sectionTitle}>Popular Services</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('Marketplace', undefined)}>
+                <Text style={styles.seeAll}>See all</Text>
+              </TouchableOpacity>
+            </View>
             <View style={styles.grid}>
               {services.map(service => (
                 <ServiceCard
@@ -276,6 +333,18 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
+    position: 'relative',
+  },
+  badgeDot: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: COLORS.rose,
+    borderWidth: 1.5,
+    borderColor: COLORS.white,
   },
   searchContainer: {
     flexDirection: 'row',
@@ -339,9 +408,19 @@ const styles = StyleSheet.create({
   loader: {
     marginTop: SPACING.xxl,
   },
-  sectionTitle: {
+  sectionHead: {
     marginTop: SPACING.lg,
     marginHorizontal: SPACING.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  seeAll: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.primary,
+  },
+  sectionTitle: {
     fontSize: 17,
     fontWeight: '700',
     color: COLORS.dark,
