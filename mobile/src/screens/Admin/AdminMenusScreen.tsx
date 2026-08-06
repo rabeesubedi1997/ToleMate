@@ -166,7 +166,7 @@ const AdminMenusScreen: React.FC = () => {
         onPress={() => openEdit(item)}
         hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
       >
-        <MaterialIcons name="edit-outline" size={18} color={COLORS.primary700} />
+        <MaterialIcons name="edit" size={18} color={COLORS.primary700} />
       </Pressable>
       {!child ? (
         <Pressable

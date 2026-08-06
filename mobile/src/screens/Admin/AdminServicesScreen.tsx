@@ -261,7 +261,7 @@ const AdminServicesScreen: React.FC = () => {
               onPress={() => openEdit(item)}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             >
-              <MaterialIcons name="edit-outline" size={18} color={COLORS.primary700} />
+              <MaterialIcons name="edit" size={18} color={COLORS.primary700} />
             </Pressable>
             <Pressable
               onPress={() => remove(item)}
@@ -278,11 +278,15 @@ const AdminServicesScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <ScreenHeader title="Services" subtitle="All services on the platform" />
-      <TouchableOpacity style={styles.addBtn} onPress={openCreate}>
-        <MaterialIcons name="add" size={18} color={COLORS.white} />
-        <Text style={styles.addBtnText}>Add service</Text>
-      </TouchableOpacity>
-      <FilterChips options={STATUSES} selected={filter} onSelect={setFilter} />
+      <View style={styles.toolbar}>
+        <View style={styles.chipsWrap}>
+          <FilterChips options={STATUSES} selected={filter} onSelect={setFilter} />
+        </View>
+        <TouchableOpacity style={styles.addBtn} onPress={openCreate}>
+          <MaterialIcons name="add" size={18} color={COLORS.white} />
+          <Text style={styles.addBtnText}>Add service</Text>
+        </TouchableOpacity>
+      </View>
 
       {loading ? (
         <ActivityIndicator
@@ -553,14 +557,22 @@ const styles = StyleSheet.create({
     gap: 6,
     backgroundColor: COLORS.primary,
     borderRadius: RADIUS.md,
-    height: 42,
-    marginHorizontal: SPACING.md,
-    marginTop: SPACING.sm,
+    paddingHorizontal: SPACING.sm,
+    height: 36,
+    alignSelf: 'center',
   },
   addBtnText: {
     color: COLORS.white,
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '700',
+  },
+  toolbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingRight: SPACING.md,
+  },
+  chipsWrap: {
+    flex: 1,
   },
   fieldLabel: {
     fontSize: 12,

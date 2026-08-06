@@ -8,12 +8,13 @@ import {
   RefreshControl,
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, NavigationProp } from '@react-navigation/native';
 import api from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import StatCard from '../../components/StatCard';
 import AdminHeader from '../../components/AdminHeader';
 import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme';
+import { MainStackParamList, AdminTabParamList } from '../../navigation/types';
 
 interface Stats {
   total_users: number;
@@ -45,6 +46,8 @@ const ACTIVITY_ICONS: Record<string, string> = {
 
 const AdminOverviewScreen: React.FC = () => {
   const { isSuperAdmin } = useAuth();
+  const navigation =
+    useNavigation<NavigationProp<AdminTabParamList & MainStackParamList>>();
   const [stats, setStats] = useState<Stats | null>(null);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -129,12 +132,14 @@ const AdminOverviewScreen: React.FC = () => {
               value={stats?.total_users ?? 0}
               icon="people"
               tint={COLORS.primary}
+              onPress={() => navigation.navigate('Users' as never)}
             />
             <StatCard
               label="Vendors"
               value={stats?.total_vendors ?? 0}
               icon="storefront"
               tint={COLORS.infoText}
+              onPress={() => navigation.navigate('Vendors' as never)}
             />
           </View>
           <View style={styles.statsRow}>
@@ -143,26 +148,30 @@ const AdminOverviewScreen: React.FC = () => {
               value={stats?.total_services ?? 0}
               icon="handyman"
               tint={COLORS.warningText}
+              onPress={() => navigation.navigate('AdminServices' as never)}
             />
             <StatCard
               label="Bookings"
               value={stats?.total_bookings ?? 0}
               icon="event"
               tint={COLORS.purple}
+              onPress={() => navigation.navigate('AdminBookings' as never)}
             />
           </View>
           <View style={styles.statsRow}>
             <StatCard
-              label="Pending"
+              label="Pending Bookings"
               value={stats?.pending_bookings ?? 0}
               icon="schedule"
               tint={COLORS.warningText}
+              onPress={() => navigation.navigate('AdminBookings' as never)}
             />
             <StatCard
               label="Completed"
               value={stats?.completed_bookings ?? 0}
               icon="check-circle"
               tint={COLORS.successText}
+              onPress={() => navigation.navigate('AdminBookings' as never)}
             />
           </View>
 

@@ -639,7 +639,7 @@ const VendorServicesScreen: React.FC = () => {
                   </View>
                   <View style={styles.pkgActions}>
                     <TouchableOpacity onPress={() => startEditPkg(pkg)} hitSlop={6}>
-                      <MaterialIcons name="edit-outline" size={18} color={COLORS.primary700} />
+                      <MaterialIcons name="edit" size={18} color={COLORS.primary700} />
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => removePkg(pkg)} hitSlop={6}>
                       <MaterialIcons name="delete-outline" size={18} color={COLORS.rose} />

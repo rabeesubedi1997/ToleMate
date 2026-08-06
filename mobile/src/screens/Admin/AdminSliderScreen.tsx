@@ -221,7 +221,7 @@ const AdminSliderScreen: React.FC = () => {
             />
           </Pressable>
           <Pressable onPress={() => openEdit(index)} hitSlop={6}>
-            <MaterialIcons name="edit-outline" size={18} color={COLORS.primary700} />
+            <MaterialIcons name="edit" size={18} color={COLORS.primary700} />
           </Pressable>
           <Pressable onPress={() => remove(index)} hitSlop={6}>
             <MaterialIcons name="delete-outline" size={18} color={COLORS.rose} />
