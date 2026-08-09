@@ -56,7 +56,7 @@ class ReviewController extends Controller
 
         $booking = Booking::find($request->booking_id);
 
-        if ($booking->customer_id !== $user->id) {
+        if ((int) $booking->customer_id !== (int) $user->id) {
             return response()->json(['message' => 'Unauthorized. This is not your booking.'], 403);
         }
 
@@ -110,7 +110,7 @@ class ReviewController extends Controller
             return response()->json(['message' => 'Review not found'], 404);
         }
 
-        if ($review->vendor_id !== $vendor->id) {
+        if ((int) $review->vendor_id !== (int) $vendor->id) {
             return response()->json(['message' => 'Unauthorized — not your review'], 403);
         }
 

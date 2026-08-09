@@ -6,6 +6,7 @@ import {
   ScrollView,
   ActivityIndicator,
   RefreshControl,
+  TouchableOpacity,
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useFocusEffect, useNavigation, NavigationProp } from '@react-navigation/native';
@@ -24,6 +25,7 @@ interface Stats {
   total_bookings: number;
   pending_bookings: number;
   completed_bookings: number;
+  pending_services?: number;
   monthly?: { month: string; bookings: number; revenue: number }[];
   recent_activity?: { type: string; text: string; time: string; status?: string }[];
 }
@@ -126,6 +128,30 @@ const AdminOverviewScreen: React.FC = () => {
         />
       ) : (
         <>
+          {isSuperAdmin && (stats?.pending_services ?? 0) > 0 ? (
+            <TouchableOpacity
+              style={styles.moderationBanner}
+              activeOpacity={0.8}
+              onPress={() => navigation.navigate('AdminModeration' as never)}
+            >
+              <View style={styles.moderationIcon}>
+                <MaterialIcons name="verified" size={20} color={COLORS.warningText} />
+              </View>
+              <View style={styles.moderationBody}>
+                <Text style={styles.moderationTitle}>
+                  {stats?.pending_services ?? 0}{' '}
+                  {(stats?.pending_services ?? 0) > 1
+                    ? 'services'
+                    : 'service'}{' '}
+                  awaiting review
+                </Text>
+                <Text style={styles.moderationSub}>
+                  Vendor added new services — tap to verify
+                </Text>
+              </View>
+              <MaterialIcons name="chevron-right" size={22} color={COLORS.gray400} />
+            </TouchableOpacity>
+          ) : null}
           <View style={styles.statsRow}>
             <StatCard
               label="Total Users"
@@ -248,6 +274,40 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: SPACING.sm,
     marginTop: SPACING.xs,
+  },
+  moderationBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.warningText,
+    padding: SPACING.md,
+    marginHorizontal: SPACING.md,
+    marginTop: SPACING.md,
+    ...SHADOW.card,
+  },
+  moderationIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: RADIUS.pill,
+    backgroundColor: COLORS.gray50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: SPACING.sm,
+  },
+  moderationBody: {
+    flex: 1,
+  },
+  moderationTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.gray900,
+  },
+  moderationSub: {
+    marginTop: 2,
+    fontSize: 12,
+    color: COLORS.gray500,
   },
   card: {
     backgroundColor: COLORS.white,

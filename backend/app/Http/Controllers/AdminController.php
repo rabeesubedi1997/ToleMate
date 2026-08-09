@@ -49,6 +49,7 @@ class AdminController extends Controller
             'total_bookings' => \App\Models\Booking::count(),
             'completed_bookings' => \App\Models\Booking::where('status', 'completed')->count(),
             'pending_bookings' => \App\Models\Booking::where('status', 'pending')->count(),
+            'pending_services' => \App\Models\Service::where('status', 'pending')->count(),
             'monthly' => $monthlyData,
             'recent_activity' => $this->buildRecentActivity(),
         ];

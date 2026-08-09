@@ -159,7 +159,7 @@ class MessageController extends Controller
                 return response()->json(['message' => 'Booking not found or unauthorized'], 404);
             }
 
-            $receiverId = ($booking->customer_id === $user->id)
+            $receiverId = ((int) $booking->customer_id === (int) $user->id)
                 ? $booking->vendor_id
                 : $booking->customer_id;
         } elseif ($request->receiver_id) {
@@ -243,8 +243,8 @@ class MessageController extends Controller
 
         $grouped = [];
         foreach ($messages as $msg) {
-            $otherId = ($msg->sender_id === $user->id) ? $msg->receiver_id : $msg->sender_id;
-            $other   = ($msg->sender_id === $user->id) ? $msg->receiver : $msg->sender;
+            $otherId = ((int) $msg->sender_id === (int) $user->id) ? $msg->receiver_id : $msg->sender_id;
+            $other   = ((int) $msg->sender_id === (int) $user->id) ? $msg->receiver : $msg->sender;
 
             if (!isset($grouped[$otherId])) {
                 $grouped[$otherId] = [
@@ -259,7 +259,7 @@ class MessageController extends Controller
                 ];
             }
 
-            if ($msg->receiver_id === $user->id && !$msg->is_read) {
+            if ((int) $msg->receiver_id === (int) $user->id && !$msg->is_read) {
                 $grouped[$otherId]['unread_count']++;
             }
         }

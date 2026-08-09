@@ -171,13 +171,13 @@ class BookingController extends Controller
             return response()->json(['message' => 'Booking not found'], 404);
         }
 
-        if ($user->role === 'customer' && $booking->customer_id !== $user->id) {
+        if ($user->role === 'customer' && (int) $booking->customer_id !== (int) $user->id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
         if ($user->role === 'vendor') {
             $vendorId = $user->vendor?->id;
-            if (!$vendorId || $booking->vendor_id !== $vendorId) {
+            if (!$vendorId || (int) $booking->vendor_id !== (int) $vendorId) {
                 return response()->json(['message' => 'Unauthorized'], 403);
             }
         }
@@ -289,7 +289,7 @@ class BookingController extends Controller
             return response()->json(['message' => 'Booking not found'], 404);
         }
 
-        if ($booking->customer_id !== $user->id) {
+        if ((int) $booking->customer_id !== (int) $user->id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -481,7 +481,7 @@ class BookingController extends Controller
         $booking = Booking::find($id);
 
         if (!$booking) return response()->json(['message' => 'Booking not found'], 404);
-        if ($booking->customer_id !== $user->id) return response()->json(['message' => 'Unauthorized'], 403);
+        if ((int) $booking->customer_id !== (int) $user->id) return response()->json(['message' => 'Unauthorized'], 403);
         if (!in_array($booking->status, ['pending', 'accepted'])) {
             return response()->json(['message' => 'Can only reschedule pending or accepted bookings'], 422);
         }
@@ -515,7 +515,7 @@ class BookingController extends Controller
         if (!$booking) return response()->json(['message' => 'Booking not found'], 404);
 
         $vendorId = $user->vendor?->id;
-        if (!$vendorId || $booking->vendor_id !== $vendorId) {
+        if (!$vendorId || (int) $booking->vendor_id !== (int) $vendorId) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
         if ($booking->reschedule_status !== 'pending') {

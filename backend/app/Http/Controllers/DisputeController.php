@@ -46,8 +46,8 @@ class DisputeController extends Controller
         $booking = Booking::find($request->booking_id);
 
         // Verify user is party to this booking
-        $isCustomer = $user->role === 'customer' && $booking->customer_id === $user->id;
-        $isVendor = $user->role === 'vendor' && $booking->vendor_id === $user->vendor?->id;
+        $isCustomer = $user->role === 'customer' && (int) $booking->customer_id === (int) $user->id;
+        $isVendor = $user->role === 'vendor' && (int) $booking->vendor_id === (int) $user->vendor?->id;
 
         if (!$isCustomer && !$isVendor && !in_array($user->role, ['admin', 'super_admin'])) {
             return response()->json(['message' => 'You are not a party to this booking'], 403);
@@ -93,7 +93,7 @@ class DisputeController extends Controller
 
         if (!$dispute) return response()->json(['message' => 'Dispute not found'], 404);
 
-        if (!in_array($user->role, ['admin', 'super_admin']) && $dispute->raised_by !== $user->id) {
+        if (!in_array($user->role, ['admin', 'super_admin']) && (int) $dispute->raised_by !== (int) $user->id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 

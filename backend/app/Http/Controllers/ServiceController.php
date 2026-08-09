@@ -10,6 +10,7 @@ use App\Models\ServiceImage;
 use App\Models\ServicePackage;
 use App\Models\Category;
 use App\Models\Vendor;
+use App\Models\User;
 
 class ServiceController extends Controller
 {
@@ -24,10 +25,10 @@ class ServiceController extends Controller
             } elseif ($user->role === 'vendor') {
                 $query->where('vendor_id', $user->vendor->id);
             } else {
-                $query->where('is_active', true);
+                $query->where('is_active', true)->where('status', 'approved');
             }
         } else {
-            $query->where('is_active', true);
+            $query->where('is_active', true)->where('status', 'approved');
         }
 
         if ($request->category_id) {
@@ -80,10 +81,11 @@ class ServiceController extends Controller
         } elseif ($user && $user->role === 'vendor') {
             $query->where(function ($q) use ($user) {
                 $q->where('is_active', true)
+                  ->where('status', 'approved')
                   ->orWhere('vendor_id', $user->vendor->id);
             });
         } else {
-            $query->where('is_active', true);
+            $query->where('is_active', true)->where('status', 'approved');
         }
 
         $service = $query->first();
@@ -166,6 +168,21 @@ class ServiceController extends Controller
             }
         }
 
+        if (!$isAdminCreate) {
+            User::whereIn('role', ['admin', 'super_admin'])
+                ->where('is_active', true)
+                ->get()
+                ->each(function (User $admin) use ($vendor, $service) {
+                    NotificationController::sendNotification(
+                        $admin->id,
+                        'system',
+                        'New service awaiting review',
+                        "{$vendor->business_name} added \"{$service->name}\". Tap to review it.",
+                        ['service_id' => $service->id, 'route' => 'Moderation']
+                    );
+                });
+        }
+
         return response()->json([
             'service' => $service->load(['category', 'vendor', 'images']),
             'message' => 'Service created successfully'
@@ -186,7 +203,7 @@ class ServiceController extends Controller
             return response()->json(['message' => 'Service not found'], 404);
         }
 
-        if (in_array($user->role, ['vendor']) && $service->vendor->user_id !== $user->id) {
+        if (in_array($user->role, ['vendor']) && (int) $service->vendor->user_id !== (int) $user->id) {
             return response()->json(['message' => 'Unauthorized. This is not your service.'], 403);
         }
 
@@ -216,13 +233,15 @@ class ServiceController extends Controller
         }
 
         // When a vendor edits, reset to pending for re-approval
+        $needsReapproval = false;
         if ($user->role === 'vendor' && $service->status === 'approved') {
             $service->status = 'pending';
             $service->is_active = false;
             $service->rejection_reason = null;
+            $needsReapproval = true;
         }
 
-        $service->update($request->only([
+        $fields = $request->only([
             'category_id',
             'name',
             'description',
@@ -232,9 +251,30 @@ class ServiceController extends Controller
             'sale_ends_at',
             'radius',
             'tags',
-            'is_active',
             'cancellation_policy',
-        ]));
+        ]);
+        if ($service->status !== 'approved') {
+            $fields['is_active'] = false;
+        } elseif (!$needsReapproval && $request->has('is_active')) {
+            $fields['is_active'] = (bool) $request->is_active;
+        }
+        $service->update($fields);
+
+        if ($needsReapproval) {
+            $vendor = $service->vendor;
+            User::whereIn('role', ['admin', 'super_admin'])
+                ->where('is_active', true)
+                ->get()
+                ->each(function (User $admin) use ($vendor, $service) {
+                    NotificationController::sendNotification(
+                        $admin->id,
+                        'system',
+                        'Service update awaiting review',
+                        "{$vendor->business_name} updated \"{$service->name}\". Tap to review it.",
+                        ['service_id' => $service->id, 'route' => 'Moderation']
+                    );
+                });
+        }
 
         if ($request->has('images')) {
             // Remove old images
@@ -269,7 +309,7 @@ class ServiceController extends Controller
             return response()->json(['message' => 'Service not found'], 404);
         }
 
-        if ($user->role === 'vendor' && $service->vendor->user_id !== $user->id) {
+        if ($user->role === 'vendor' && (int) $service->vendor->user_id !== (int) $user->id) {
             return response()->json(['message' => 'Unauthorized. This is not your service.'], 403);
         }
 
@@ -289,7 +329,7 @@ class ServiceController extends Controller
             return response()->json(['message' => 'Service not found'], 404);
         }
 
-        if ($user->role === 'vendor' && $service->vendor->user_id !== $user->id) {
+        if ($user->role === 'vendor' && (int) $service->vendor->user_id !== (int) $user->id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -335,7 +375,7 @@ class ServiceController extends Controller
             return response()->json(['message' => 'Not found'], 404);
         }
 
-        if ($user->role === 'vendor' && $service->vendor->user_id !== $user->id) {
+        if ($user->role === 'vendor' && (int) $service->vendor->user_id !== (int) $user->id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -369,7 +409,7 @@ class ServiceController extends Controller
             return response()->json(['message' => 'Not found'], 404);
         }
 
-        if ($user->role === 'vendor' && $service->vendor->user_id !== $user->id) {
+        if ($user->role === 'vendor' && (int) $service->vendor->user_id !== (int) $user->id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -385,7 +425,7 @@ class ServiceController extends Controller
         $service = Service::with('vendor')->find($id);
 
         if (!$service) return response()->json(['message' => 'Service not found'], 404);
-        if ($user->role === 'vendor' && $service->vendor->user_id !== $user->id) {
+        if ($user->role === 'vendor' && (int) $service->vendor->user_id !== (int) $user->id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 

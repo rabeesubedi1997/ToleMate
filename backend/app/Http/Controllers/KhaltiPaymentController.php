@@ -19,7 +19,7 @@ class KhaltiPaymentController extends Controller
         $user = $request->user();
         $booking = Booking::findOrFail($request->booking_id);
 
-        if ($booking->customer_id !== $user->id && $user->role === 'customer') {
+        if ((int) $booking->customer_id !== (int) $user->id && $user->role === 'customer') {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
