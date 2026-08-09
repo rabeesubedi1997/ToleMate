@@ -32,12 +32,69 @@ const mediaUrl = (path: string) => {
   return `${api.defaults.baseURL?.replace(/\/api\/?$/, '')}${path}`;
 };
 
+const apiBase = () =>
+  (api.defaults.baseURL ?? '').replace(/\/api\/?$/, '').replace(/\/$/, '');
+
+/**
+ * Resolve stored slide image URLs so they always point at the host
+ * this app talks to. Fixes dev machines saving `localhost:8000/storage/...`
+ * or `10.0.2.2/...` paths that cannot load on a phone.
+ */
+const resolveImageUrl = (raw: string): string => {
+  const url = typeof raw === 'string' ? raw.trim() : '';
+  if (!url) return '';
+  if (/^https?:\/\//i.test(url)) {
+    const m = url.match(
+      /^(https?:\/\/)(localhost|127\.0\.0\.1|10\.0\.2\.2|0\.0\.0\.0)(:\d+)?(\/.*)?$/i,
+    );
+    if (m) {
+      return `${apiBase()}${m[4] ?? ''}`;
+    }
+    return url;
+  }
+  return mediaUrl(url.startsWith('/') ? url : `/${url}`);
+};
+
+const normalizeSlides = (raw: unknown): Slide[] => {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter(
+      (s): s is Record<string, unknown> =>
+        !!s && typeof s === 'object' && typeof (s as any).url === 'string' && !!(s as any).url,
+    )
+    .map(s => ({
+      url: s.url as string,
+      title: typeof s.title === 'string' ? s.title : undefined,
+      link: typeof s.link === 'string' ? s.link : undefined,
+      enabled: (s as any).enabled !== false,
+    }));
+};
+
 const DEFAULT_SLIDES = [
   { url: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=1200&q=80', title: 'Professional Home Repair Services', link: '/services', enabled: true },
   { url: 'https://images.unsplash.com/photo-1563453392212-326f5e854473?w=1200&q=80', title: 'Trusted Cleaning Professionals', link: '/services', enabled: true },
   { url: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200&q=80', title: 'Expert Tech Support at Your Door', link: '/services', enabled: true },
   { url: 'https://images.unsplash.com/photo-1527529482837-4698179dc6ce?w=1200&q=80', title: 'Perfect Events, Every Time', link: '/services', enabled: true },
 ];
+
+const SlideThumb: React.FC<{ item: Slide }> = ({ item }) => {
+  const [failed, setFailed] = useState(false);
+
+  if (!item.url || failed) {
+    return (
+      <View style={[styles.thumb, styles.thumbFailed]}>
+        <MaterialIcons name="broken-image" size={18} color={COLORS.gray400} />
+      </View>
+    );
+  }
+  return (
+    <Image
+      source={{ uri: resolveImageUrl(item.url) }}
+      style={[styles.thumb, item.enabled === false && styles.thumbOff]}
+      onError={() => setFailed(true)}
+    />
+  );
+};
 
 const AdminSliderScreen: React.FC = () => {
   const [slides, setSlides] = useState<Slide[]>([]);
@@ -54,7 +111,7 @@ const AdminSliderScreen: React.FC = () => {
       setIntervalMs(res.data?.slider_interval ?? '');
       try {
         const parsed = JSON.parse(res.data?.slider_images || '[]');
-        setSlides(Array.isArray(parsed) ? parsed : []);
+        setSlides(normalizeSlides(parsed));
       } catch {
         setSlides([]);
       }
@@ -169,7 +226,7 @@ const AdminSliderScreen: React.FC = () => {
         await saveSlides([
           ...slides,
           {
-            url: mediaUrl(uploaded.file_path),
+            url: resolveImageUrl(uploaded.file_path),
             title: '',
             link: '/services',
             enabled: true,
@@ -188,10 +245,7 @@ const AdminSliderScreen: React.FC = () => {
 
   const renderItem = ({ item, index }: { item: Slide; index: number }) => (
     <View style={styles.card}>
-      <Image
-        source={{ uri: item.url }}
-        style={[styles.thumb, item.enabled === false && styles.thumbOff]}
-      />
+      <SlideThumb item={item} />
       <View style={styles.body}>
         <Text style={styles.title} numberOfLines={1}>
           {item.title || '(no title)'}
@@ -205,28 +259,46 @@ const AdminSliderScreen: React.FC = () => {
           </Text>
         ) : null}
       </View>
-      <View style={styles.right}>
-        <View style={styles.actions}>
-          <Pressable onPress={() => move(index, -1)} hitSlop={6}>
-            <MaterialIcons name="arrow-upward" size={18} color={COLORS.gray500} />
-          </Pressable>
-          <Pressable onPress={() => move(index, 1)} hitSlop={6}>
-            <MaterialIcons name="arrow-downward" size={18} color={COLORS.gray500} />
-          </Pressable>
-          <Pressable onPress={() => toggleEnabled(index)} hitSlop={6}>
-            <MaterialIcons
-              name={item.enabled !== false ? 'visibility' : 'visibility-off'}
-              size={18}
-              color={item.enabled !== false ? COLORS.primary : COLORS.gray400}
-            />
-          </Pressable>
-          <Pressable onPress={() => openEdit(index)} hitSlop={6}>
-            <MaterialIcons name="edit" size={18} color={COLORS.primary700} />
-          </Pressable>
-          <Pressable onPress={() => remove(index)} hitSlop={6}>
-            <MaterialIcons name="delete-outline" size={18} color={COLORS.rose} />
-          </Pressable>
-        </View>
+      <View style={styles.actions}>
+        <Pressable
+          style={styles.iconBtn}
+          onPress={() => move(index, -1)}
+          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+        >
+          <MaterialIcons name="arrow-upward" size={16} color={COLORS.gray600} />
+        </Pressable>
+        <Pressable
+          style={styles.iconBtn}
+          onPress={() => move(index, 1)}
+          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+        >
+          <MaterialIcons name="arrow-downward" size={16} color={COLORS.gray600} />
+        </Pressable>
+        <Pressable
+          style={styles.iconBtn}
+          onPress={() => toggleEnabled(index)}
+          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+        >
+          <MaterialIcons
+            name={item.enabled !== false ? 'visibility' : 'visibility-off'}
+            size={16}
+            color={item.enabled !== false ? COLORS.primary : COLORS.gray400}
+          />
+        </Pressable>
+        <Pressable
+          style={styles.iconBtn}
+          onPress={() => openEdit(index)}
+          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+        >
+          <MaterialIcons name="edit" size={16} color={COLORS.primary700} />
+        </Pressable>
+        <Pressable
+          style={styles.iconBtn}
+          onPress={() => remove(index)}
+          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+        >
+          <MaterialIcons name="delete-outline" size={16} color={COLORS.rose} />
+        </Pressable>
       </View>
     </View>
   );
@@ -402,6 +474,11 @@ const styles = StyleSheet.create({
   thumbOff: {
     opacity: 0.4,
   },
+  thumbFailed: {
+    backgroundColor: COLORS.gray100,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   body: {
     flex: 1,
   },
@@ -420,13 +497,19 @@ const styles = StyleSheet.create({
     color: COLORS.gray400,
     marginTop: 1,
   },
-  right: {
+  actions: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 4,
     marginLeft: SPACING.sm,
   },
-  actions: {
-    flexDirection: 'row',
+  iconBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.gray50,
     alignItems: 'center',
-    gap: SPACING.sm,
+    justifyContent: 'center',
   },
   fieldLabel: {
     fontSize: 12,

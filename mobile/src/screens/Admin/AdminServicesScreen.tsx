@@ -278,10 +278,10 @@ const AdminServicesScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <ScreenHeader title="Services" subtitle="All services on the platform" />
-      <View style={styles.toolbar}>
-        <View style={styles.chipsWrap}>
-          <FilterChips options={STATUSES} selected={filter} onSelect={setFilter} />
-        </View>
+      <View style={styles.chipsBar}>
+        <FilterChips options={STATUSES} selected={filter} onSelect={setFilter} />
+      </View>
+      <View style={styles.addBar}>
         <TouchableOpacity style={styles.addBtn} onPress={openCreate}>
           <MaterialIcons name="add" size={18} color={COLORS.white} />
           <Text style={styles.addBtnText}>Add service</Text>
@@ -551,28 +551,27 @@ const styles = StyleSheet.create({
     color: COLORS.gray400,
   },
   addBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
     backgroundColor: COLORS.primary,
     borderRadius: RADIUS.md,
-    paddingHorizontal: SPACING.sm,
-    height: 36,
-    alignSelf: 'center',
+    height: 40,
   },
   addBtnText: {
     color: COLORS.white,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
   },
-  toolbar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingRight: SPACING.md,
+  chipsBar: {
+    paddingHorizontal: 0,
   },
-  chipsWrap: {
-    flex: 1,
+  addBar: {
+    flexDirection: 'row',
+    paddingHorizontal: SPACING.md,
+    paddingBottom: SPACING.sm,
   },
   fieldLabel: {
     fontSize: 12,

@@ -89,12 +89,13 @@ class AdminController extends Controller
         $request->validate([
             'name'          => 'sometimes|string|max:255',
             'email'         => 'sometimes|email|unique:users,email,' . $id,
+            'phone'         => 'sometimes|nullable|string|max:20',
             'role'          => 'sometimes|in:' . $validRoles,
             'business_name' => 'nullable|string|max:255',
             'description'   => 'nullable|string',
         ]);
 
-        $user->update($request->only(['name', 'email', 'role']));
+        $user->update($request->only(['name', 'email', 'phone', 'role']));
 
         if ($user->role === 'vendor' && !$user->vendor) {
             $businessName = $request->business_name ?? $user->name . "'s Business";

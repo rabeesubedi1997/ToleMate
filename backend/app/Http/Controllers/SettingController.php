@@ -30,7 +30,13 @@ class SettingController extends Controller
             ]),
         ];
 
-        return response()->json($settings->merge($defaults));
+        // Saved DB values take precedence over defaults; defaults only fill gaps.
+        $merged = $defaults;
+        foreach ($settings as $key => $value) {
+            $merged[$key] = $value;
+        }
+
+        return response()->json($merged);
     }
 
     /**
@@ -39,7 +45,7 @@ class SettingController extends Controller
     public function updateBatch(Request $request)
     {
         $user = $request->user();
-        if ($user->role !== 'admin') {
+        if (!in_array($user->role, ['admin', 'super_admin'])) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 

@@ -15,7 +15,7 @@ class MediaController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        if ($user->role !== 'admin' && $user->role !== 'vendor') {
+        if (!in_array($user->role, ['admin', 'super_admin', 'vendor'])) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -29,7 +29,7 @@ class MediaController extends Controller
     public function store(Request $request)
     {
         $user = $request->user();
-        if ($user->role !== 'admin' && $user->role !== 'vendor') {
+        if (!in_array($user->role, ['admin', 'super_admin', 'vendor'])) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -70,7 +70,7 @@ class MediaController extends Controller
     public function destroy(Request $request, $id)
     {
         $user = $request->user();
-        if ($user->role !== 'admin' && $user->role !== 'vendor') {
+        if (!in_array($user->role, ['admin', 'super_admin', 'vendor'])) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 

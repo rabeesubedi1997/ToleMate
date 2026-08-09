@@ -35,6 +35,13 @@ class ServiceController extends Controller
             $query->where('category_id', $request->category_id);
         }
 
+        $status = $request->input('status');
+        if ($status && in_array($status, ['pending', 'approved', 'rejected', 'draft'], true)) {
+            if ($user && in_array($user->role, ['admin', 'super_admin', 'vendor'])) {
+                $query->where('status', $status);
+            }
+        }
+
         if ($request->search) {
             $query->where(function ($q) use ($request) {
                 $q->where('name', 'LIKE', '%' . $request->search . '%')

@@ -50,6 +50,7 @@ const AdminUsersScreen: React.FC = () => {
   const [saving, setSaving] = useState(false);
 
   const [selected, setSelected] = useState<AdminUser | null>(null);
+  const [editForm, setEditForm] = useState({ name: '', email: '', phone: '' });
 
   const load = useCallback(async () => {
     try {
@@ -179,6 +180,30 @@ const AdminUsersScreen: React.FC = () => {
   const openUser = (u: AdminUser) => {
     if (u.id === me?.id) return;
     setSelected(u);
+    setEditForm({ name: u.name ?? '', email: u.email ?? '', phone: u.phone ?? '' });
+  };
+
+  const saveDetails = async () => {
+    if (!selected) return;
+    if (!editForm.name.trim() || !editForm.email.trim()) {
+      Alert.alert('Missing info', 'Name and email are required.');
+      return;
+    }
+    setSaving(true);
+    try {
+      await api.put(`/admin/users/${selected.id}`, {
+        name: editForm.name.trim(),
+        email: editForm.email.trim(),
+        phone: editForm.phone.trim() || undefined,
+      });
+      setSelected(null);
+      load();
+      Alert.alert('Saved', 'User details updated.');
+    } catch (e: any) {
+      Alert.alert('Failed', e?.response?.data?.message ?? 'Could not update user.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const renderUser = ({ item }: { item: AdminUser }) => (
@@ -365,6 +390,41 @@ const AdminUsersScreen: React.FC = () => {
         onClose={() => setSelected(null)}
       >
         <Text style={styles.userEmail}>{selected?.email}</Text>
+
+        <Text style={styles.label}>Full name</Text>
+        <TextInput
+          style={styles.input}
+          value={editForm.name}
+          onChangeText={t => setEditForm(f => ({ ...f, name: t }))}
+        />
+        <Text style={styles.label}>Email</Text>
+        <TextInput
+          style={styles.input}
+          value={editForm.email}
+          onChangeText={t => setEditForm(f => ({ ...f, email: t }))}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        <Text style={styles.label}>Phone</Text>
+        <TextInput
+          style={styles.input}
+          value={editForm.phone}
+          onChangeText={t => setEditForm(f => ({ ...f, phone: t }))}
+          keyboardType="phone-pad"
+          placeholder="98XXXXXXXX"
+          placeholderTextColor={COLORS.gray400}
+        />
+
+        <TouchableOpacity
+          style={[styles.primaryBtn, saving && styles.btnDisabled]}
+          onPress={saveDetails}
+          disabled={saving}
+        >
+          <Text style={styles.primaryBtnText}>
+            {saving ? 'Saving...' : 'Save details'}
+          </Text>
+        </TouchableOpacity>
 
         <Text style={styles.label}>Change role</Text>
         <View style={styles.chipsRow}>
