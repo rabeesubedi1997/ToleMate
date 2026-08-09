@@ -7,7 +7,6 @@ import {
   ActivityIndicator,
   RefreshControl,
   TouchableOpacity,
-  Alert,
   TextInput,
   ScrollView,
   Image,
@@ -20,7 +19,9 @@ import api from '../../api/client';
 import StatusBadge from '../../components/StatusBadge';
 import EmptyState from '../../components/EmptyState';
 import Modal from '../../components/Modal';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import AppImage from '../../components/AppImage';
+import { useToast } from '../../context/ToastContext';
 import { COLORS, SPACING, RADIUS, SHADOW, FONT_SIZE } from '../../theme';
 import { validateFile } from '../../utils/security';
 
@@ -83,8 +84,18 @@ const EMPTY_PKG = {
   features: '',
 };
 
+interface ConfirmState {
+  title: string;
+  message: string;
+  tone?: 'danger' | 'primary' | 'warning';
+  confirmLabel?: string;
+  icon?: string;
+  fn: () => void;
+}
+
 const VendorServicesScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
+  const toast = useToast();
   const [services, setServices] = useState<VendorService[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -100,6 +111,7 @@ const VendorServicesScreen: React.FC = () => {
   const [pkgForm, setPkgForm] = useState(EMPTY_PKG);
   const [editingPkg, setEditingPkg] = useState<ServicePackage | null>(null);
   const [pkgBusy, setPkgBusy] = useState(false);
+  const [confirm, setConfirm] = useState<ConfirmState | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -162,7 +174,7 @@ const VendorServicesScreen: React.FC = () => {
 
   const uploadCover = async () => {
     if (!editing) {
-      Alert.alert('Save first', 'Create the service, then upload a cover photo.');
+      toast.info('Save the service first, then upload a cover photo.');
       return;
     }
     const result = await launchImageLibrary({
@@ -178,7 +190,7 @@ const VendorServicesScreen: React.FC = () => {
       4,
     );
     if (!check.valid) {
-      Alert.alert('Invalid image', check.error ?? 'File not allowed');
+      toast.error(check.error ?? 'File not allowed');
       return;
     }
     setUploading(true);
@@ -193,10 +205,10 @@ const VendorServicesScreen: React.FC = () => {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       setCoverLocal(asset.uri);
-      Alert.alert('Uploaded', 'Cover photo updated.');
+      toast.success('Cover photo updated.');
       load();
     } catch (e: any) {
-      Alert.alert('Failed', e?.response?.data?.message ?? 'Could not upload image.');
+      toast.error(e?.response?.data?.message ?? 'Could not upload image.');
     } finally {
       setUploading(false);
     }
@@ -205,11 +217,11 @@ const VendorServicesScreen: React.FC = () => {
   const savePkg = async () => {
     if (!editing) return;
     if (!pkgForm.name.trim()) {
-      Alert.alert('Missing', 'Tier name is required.');
+      toast.info('Tier name is required.');
       return;
     }
     if (!pkgForm.price || Number(pkgForm.price) <= 0) {
-      Alert.alert('Missing', 'Enter a tier price.');
+      toast.info('Enter a tier price.');
       return;
     }
     setPkgBusy(true);
@@ -236,8 +248,7 @@ const VendorServicesScreen: React.FC = () => {
       const res = await api.get(`/services/${editing.id}`);
       setPackages(res.data.service?.packages ?? []);
     } catch (e: any) {
-      Alert.alert(
-        'Failed',
+      toast.error(
         e?.response?.data?.message ??
           Object.values(e?.response?.data?.errors ?? {}).flat()[0] ??
           'Could not save tier.',
@@ -260,42 +271,42 @@ const VendorServicesScreen: React.FC = () => {
 
   const removePkg = (pkg: ServicePackage) => {
     if (!editing) return;
-    Alert.alert('Delete tier', `Delete "${pkg.name}"?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await api.delete(`/services/${editing.id}/packages/${pkg.id}`);
-            setPackages(prev => prev.filter(p => p.id !== pkg.id));
-          } catch (e: any) {
-            Alert.alert('Failed', e?.response?.data?.message ?? 'Could not delete tier.');
-          }
-        },
+    setConfirm({
+      title: `Delete "${pkg.name}"?`,
+      message: 'This pricing tier will be removed from the service.',
+      confirmLabel: 'Delete',
+      tone: 'danger',
+      icon: 'delete-outline',
+      fn: async () => {
+        try {
+          await api.delete(`/services/${editing.id}/packages/${pkg.id}`);
+          setPackages(prev => prev.filter(p => p.id !== pkg.id));
+        } catch (e: any) {
+          toast.error(e?.response?.data?.message ?? 'Could not delete tier.');
+        }
       },
-    ]);
+    });
   };
 
   const save = async () => {
     if (!form.name.trim() || !form.description.trim()) {
-      Alert.alert('Missing fields', 'Name and description are required.');
+      toast.info('Name and description are required.');
       return;
     }
     if (!form.category_id) {
-      Alert.alert('Missing fields', 'Please select a category.');
+      toast.info('Please select a category.');
       return;
     }
     if (form.pricing_type !== 'quote' && !form.price) {
-      Alert.alert('Missing fields', 'Please enter a price.');
+      toast.info('Please enter a price.');
       return;
     }
     if (form.price && (isNaN(Number(form.price)) || Number(form.price) <= 0)) {
-      Alert.alert('Invalid price', 'Price must be a positive number.');
+      toast.info('Price must be a positive number.');
       return;
     }
     if (form.sale_price && (isNaN(Number(form.sale_price)) || Number(form.sale_price) <= 0)) {
-      Alert.alert('Invalid sale price', 'Sale price must be a positive number.');
+      toast.info('Sale price must be a positive number.');
       return;
     }
 
@@ -317,16 +328,15 @@ const VendorServicesScreen: React.FC = () => {
     try {
       if (editing) {
         await api.put(`/services/${editing.id}`, payload);
-        Alert.alert('Saved', 'Service updated.');
+        toast.success('Service updated.');
       } else {
         await api.post('/services', payload);
-        Alert.alert('Service created', 'Your service is pending review by admins.');
+        toast.success('Service created — pending review by admins.');
       }
       setShowForm(false);
       load();
     } catch (e: any) {
-      Alert.alert(
-        'Failed',
+      toast.error(
         e?.response?.data?.message ??
           Object.values(e?.response?.data?.errors ?? {}).flat()[0] ??
           'Could not save service.',
@@ -337,42 +347,39 @@ const VendorServicesScreen: React.FC = () => {
   };
 
   const toggleActive = (item: VendorService) => {
-    Alert.alert(
-      item.is_active ? 'Hide service' : 'Activate service',
-      `${item.is_active ? 'Hide' : 'Show'} "${item.name}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: item.is_active ? 'Hide' : 'Activate',
-          onPress: async () => {
-            try {
-              await api.put(`/services/${item.id}`, { is_active: !item.is_active });
-              load();
-            } catch (e: any) {
-              Alert.alert('Failed', e?.response?.data?.message ?? 'Could not update service.');
-            }
-          },
-        },
-      ],
-    );
+    setConfirm({
+      title: item.is_active ? 'Hide service?' : 'Activate service?',
+      message: `${item.is_active ? 'Hide' : 'Show'} "${item.name}" to customers?`,
+      confirmLabel: item.is_active ? 'Hide' : 'Activate',
+      tone: 'primary',
+      icon: item.is_active ? 'visibility-off' : 'visibility',
+      fn: async () => {
+        try {
+          await api.put(`/services/${item.id}`, { is_active: !item.is_active });
+          load();
+        } catch (e: any) {
+          toast.error(e?.response?.data?.message ?? 'Could not update service.');
+        }
+      },
+    });
   };
 
   const remove = (item: VendorService) => {
-    Alert.alert('Delete service', `Delete "${item.name}"? This cannot be undone.`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await api.delete(`/services/${item.id}`);
-            load();
-          } catch (e: any) {
-            Alert.alert('Failed', e?.response?.data?.message ?? 'Could not delete service.');
-          }
-        },
+    setConfirm({
+      title: 'Delete service?',
+      message: `Delete "${item.name}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      tone: 'danger',
+      icon: 'delete-outline',
+      fn: async () => {
+        try {
+          await api.delete(`/services/${item.id}`);
+          load();
+        } catch (e: any) {
+          toast.error(e?.response?.data?.message ?? 'Could not delete service.');
+        }
       },
-    ]);
+    });
   };
 
   const renderService = ({ item }: { item: VendorService }) => (
@@ -408,14 +415,22 @@ const VendorServicesScreen: React.FC = () => {
           </Text>
         </View>
         <View style={styles.iconRow}>
-          <TouchableOpacity onPress={() => toggleActive(item)} hitSlop={6}>
+          <TouchableOpacity
+            style={[styles.iconBtn, styles.iconBtnPrimary]}
+            onPress={() => toggleActive(item)}
+            hitSlop={6}
+          >
             <MaterialIcons
               name={item.is_active ? 'visibility-off' : 'visibility'}
               size={18}
-              color={COLORS.gray500}
+              color={COLORS.primary700}
             />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => remove(item)} hitSlop={6}>
+          <TouchableOpacity
+            style={[styles.iconBtn, styles.iconBtnDanger]}
+            onPress={() => remove(item)}
+            hitSlop={6}
+          >
             <MaterialIcons name="delete-outline" size={18} color={COLORS.rose} />
           </TouchableOpacity>
         </View>
@@ -466,6 +481,8 @@ const VendorServicesScreen: React.FC = () => {
       <Modal
         visible={showForm}
         title={editing ? 'Edit Service' : 'Add Service'}
+        subtitle={editing ? 'Update details, cover and pricing' : 'Create a new service listing'}
+        icon="build"
         onClose={() => setShowForm(false)}
       >
         <ScrollView>
@@ -638,11 +655,23 @@ const VendorServicesScreen: React.FC = () => {
                     ))}
                   </View>
                   <View style={styles.pkgActions}>
-                    <TouchableOpacity onPress={() => startEditPkg(pkg)} hitSlop={6}>
-                      <MaterialIcons name="edit" size={18} color={COLORS.primary700} />
+                    <TouchableOpacity
+                      style={[styles.iconBtn, styles.iconBtnPrimary]}
+                      onPress={() => startEditPkg(pkg)}
+                      hitSlop={6}
+                    >
+                      <MaterialIcons name="edit" size={16} color={COLORS.primary700} />
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={() => removePkg(pkg)} hitSlop={6}>
-                      <MaterialIcons name="delete-outline" size={18} color={COLORS.rose} />
+                    <TouchableOpacity
+                      style={[styles.iconBtn, styles.iconBtnDanger]}
+                      onPress={() => removePkg(pkg)}
+                      hitSlop={6}
+                    >
+                      <MaterialIcons
+                        name="delete-outline"
+                        size={18}
+                        color={COLORS.rose}
+                      />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -762,6 +791,21 @@ const VendorServicesScreen: React.FC = () => {
           </TouchableOpacity>
         </ScrollView>
       </Modal>
+
+      <ConfirmDialog
+        visible={!!confirm}
+        title={confirm?.title ?? ''}
+        message={confirm?.message ?? ''}
+        confirmLabel={confirm?.confirmLabel}
+        tone={confirm?.tone}
+        icon={confirm?.icon}
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => {
+          const c = confirm;
+          setConfirm(null);
+          c?.fn();
+        }}
+      />
     </View>
   );
 };
@@ -794,9 +838,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.md,
-    paddingHorizontal: SPACING.md,
-    height: 38,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: SPACING.md + 4,
+    height: 40,
+    ...SHADOW.card,
   },
   addBtnText: {
     color: COLORS.white,
@@ -807,8 +852,10 @@ const styles = StyleSheet.create({
     marginTop: SPACING.xxl,
   },
   list: {
-    padding: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.xs,
     paddingBottom: SPACING.xl,
+    gap: SPACING.sm + 4,
   },
   card: {
     flexDirection: 'row',
@@ -816,14 +863,13 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.gray200,
-    padding: SPACING.sm,
-    marginBottom: SPACING.sm,
+    borderColor: COLORS.gray100,
+    padding: SPACING.md,
     ...SHADOW.card,
   },
   thumb: {
-    width: 52,
-    height: 52,
+    width: 56,
+    height: 56,
     borderRadius: RADIUS.md,
     backgroundColor: COLORS.gray100,
   },
@@ -869,8 +915,21 @@ const styles = StyleSheet.create({
   },
   iconRow: {
     flexDirection: 'row',
-    gap: SPACING.md,
-    marginTop: 6,
+    gap: SPACING.sm,
+    marginTop: 8,
+  },
+  iconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconBtnPrimary: {
+    backgroundColor: COLORS.primary100,
+  },
+  iconBtnDanger: {
+    backgroundColor: COLORS.roseBg,
   },
   fieldLabel: {
     fontSize: 12,
@@ -963,7 +1022,7 @@ const styles = StyleSheet.create({
   },
   pkgActions: {
     flexDirection: 'row',
-    gap: SPACING.md,
+    gap: SPACING.sm,
   },
   pkgFormActions: {
     flexDirection: 'row',
@@ -973,8 +1032,8 @@ const styles = StyleSheet.create({
   pkgAddBtn: {
     flex: 1,
     backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.md,
-    height: 40,
+    borderRadius: RADIUS.pill,
+    height: 42,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1043,8 +1102,8 @@ const styles = StyleSheet.create({
   saveBtn: {
     marginTop: SPACING.md,
     backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.md,
-    height: 46,
+    borderRadius: RADIUS.pill,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
   },

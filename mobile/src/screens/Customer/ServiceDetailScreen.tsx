@@ -6,16 +6,16 @@ import {
   ScrollView,
   TouchableOpacity,
   Dimensions,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import api from '../../api/client';
-import { COLORS, SPACING } from '../../theme';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from '../../theme';
 import AppImage from '../../components/AppImage';
 import { ServiceDetailSkeleton } from '../../components/Skeleton';
+import { useToast } from '../../context/ToastContext';
 import { MainStackParamList } from '../../navigation/types';
 
 type Props = NativeStackScreenProps<MainStackParamList, 'ServiceDetail'>;
@@ -65,6 +65,7 @@ interface Review {
 
 const ServiceDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const { id } = route.params;
+  const toast = useToast();
   const [service, setService] = useState<ServiceDetail | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,13 +90,13 @@ const ServiceDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         }
       })
       .catch(() => {
-        Alert.alert('Error', 'Could not load service.');
+        toast.error('Could not load this service. Please try again.');
       })
       .finally(() => mounted && setLoading(false));
     return () => {
       mounted = false;
     };
-  }, [id]);
+  }, [id, toast]);
 
   const toggleFav = useCallback(async () => {
     const next = !fav;
@@ -105,10 +106,11 @@ const ServiceDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       const ids: number[] = raw ? JSON.parse(raw) : [];
       const updated = next ? [...ids, id] : ids.filter(x => x !== id);
       await AsyncStorage.setItem(FAV_KEY, JSON.stringify(updated));
+      toast.success(next ? 'Added to favorites' : 'Removed from favorites');
     } catch {
       setFav(!next);
     }
-  }, [fav, id]);
+  }, [fav, id, toast]);
 
   useEffect(() => {
     AsyncStorage.getItem(FAV_KEY).then(raw => {
@@ -145,7 +147,7 @@ const ServiceDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Image */}
         <View>
           <AppImage uri={image} style={styles.hero} />
@@ -154,13 +156,13 @@ const ServiceDetailScreen: React.FC<Props> = ({ route, navigation }) => {
               style={styles.roundBtn}
               onPress={() => navigation.goBack()}
             >
-              <MaterialIcons name="arrow-back" size={22} color={COLORS.dark} />
+              <MaterialIcons name="arrow-back" size={22} color={COLORS.gray900} />
             </TouchableOpacity>
             <TouchableOpacity style={styles.roundBtn} onPress={toggleFav}>
               <MaterialIcons
                 name={fav ? 'favorite' : 'favorite-border'}
                 size={22}
-                color={fav ? COLORS.rose : COLORS.dark}
+                color={fav ? COLORS.rose : COLORS.gray900}
               />
             </TouchableOpacity>
           </View>
@@ -170,7 +172,7 @@ const ServiceDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           <View style={styles.titleRow}>
             <View style={styles.titleFlex}>
               {service.category ? (
-                <Text style={styles.category}>{service.category.name}</Text>
+                <Text style={styles.kicker}>{service.category.name}</Text>
               ) : null}
               <Text style={styles.name}>{service.name}</Text>
             </View>
@@ -227,22 +229,30 @@ const ServiceDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                   <Text style={styles.verifiedText}>Verified</Text>
                 </View>
               ) : null}
-              <MaterialIcons name="chevron-right" size={20} color={COLORS.slate400} />
+              <MaterialIcons name="chevron-right" size={20} color={COLORS.gray400} />
             </TouchableOpacity>
           ) : null}
 
           {/* Description */}
           {service.description ? (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>About this service</Text>
-              <Text style={styles.description}>{service.description}</Text>
+              <View style={styles.sectionHead}>
+                <Text style={styles.kicker}>Details</Text>
+                <Text style={styles.sectionTitle}>About this service</Text>
+              </View>
+              <View style={styles.descriptionCard}>
+                <Text style={styles.description}>{service.description}</Text>
+              </View>
             </View>
           ) : null}
 
           {/* Packages */}
           {service.packages && service.packages.length > 0 ? (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Choose a package</Text>
+              <View style={styles.sectionHead}>
+                <Text style={styles.kicker}>Pricing</Text>
+                <Text style={styles.sectionTitle}>Choose a package</Text>
+              </View>
               {service.packages.map(pkg => (
                 <View key={pkg.id} style={styles.pkgCard}>
                   <View style={styles.pkgTop}>
@@ -256,11 +266,13 @@ const ServiceDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                     <View style={styles.pkgFeatures}>
                       {pkg.features!.map((f, i) => (
                         <View key={i} style={styles.pkgFeatureRow}>
-                          <MaterialIcons
-                            name="check"
-                            size={14}
-                            color={COLORS.primary}
-                          />
+                          <View style={styles.checkIcon}>
+                            <MaterialIcons
+                              name="check"
+                              size={12}
+                              color={COLORS.primary700}
+                            />
+                          </View>
                           <Text style={styles.pkgFeatureText}>{f}</Text>
                         </View>
                       ))}
@@ -294,14 +306,17 @@ const ServiceDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
           {/* Reviews */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
-              Reviews ({reviews.length})
-            </Text>
+            <View style={styles.sectionHead}>
+              <Text style={styles.kicker}>Feedback</Text>
+              <Text style={styles.sectionTitle}>
+                Reviews ({reviews.length})
+              </Text>
+            </View>
             {reviews.length === 0 ? (
               <Text style={styles.noReviews}>No reviews yet.</Text>
             ) : (
               <>
-                <View style={styles.avgRow}>
+                <View style={styles.avgCard}>
                   <Text style={styles.avgScore}>
                     {(
                       reviews.reduce((s, r) => s + r.rating, 0) / reviews.length
@@ -386,6 +401,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.light,
   },
+  scrollContent: {
+    paddingBottom: SPACING.xl,
+  },
   center: {
     flex: 1,
     alignItems: 'center',
@@ -393,8 +411,8 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.light,
   },
   errorText: {
-    fontSize: 16,
-    color: COLORS.slate500,
+    fontSize: FONT_SIZE.md,
+    color: COLORS.gray500,
   },
   hero: {
     width,
@@ -409,17 +427,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   roundBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: COLORS.white,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: COLORS.gray100,
+    ...SHADOW.card,
   },
   body: {
     padding: SPACING.md,
@@ -432,29 +448,30 @@ const styles = StyleSheet.create({
   titleFlex: {
     flex: 1,
   },
-  category: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: COLORS.primary,
+  kicker: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '700',
+    color: COLORS.gray500,
     textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
   name: {
     marginTop: 2,
-    fontSize: 22,
+    fontSize: FONT_SIZE.xxl,
     fontWeight: '700',
-    color: COLORS.dark,
+    color: COLORS.gray900,
   },
   price: {
-    fontSize: 18,
+    fontSize: FONT_SIZE.xl,
     fontWeight: '700',
-    color: COLORS.primary,
+    color: COLORS.primary700,
     marginLeft: SPACING.sm,
   },
   quoteNote: {
     marginTop: 6,
-    fontSize: 13,
+    fontSize: FONT_SIZE.sm,
     color: COLORS.accent,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   tagsRow: {
     flexDirection: 'row',
@@ -464,13 +481,15 @@ const styles = StyleSheet.create({
   },
   tag: {
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
+    paddingVertical: 5,
+    borderRadius: RADIUS.pill,
     backgroundColor: COLORS.primary50,
+    borderWidth: 1,
+    borderColor: COLORS.primary100,
   },
   tagText: {
-    fontSize: 12,
-    color: COLORS.primary,
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.primary700,
     fontWeight: '600',
   },
   vendorCard: {
@@ -478,13 +497,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.white,
-    borderRadius: 14,
-    padding: SPACING.sm,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.gray100,
+    padding: SPACING.sm + 4,
+    gap: SPACING.sm,
+    ...SHADOW.card,
   },
   vendorAvatar: {
     width: 48,
@@ -493,56 +511,67 @@ const styles = StyleSheet.create({
   },
   vendorInfo: {
     flex: 1,
-    marginLeft: SPACING.sm,
   },
   vendorName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: COLORS.dark,
+    fontSize: FONT_SIZE.md,
+    fontWeight: '700',
+    color: COLORS.gray900,
   },
   vendorRating: {
     marginTop: 2,
-    fontSize: 13,
+    fontSize: FONT_SIZE.sm,
     color: COLORS.accent,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   verifiedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginRight: SPACING.sm,
+    marginRight: SPACING.xs,
   },
   verifiedText: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     color: COLORS.primary,
     fontWeight: '600',
   },
   section: {
     marginTop: SPACING.lg,
   },
+  sectionHead: {
+    marginBottom: SPACING.sm,
+  },
   sectionTitle: {
-    fontSize: 17,
+    fontSize: FONT_SIZE.lg,
     fontWeight: '700',
-    color: COLORS.dark,
+    color: COLORS.gray900,
+    marginTop: 2,
+  },
+  descriptionCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.gray100,
+    padding: SPACING.md,
+    ...SHADOW.card,
   },
   description: {
-    marginTop: SPACING.sm,
-    fontSize: 14,
+    fontSize: FONT_SIZE.base,
     lineHeight: 22,
-    color: COLORS.slate600,
+    color: COLORS.gray600,
   },
   noReviews: {
     marginTop: SPACING.sm,
-    fontSize: 13,
-    color: COLORS.slate500,
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.gray500,
   },
   pkgCard: {
     marginTop: SPACING.sm,
     backgroundColor: COLORS.white,
-    borderRadius: 12,
+    borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.gray200,
+    borderColor: COLORS.gray100,
     padding: SPACING.md,
+    ...SHADOW.card,
   },
   pkgTop: {
     flexDirection: 'row',
@@ -550,83 +579,101 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   pkgName: {
-    fontSize: 15,
+    fontSize: FONT_SIZE.md,
     fontWeight: '700',
-    color: COLORS.dark,
+    color: COLORS.gray900,
   },
   pkgPrice: {
-    fontSize: 15,
+    fontSize: FONT_SIZE.md,
     fontWeight: '700',
-    color: COLORS.primary,
+    color: COLORS.primary700,
   },
   pkgDesc: {
     marginTop: 4,
-    fontSize: 13,
-    color: COLORS.slate500,
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.gray500,
     lineHeight: 18,
   },
   pkgFeatures: {
     marginTop: SPACING.sm,
-    gap: 4,
+    gap: 6,
   },
   pkgFeatureRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
+  checkIcon: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: COLORS.primary100,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   pkgFeatureText: {
     flex: 1,
-    fontSize: 13,
-    color: COLORS.slate600,
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.gray600,
   },
   pkgBottom: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: SPACING.sm,
+    marginTop: SPACING.md,
   },
   pkgDelivery: {
-    fontSize: 12,
-    color: COLORS.slate500,
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.gray500,
     fontWeight: '600',
   },
   pkgBookBtn: {
     backgroundColor: COLORS.primary,
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: 18,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   pkgBookText: {
     color: COLORS.white,
-    fontSize: 13,
+    fontSize: FONT_SIZE.sm,
     fontWeight: '700',
   },
-  avgRow: {
+  avgCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.md,
-    marginTop: SPACING.sm,
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.gray100,
+    padding: SPACING.md,
+    ...SHADOW.card,
   },
   avgScore: {
-    fontSize: 32,
+    fontSize: FONT_SIZE.hero,
     fontWeight: '800',
-    color: COLORS.dark,
+    color: COLORS.gray900,
   },
   avgStars: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.base,
     color: COLORS.accent,
     letterSpacing: 2,
   },
   avgCount: {
     marginTop: 2,
-    fontSize: 12,
-    color: COLORS.slate500,
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.gray500,
   },
   reviewItem: {
-    marginTop: SPACING.md,
-    paddingTop: SPACING.md,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: COLORS.gray200,
+    marginTop: SPACING.sm,
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.gray100,
+    padding: SPACING.md,
+    ...SHADOW.card,
   },
   reviewTop: {
     flexDirection: 'row',
@@ -639,55 +686,59 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary50,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.primary100,
   },
   reviewAvatarText: {
-    fontSize: 15,
+    fontSize: FONT_SIZE.md,
     fontWeight: '700',
-    color: COLORS.primary,
+    color: COLORS.primary700,
   },
   reviewInfo: {
     flex: 1,
     marginLeft: SPACING.sm,
   },
   reviewName: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.base,
     fontWeight: '600',
-    color: COLORS.dark,
+    color: COLORS.gray900,
   },
   reviewStars: {
     marginTop: 1,
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     color: COLORS.accent,
     letterSpacing: 1,
   },
   reviewDate: {
-    fontSize: 11,
-    color: COLORS.slate400,
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.gray400,
   },
   reviewComment: {
     marginTop: 6,
-    fontSize: 13,
+    fontSize: FONT_SIZE.sm,
     lineHeight: 19,
-    color: COLORS.slate600,
+    color: COLORS.gray600,
   },
   replyBox: {
     marginTop: SPACING.sm,
     backgroundColor: COLORS.gray50,
-    borderRadius: 10,
+    borderRadius: RADIUS.md,
     padding: SPACING.sm,
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.primary,
   },
   replyLabel: {
-    fontSize: 11,
+    fontSize: FONT_SIZE.xs,
     fontWeight: '700',
-    color: COLORS.primary,
+    color: COLORS.primary700,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   replyText: {
     marginTop: 3,
-    fontSize: 13,
+    fontSize: FONT_SIZE.sm,
     lineHeight: 19,
-    color: COLORS.slate600,
+    color: COLORS.gray600,
   },
   ctaBar: {
     padding: SPACING.md,
@@ -697,13 +748,14 @@ const styles = StyleSheet.create({
   },
   bookBtn: {
     backgroundColor: COLORS.primary,
-    borderRadius: 12,
-    paddingVertical: 15,
+    borderRadius: RADIUS.pill,
+    height: 46,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   bookBtnText: {
     color: COLORS.white,
-    fontSize: 16,
+    fontSize: FONT_SIZE.md,
     fontWeight: '700',
   },
 });

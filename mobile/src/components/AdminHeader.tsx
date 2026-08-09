@@ -1,8 +1,9 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useAuth } from '../context/AuthContext';
+import ConfirmDialog from './ConfirmDialog';
 import { COLORS, SPACING, FONT_SIZE } from '../theme';
 
 interface Props {
@@ -14,14 +15,8 @@ interface Props {
 const AdminHeader: React.FC<Props> = ({ title, subtitle, brand = 'ToleMate Admin' }) => {
   const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
+  const [confirmLogout, setConfirmLogout] = useState(false);
   const initial = (user?.name ?? '?').split(' ')[0]?.[0] ?? '?';
-
-  const handleLogout = () => {
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Logout', style: 'destructive', onPress: logout },
-    ]);
-  };
 
   return (
     <View style={[styles.header, { paddingTop: insets.top + SPACING.md }]}>
@@ -44,7 +39,7 @@ const AdminHeader: React.FC<Props> = ({ title, subtitle, brand = 'ToleMate Admin
             </View>
             <TouchableOpacity
               style={styles.logoutBtn}
-              onPress={handleLogout}
+              onPress={() => setConfirmLogout(true)}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <MaterialIcons name="logout" size={20} color={COLORS.rose} />
@@ -52,6 +47,19 @@ const AdminHeader: React.FC<Props> = ({ title, subtitle, brand = 'ToleMate Admin
           </View>
         ) : null}
       </View>
+      <ConfirmDialog
+        visible={confirmLogout}
+        title="Log out?"
+        message={`You are signed in as ${user?.name ?? 'admin'}. Logging out returns you to the login screen.`}
+        confirmLabel="Log out"
+        icon="logout"
+        tone="warning"
+        onConfirm={() => {
+          setConfirmLogout(false);
+          logout();
+        }}
+        onCancel={() => setConfirmLogout(false)}
+      />
     </View>
   );
 };

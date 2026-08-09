@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ActivityIndicator,
   TouchableOpacity,
-  Alert,
   TextInput,
   ScrollView,
   Linking,
@@ -15,6 +14,7 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import api from '../../api/client';
 import ScreenHeader from '../../components/ScreenHeader';
+import { useToast } from '../../context/ToastContext';
 import { COLORS, SPACING, RADIUS, SHADOW, FONT_SIZE } from '../../theme';
 import { MainStackParamList } from '../../navigation/types';
 
@@ -40,6 +40,7 @@ const WEB_URL = __DEV__
 
 const CheckoutScreen: React.FC<Props> = ({ route, navigation }) => {
   const { bookingId } = route.params;
+  const toast = useToast();
   const [booking, setBooking] = useState<BookingInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [method, setMethod] = useState<'card' | 'khalti'>('card');
@@ -53,12 +54,12 @@ const CheckoutScreen: React.FC<Props> = ({ route, navigation }) => {
       .then(res => {
         if (mounted) setBooking(res.data.booking ?? res.data);
       })
-      .catch(() => Alert.alert('Error', 'Could not load booking.'))
+      .catch(() => toast.error('Could not load booking.'))
       .finally(() => mounted && setLoading(false));
     return () => {
       mounted = false;
     };
-  }, [bookingId]);
+  }, [bookingId, toast]);
 
   const amount = Number(booking?.price ?? 0);
   const total = amount + PLATFORM_FEE;
@@ -66,7 +67,7 @@ const CheckoutScreen: React.FC<Props> = ({ route, navigation }) => {
   const payCard = async () => {
     const last4 = cardNumber.replace(/\s/g, '').slice(-4);
     if (last4.length !== 4) {
-      Alert.alert('Card required', 'Enter a card number to pay with.');
+      toast.error('Enter a card number to pay with.');
       return;
     }
     setPaying(true);
@@ -76,12 +77,10 @@ const CheckoutScreen: React.FC<Props> = ({ route, navigation }) => {
         payment_method: 'Stripe Mock',
         card_last_four: last4,
       });
-      Alert.alert('Payment successful', 'Your payment has been processed.', [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
+      toast.success('Payment successful.');
+      navigation.goBack();
     } catch (e: any) {
-      Alert.alert(
-        'Payment failed',
+      toast.error(
         e?.response?.data?.message ?? 'Could not process payment.',
       );
     } finally {
@@ -93,7 +92,7 @@ const CheckoutScreen: React.FC<Props> = ({ route, navigation }) => {
     const url = `${WEB_URL}/checkout/${bookingId}`;
     const supported = await Linking.canOpenURL(url);
     if (!supported) {
-      Alert.alert('Cannot open browser', 'No browser app found on this device.');
+      toast.error('No browser app found on this device.');
       return;
     }
     await Linking.openURL(url);
@@ -147,11 +146,12 @@ const CheckoutScreen: React.FC<Props> = ({ route, navigation }) => {
           </View>
         </View>
 
-        <Text style={styles.label}>PAYMENT METHOD</Text>
+        <Text style={styles.label}>Payment method</Text>
         <View style={styles.methodRow}>
           <TouchableOpacity
             style={[styles.methodBtn, method === 'card' && styles.methodBtnActive]}
             onPress={() => setMethod('card')}
+            activeOpacity={0.8}
           >
             <MaterialIcons
               name="credit-card"
@@ -165,6 +165,7 @@ const CheckoutScreen: React.FC<Props> = ({ route, navigation }) => {
           <TouchableOpacity
             style={[styles.methodBtn, method === 'khalti' && styles.methodBtnActive]}
             onPress={() => setMethod('khalti')}
+            activeOpacity={0.8}
           >
             <MaterialIcons
               name="account-balance-wallet"
@@ -178,8 +179,8 @@ const CheckoutScreen: React.FC<Props> = ({ route, navigation }) => {
         </View>
 
         {method === 'card' ? (
-          <View style={styles.cardBlock}>
-            <Text style={styles.label}>CARD NUMBER</Text>
+          <View style={styles.card}>
+            <Text style={styles.label}>Card number</Text>
             <TextInput
               style={styles.input}
               placeholder="4242 4242 4242 4242"
@@ -194,7 +195,7 @@ const CheckoutScreen: React.FC<Props> = ({ route, navigation }) => {
             </Text>
           </View>
         ) : (
-          <View style={styles.cardBlock}>
+          <View style={styles.card}>
             <Text style={styles.hint}>
               You will be redirected to ToleMate's web checkout to complete the
               Khalti payment, then return to the app.
@@ -208,6 +209,7 @@ const CheckoutScreen: React.FC<Props> = ({ route, navigation }) => {
           style={[styles.payBtn, paying && styles.btnDisabled]}
           onPress={method === 'card' ? payCard : payKhalti}
           disabled={paying}
+          activeOpacity={0.85}
         >
           {paying ? (
             <ActivityIndicator color={COLORS.white} />
@@ -241,9 +243,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.gray200,
+    borderColor: COLORS.gray100,
     padding: SPACING.md,
-    marginBottom: SPACING.sm,
+    marginBottom: SPACING.md,
     ...SHADOW.card,
   },
   cardTitle: {
@@ -261,8 +263,9 @@ const styles = StyleSheet.create({
   },
   itemMeta: {
     marginTop: 2,
-    fontSize: 13,
+    fontSize: 12,
     color: COLORS.gray500,
+    lineHeight: 18,
   },
   sumRow: {
     flexDirection: 'row',
@@ -271,7 +274,7 @@ const styles = StyleSheet.create({
   },
   sumLabel: {
     fontSize: 14,
-    color: COLORS.gray600,
+    color: COLORS.gray500,
   },
   sumValue: {
     fontSize: 14,
@@ -280,7 +283,7 @@ const styles = StyleSheet.create({
   },
   sumTotalRow: {
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: COLORS.gray200,
+    borderTopColor: COLORS.gray100,
     marginTop: 4,
     paddingTop: SPACING.sm,
   },
@@ -297,13 +300,15 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 12,
     fontWeight: '700',
-    color: COLORS.gray600,
-    marginTop: SPACING.sm,
-    marginBottom: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    color: COLORS.gray500,
+    marginBottom: SPACING.sm,
   },
   methodRow: {
     flexDirection: 'row',
-    gap: SPACING.sm,
+    gap: SPACING.md,
+    marginBottom: SPACING.md,
   },
   methodBtn: {
     flex: 1,
@@ -311,8 +316,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 12,
-    borderRadius: RADIUS.md,
+    height: 48,
+    borderRadius: RADIUS.pill,
     borderWidth: 1,
     borderColor: COLORS.gray200,
     backgroundColor: COLORS.white,
@@ -329,36 +334,33 @@ const styles = StyleSheet.create({
   methodTextActive: {
     color: COLORS.primary700,
   },
-  cardBlock: {
-    marginTop: SPACING.sm,
-  },
   input: {
     borderWidth: 1,
     borderColor: COLORS.gray200,
     borderRadius: RADIUS.md,
     backgroundColor: COLORS.gray50,
     paddingHorizontal: SPACING.md,
-    height: 46,
+    height: 50,
     fontSize: 15,
     color: COLORS.gray900,
     letterSpacing: 1,
   },
   hint: {
     marginTop: 6,
-    fontSize: 11,
+    fontSize: 12,
     color: COLORS.gray500,
-    lineHeight: 16,
+    lineHeight: 18,
   },
   footer: {
     padding: SPACING.md,
     backgroundColor: COLORS.white,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: COLORS.gray200,
+    borderTopColor: COLORS.gray100,
   },
   payBtn: {
     backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.md,
-    height: 48,
+    borderRadius: RADIUS.pill,
+    height: 50,
     alignItems: 'center',
     justifyContent: 'center',
   },

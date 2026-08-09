@@ -7,7 +7,6 @@ import {
   TextInput,
   ActivityIndicator,
   RefreshControl,
-  Alert,
   TouchableOpacity,
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
@@ -16,8 +15,10 @@ import api from '../../api/client';
 import RoleBadge from '../../components/RoleBadge';
 import EmptyState from '../../components/EmptyState';
 import Modal from '../../components/Modal';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import AdminHeader from '../../components/AdminHeader';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme';
 
 interface AdminUser {
@@ -34,10 +35,19 @@ const ROLES = ['customer', 'vendor', 'admin', 'super_admin'];
 
 const AdminUsersScreen: React.FC = () => {
   const { user: me, isSuperAdmin } = useAuth();
+  const toast = useToast();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [confirm, setConfirm] = useState<{
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    tone?: 'danger' | 'primary' | 'warning';
+    icon?: string;
+    fn: () => void;
+  } | null>(null);
 
   const [showCreate, setShowCreate] = useState(false);
   const [createForm, setCreateForm] = useState({
@@ -80,11 +90,11 @@ const AdminUsersScreen: React.FC = () => {
 
   const createUser = async () => {
     if (!createForm.name.trim() || !createForm.email.trim()) {
-      Alert.alert('Missing info', 'Name and email are required.');
+      toast.error('Name and email are required.');
       return;
     }
     if (createForm.password.length < 6) {
-      Alert.alert('Password too short', 'Password must be at least 6 characters.');
+      toast.error('Password must be at least 6 characters.');
       return;
     }
     setSaving(true);
@@ -107,10 +117,10 @@ const AdminUsersScreen: React.FC = () => {
         role: 'customer',
       });
       load();
-      Alert.alert('Created', 'User created successfully.');
+      toast.success('User created successfully.');
     } catch (e: any) {
       const msg = e?.response?.data?.message ?? e?.response?.data?.errors ?? 'Could not create user.';
-      Alert.alert('Failed', typeof msg === 'string' ? msg : JSON.stringify(msg));
+      toast.error(typeof msg === 'string' ? msg : JSON.stringify(msg));
     } finally {
       setSaving(false);
     }
@@ -123,9 +133,9 @@ const AdminUsersScreen: React.FC = () => {
       await api.put(`/admin/users/${selected.id}`, { role });
       setSelected(null);
       load();
-      Alert.alert('Updated', `Role changed to ${role}.`);
+      toast.success(`Role changed to ${role}.`);
     } catch (e: any) {
-      Alert.alert('Failed', e?.response?.data?.message ?? 'Could not change role.');
+      toast.error(e?.response?.data?.message ?? 'Could not change role.');
     } finally {
       setSaving(false);
     }
@@ -138,16 +148,15 @@ const AdminUsersScreen: React.FC = () => {
       const res = await api.post(`/admin/users/${selected.id}/reset-password`, {
         action: 'generate',
       });
-      setSelected(null);
       const newPassword = res.data?.password ?? res.data?.temp_password;
-      Alert.alert(
-        'Password reset',
+      setSelected(null);
+      toast.info(
         newPassword
           ? `New password for ${selected.name}: ${newPassword}\n\nShare it securely with the user.`
           : `Password reset for ${selected.name}.`,
       );
     } catch (e: any) {
-      Alert.alert('Failed', e?.response?.data?.message ?? 'Could not reset password.');
+      toast.error(e?.response?.data?.message ?? 'Could not reset password.');
     } finally {
       setSaving(false);
     }
@@ -155,26 +164,27 @@ const AdminUsersScreen: React.FC = () => {
 
   const removeUser = () => {
     if (!selected) return;
-    Alert.alert('Delete user', `Delete ${selected.name} (${selected.email})? This cannot be undone.`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          setSaving(true);
-          try {
-            await api.delete(`/admin/users/${selected.id}`);
-            setSelected(null);
-            load();
-            Alert.alert('Deleted', 'User deleted.');
-          } catch (e: any) {
-            Alert.alert('Failed', e?.response?.data?.message ?? 'Could not delete user.');
-          } finally {
-            setSaving(false);
-          }
-        },
+    const target = selected;
+    setConfirm({
+      title: 'Delete user',
+      message: `Delete ${target.name} (${target.email})? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      tone: 'danger',
+      icon: 'delete-outline',
+      fn: async () => {
+        setSaving(true);
+        try {
+          await api.delete(`/admin/users/${target.id}`);
+          setSelected(null);
+          load();
+          toast.success('User deleted.');
+        } catch (e: any) {
+          toast.error(e?.response?.data?.message ?? 'Could not delete user.');
+        } finally {
+          setSaving(false);
+        }
       },
-    ]);
+    });
   };
 
   const openUser = (u: AdminUser) => {
@@ -186,7 +196,7 @@ const AdminUsersScreen: React.FC = () => {
   const saveDetails = async () => {
     if (!selected) return;
     if (!editForm.name.trim() || !editForm.email.trim()) {
-      Alert.alert('Missing info', 'Name and email are required.');
+      toast.error('Name and email are required.');
       return;
     }
     setSaving(true);
@@ -198,9 +208,9 @@ const AdminUsersScreen: React.FC = () => {
       });
       setSelected(null);
       load();
-      Alert.alert('Saved', 'User details updated.');
+      toast.success('User details updated.');
     } catch (e: any) {
-      Alert.alert('Failed', e?.response?.data?.message ?? 'Could not update user.');
+      toast.error(e?.response?.data?.message ?? 'Could not update user.');
     } finally {
       setSaving(false);
     }
@@ -332,6 +342,8 @@ const AdminUsersScreen: React.FC = () => {
       <Modal
         visible={showCreate}
         title="Create user"
+        icon="person-add"
+        subtitle="Create a new account"
         onClose={() => setShowCreate(false)}
       >
         <Text style={styles.label}>Full name *</Text>
@@ -387,10 +399,10 @@ const AdminUsersScreen: React.FC = () => {
       <Modal
         visible={!!selected}
         title={selected?.name ?? ''}
+        icon="edit"
+        subtitle={selected?.email}
         onClose={() => setSelected(null)}
       >
-        <Text style={styles.userEmail}>{selected?.email}</Text>
-
         <Text style={styles.label}>Full name</Text>
         <TextInput
           style={styles.input}
@@ -450,7 +462,7 @@ const AdminUsersScreen: React.FC = () => {
           onPress={resetPassword}
           disabled={saving}
         >
-          <MaterialIcons name="lock-reset" size={16} color={COLORS.primary700} />
+          <MaterialIcons name="lock-reset" size={16} color={COLORS.gray600} />
           <Text style={styles.secondaryBtnText}>Reset password</Text>
         </TouchableOpacity>
 
@@ -463,6 +475,21 @@ const AdminUsersScreen: React.FC = () => {
           <Text style={styles.dangerBtnText}>Delete user</Text>
         </TouchableOpacity>
       </Modal>
+
+      <ConfirmDialog
+        visible={!!confirm}
+        title={confirm?.title ?? ''}
+        message={confirm?.message ?? ''}
+        confirmLabel={confirm?.confirmLabel}
+        tone={confirm?.tone}
+        icon={confirm?.icon}
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => {
+          const c = confirm;
+          setConfirm(null);
+          c?.fn();
+        }}
+      />
     </View>
   );
 };
@@ -476,19 +503,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: SPACING.md,
-    marginVertical: SPACING.sm,
+    marginBottom: SPACING.sm,
     gap: SPACING.sm,
   },
   searchBox: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.gray50,
     borderRadius: RADIUS.md,
     borderWidth: 1,
     borderColor: COLORS.gray200,
-    paddingHorizontal: SPACING.sm,
-    height: 42,
+    paddingHorizontal: 14,
+    height: 46,
   },
   searchInput: {
     flex: 1,
@@ -498,9 +525,9 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   addBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: RADIUS.md,
+    width: 46,
+    height: 46,
+    borderRadius: RADIUS.pill,
     backgroundColor: COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
@@ -511,7 +538,9 @@ const styles = StyleSheet.create({
   },
   list: {
     paddingHorizontal: SPACING.md,
-    paddingBottom: SPACING.xl,
+    paddingTop: 4,
+    paddingBottom: 40,
+    gap: 12,
   },
   card: {
     flexDirection: 'row',
@@ -519,44 +548,46 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.gray200,
-    padding: SPACING.sm,
-    marginBottom: SPACING.sm,
+    borderColor: COLORS.gray100,
+    padding: SPACING.md,
+    marginBottom: 12,
     ...SHADOW.card,
   },
   avatar: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     borderRadius: RADIUS.pill,
     backgroundColor: COLORS.primary100,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '800',
     color: COLORS.primary700,
   },
   body: {
     flex: 1,
-    marginLeft: SPACING.sm,
+    marginLeft: 12,
   },
   name: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
     color: COLORS.gray900,
   },
   email: {
-    fontSize: 12,
+    fontSize: 13,
     color: COLORS.gray500,
+    marginTop: 2,
   },
   right: {
     alignItems: 'flex-end',
+    marginLeft: SPACING.sm,
   },
   activeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
+    marginTop: 6,
   },
   dot: {
     width: 6,
@@ -565,16 +596,15 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   activeText: {
-    fontSize: 10,
+    fontSize: 11,
     color: COLORS.gray500,
     fontWeight: '600',
   },
   label: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
     color: COLORS.gray600,
-    marginTop: SPACING.sm,
-    marginBottom: 4,
+    marginBottom: 6,
     textTransform: 'capitalize',
   },
   input: {
@@ -582,8 +612,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.gray200,
     borderRadius: RADIUS.md,
-    paddingHorizontal: SPACING.sm,
-    height: 44,
+    paddingHorizontal: 14,
+    height: 46,
     fontSize: 14,
     color: COLORS.gray900,
   },
@@ -596,7 +626,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.gray100,
+    backgroundColor: COLORS.gray50,
     borderWidth: 1,
     borderColor: COLORS.gray200,
   },
@@ -607,37 +637,39 @@ const styles = StyleSheet.create({
   chipText: {
     fontSize: 12,
     fontWeight: '700',
-    color: COLORS.gray600,
+    color: COLORS.gray700,
     textTransform: 'capitalize',
   },
   chipTextActive: {
-    color: COLORS.primary700,
+    color: COLORS.primary,
   },
   primaryBtn: {
     marginTop: SPACING.md,
     backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.md,
+    borderRadius: RADIUS.pill,
     height: 46,
     alignItems: 'center',
     justifyContent: 'center',
   },
   primaryBtnText: {
     color: COLORS.white,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
   },
   secondaryBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    marginTop: SPACING.md,
-    backgroundColor: COLORS.primary100,
-    borderRadius: RADIUS.md,
-    height: 44,
+    gap: 8,
+    marginTop: 12,
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.gray200,
+    borderRadius: RADIUS.pill,
+    height: 46,
   },
   secondaryBtnText: {
-    color: COLORS.primary700,
+    color: COLORS.gray700,
     fontSize: 14,
     fontWeight: '700',
   },
@@ -645,11 +677,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    marginTop: SPACING.md,
+    gap: 8,
+    marginTop: 12,
     backgroundColor: COLORS.rose,
-    borderRadius: RADIUS.md,
-    height: 44,
+    borderRadius: RADIUS.pill,
+    height: 46,
   },
   dangerBtnText: {
     color: COLORS.white,
@@ -658,11 +690,6 @@ const styles = StyleSheet.create({
   },
   btnDisabled: {
     opacity: 0.6,
-  },
-  userEmail: {
-    fontSize: 13,
-    color: COLORS.gray500,
-    marginBottom: SPACING.xs,
   },
 });
 

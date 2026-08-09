@@ -163,15 +163,15 @@ const AdminVendorsScreen: React.FC = () => {
   const toggleVerify = () => {
     if (!selected) return;
     run(
-      () => api.put(`/vendors/${selected.id}/verify`),
+      () => api.put(`/super-admin/vendors/${selected.id}/verify`),
       'Could not update verification.',
     );
-  };
+  }
 
   const toggleFeature = () => {
     if (!selected) return;
     run(
-      () => api.put(`/vendors/${selected.id}/feature`),
+      () => api.put(`/super-admin/vendors/${selected.id}/feature`),
       'Could not update feature flag.',
     );
   };
@@ -179,7 +179,7 @@ const AdminVendorsScreen: React.FC = () => {
   const changePlan = (plan: string) => {
     if (!selected) return;
     run(
-      () => api.put(`/vendors/${selected.id}/plan`, { plan }),
+      () => api.put(`/super-admin/vendors/${selected.id}/plan`, { plan }),
       'Could not change plan.',
     );
   };
@@ -196,7 +196,7 @@ const AdminVendorsScreen: React.FC = () => {
           style: 'destructive',
           onPress: () =>
             run(
-              () => api.delete(`/vendors/${selected.id}`),
+              () => api.delete(`/super-admin/vendors/${selected.id}`),
               'Could not delete vendor.',
             ),
         },
@@ -226,7 +226,7 @@ const AdminVendorsScreen: React.FC = () => {
     if (!selected) return;
     setBusy(true);
     try {
-      await api.put(`/admin/vendors/${selected.id}/features`, {
+      await api.put(`/super-admin/vendors/${selected.id}/features`, {
         features,
       });
       setShowFeatures(false);
@@ -272,7 +272,7 @@ const AdminVendorsScreen: React.FC = () => {
     }
     setBusy(true);
     try {
-      await api.put(`/admin/vendors/${selected.id}/availability`, {
+      await api.put(`/super-admin/vendors/${selected.id}/availability`, {
         availability: availDraft,
       });
       setShowAvailability(false);

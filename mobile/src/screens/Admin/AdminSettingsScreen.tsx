@@ -7,11 +7,11 @@ import {
   TextInput,
   Pressable,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../../api/client';
 import ScreenHeader from '../../components/ScreenHeader';
+import { useToast } from '../../context/ToastContext';
 import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme';
 
 const FIELDS: { key: string; label: string }[] = [
@@ -23,6 +23,7 @@ const FIELDS: { key: string; label: string }[] = [
 ];
 
 const AdminSettingsScreen: React.FC = () => {
+  const toast = useToast();
   const [form, setForm] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -55,9 +56,9 @@ const AdminSettingsScreen: React.FC = () => {
       await api.post('/admin/settings', {
         settings: FIELDS.map(f => ({ key: f.key, value: form[f.key] ?? '' })),
       });
-      Alert.alert('Saved', 'Settings updated.');
+      toast.success('Settings updated.');
     } catch {
-      Alert.alert('Failed', 'Could not save settings.');
+      toast.error('Could not save settings.');
     } finally {
       setSaving(false);
     }
@@ -93,7 +94,11 @@ const AdminSettingsScreen: React.FC = () => {
             </View>
           ))}
         </View>
-        <Pressable style={styles.saveBtn} onPress={save} disabled={saving}>
+        <Pressable
+          style={[styles.saveBtn, saving && styles.btnDisabled]}
+          onPress={save}
+          disabled={saving}
+        >
           <Text style={styles.saveText}>{saving ? 'Saving...' : 'Save Settings'}</Text>
         </Pressable>
       </ScrollView>
@@ -111,45 +116,52 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: SPACING.md,
-    paddingBottom: SPACING.xl,
+    paddingTop: 4,
+    paddingBottom: 40,
   },
   card: {
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.gray200,
+    borderColor: COLORS.gray100,
     padding: SPACING.md,
+    marginBottom: 12,
     ...SHADOW.card,
   },
   field: {
     marginBottom: SPACING.md,
   },
   label: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
     color: COLORS.gray600,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   input: {
+    backgroundColor: COLORS.gray50,
     borderWidth: 1,
-    borderColor: COLORS.gray300,
+    borderColor: COLORS.gray200,
     borderRadius: RADIUS.md,
-    paddingHorizontal: SPACING.sm,
-    height: 42,
+    paddingHorizontal: 14,
+    height: 46,
     fontSize: 14,
     color: COLORS.gray900,
   },
   saveBtn: {
     backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.md,
-    paddingVertical: 12,
+    borderRadius: RADIUS.pill,
+    height: 46,
     alignItems: 'center',
+    justifyContent: 'center',
     marginTop: SPACING.md,
   },
   saveText: {
     color: COLORS.white,
     fontSize: 14,
     fontWeight: '700',
+  },
+  btnDisabled: {
+    opacity: 0.6,
   },
 });
 

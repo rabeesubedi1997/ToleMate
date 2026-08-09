@@ -102,23 +102,24 @@ const AdminOverviewScreen: React.FC = () => {
   );
 
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={() => {
-            setRefreshing(true);
-            load();
-          }}
-          tintColor={COLORS.primary}
-        />
-      }
-    >
+    <View style={styles.container}>
       <AdminHeader
         title="Overview"
         subtitle={isSuperAdmin ? 'Super Admin workspace' : 'Admin workspace'}
       />
+      <ScrollView
+        style={styles.body}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              load();
+            }}
+            tintColor={COLORS.primary}
+          />
+        }
+      >
 
       {loading ? (
         <ActivityIndicator
@@ -258,7 +259,8 @@ const AdminOverviewScreen: React.FC = () => {
           </View>
         </>
       )}
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 };
 
@@ -266,6 +268,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.light,
+  },
+  body: {
+    flex: 1,
   },
   loader: {
     marginTop: SPACING.xxl,

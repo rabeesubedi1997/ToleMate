@@ -17,7 +17,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 import api from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
-import { COLORS, SPACING } from '../../theme';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from '../../theme';
 import ServiceCard, { Service } from '../../components/ServiceCard';
 import AppImage from '../../components/AppImage';
 import AppBanner from '../../components/AppBanner';
@@ -158,9 +158,7 @@ const HomeScreen: React.FC = () => {
       activeOpacity={0.8}
       onPress={() => openCategory(item.id)}
     >
-      <View style={styles.categoryIcon}>
-        <MaterialIcons name="category" size={22} color={COLORS.primary} />
-      </View>
+      <MaterialIcons name="category" size={16} color={COLORS.gray700} />
       <Text style={styles.categoryName} numberOfLines={1}>
         {item.name}
       </Text>
@@ -185,6 +183,24 @@ const HomeScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Fixed header */}
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.brand}>ToleMate</Text>
+          <Text style={styles.greeting}>
+            Namaste, {user?.name?.split(' ')[0] ?? 'Guest'}
+          </Text>
+        </View>
+        <TouchableOpacity
+          style={styles.headerBadge}
+          activeOpacity={0.8}
+          onPress={() => navigation.navigate('Notifications')}
+        >
+          <MaterialIcons name="notifications-none" size={22} color={COLORS.primary} />
+          <View style={styles.badgeDot} />
+        </TouchableOpacity>
+      </View>
+
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -196,24 +212,6 @@ const HomeScreen: React.FC = () => {
           />
         }
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.brand}>ToleMate</Text>
-            <Text style={styles.greeting}>
-              Namaste, {user?.name?.split(' ')[0] ?? 'Guest'}
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={styles.headerBadge}
-            activeOpacity={0.8}
-            onPress={() => navigation.navigate('Notifications')}
-          >
-            <MaterialIcons name="notifications-none" size={22} color={COLORS.primary} />
-            <View style={styles.badgeDot} />
-          </TouchableOpacity>
-        </View>
-
         {/* Hero banner */}
         <AppBanner onPressSlide={openBannerLink} />
 
@@ -228,7 +226,7 @@ const HomeScreen: React.FC = () => {
 
         {/* Search */}
         <View style={styles.searchContainer}>
-          <MaterialIcons name="search" size={20} color={COLORS.slate500} />
+          <MaterialIcons name="search" size={20} color={COLORS.gray400} />
           <TextInput
             placeholder="What service do you need?"
             style={styles.searchInput}
@@ -236,11 +234,11 @@ const HomeScreen: React.FC = () => {
             onChangeText={setSearch}
             returnKeyType="search"
             onSubmitEditing={openSearch}
-            placeholderTextColor={COLORS.slate400}
+            placeholderTextColor={COLORS.gray400}
           />
           {search.length > 0 ? (
-            <TouchableOpacity onPress={openSearch}>
-              <Text style={styles.searchGo}>Go</Text>
+            <TouchableOpacity style={styles.searchGo} onPress={openSearch}>
+              <Text style={styles.searchGoText}>Go</Text>
             </TouchableOpacity>
           ) : null}
         </View>
@@ -264,11 +262,17 @@ const HomeScreen: React.FC = () => {
         {loading ? (
           <>
             <View style={styles.sectionHead}>
-              <Text style={styles.sectionTitle}>Categories</Text>
+              <View>
+                <Text style={styles.kicker}>Explore</Text>
+                <Text style={styles.sectionTitle}>Categories</Text>
+              </View>
             </View>
             <CategoryRowSkeleton />
             <View style={styles.sectionHead}>
-              <Text style={styles.sectionTitle}>Popular Services</Text>
+              <View>
+                <Text style={styles.kicker}>Trending</Text>
+                <Text style={styles.sectionTitle}>Popular Services</Text>
+              </View>
             </View>
             <ServiceGridSkeleton count={4} />
           </>
@@ -276,7 +280,10 @@ const HomeScreen: React.FC = () => {
           <>
             {/* Categories */}
             <View style={styles.sectionHead}>
-              <Text style={styles.sectionTitle}>Categories</Text>
+              <View>
+                <Text style={styles.kicker}>Explore</Text>
+                <Text style={styles.sectionTitle}>Categories</Text>
+              </View>
               <TouchableOpacity onPress={() => navigation.navigate('Marketplace', undefined)}>
                 <Text style={styles.seeAll}>See all</Text>
               </TouchableOpacity>
@@ -295,7 +302,10 @@ const HomeScreen: React.FC = () => {
             {vendors.length > 0 ? (
               <>
                 <View style={styles.sectionHead}>
-                  <Text style={styles.sectionTitle}>Featured Professionals</Text>
+                  <View>
+                    <Text style={styles.kicker}>Top rated</Text>
+                    <Text style={styles.sectionTitle}>Featured Professionals</Text>
+                  </View>
                 </View>
                 <FlatList
                   horizontal
@@ -311,7 +321,10 @@ const HomeScreen: React.FC = () => {
 
             {/* Services */}
             <View style={styles.sectionHead}>
-              <Text style={styles.sectionTitle}>Popular Services</Text>
+              <View>
+                <Text style={styles.kicker}>Trending</Text>
+                <Text style={styles.sectionTitle}>Popular Services</Text>
+              </View>
               <TouchableOpacity onPress={() => navigation.navigate('Marketplace', undefined)}>
                 <Text style={styles.seeAll}>See all</Text>
               </TouchableOpacity>
@@ -348,6 +361,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: SPACING.md,
     paddingTop: SPACING.sm,
+    paddingBottom: SPACING.xs,
+    backgroundColor: COLORS.light,
   },
   brand: {
     fontSize: 13,
@@ -357,8 +372,8 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   greeting: {
-    fontSize: 16,
-    color: COLORS.slate500,
+    fontSize: FONT_SIZE.base,
+    color: COLORS.gray500,
     marginTop: 1,
     fontWeight: '600',
   },
@@ -369,11 +384,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: COLORS.gray100,
+    ...SHADOW.card,
     position: 'relative',
   },
   badgeDot: {
@@ -393,58 +406,66 @@ const styles = StyleSheet.create({
     marginHorizontal: SPACING.md,
     marginTop: SPACING.md,
     paddingHorizontal: SPACING.md,
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
+    backgroundColor: COLORS.gray50,
+    borderWidth: 1,
+    borderColor: COLORS.gray200,
+    borderRadius: RADIUS.md,
     height: 46,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
   },
   searchInput: {
     flex: 1,
     marginLeft: SPACING.sm,
-    fontSize: 15,
-    color: COLORS.dark,
+    fontSize: FONT_SIZE.base,
+    color: COLORS.gray900,
+  },
+  searchGo: {
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: SPACING.md,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchGoText: {
+    color: COLORS.white,
+    fontWeight: '700',
+    fontSize: FONT_SIZE.sm,
   },
   postReq: {
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: SPACING.md,
     marginTop: SPACING.md,
-    backgroundColor: COLORS.primary50,
-    borderRadius: 12,
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.primary100,
+    borderColor: COLORS.gray100,
     padding: SPACING.md,
-    gap: SPACING.sm,
+    gap: SPACING.md,
+    ...SHADOW.card,
   },
   postReqIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
-    backgroundColor: COLORS.white,
+    width: 42,
+    height: 42,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.primary50,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.primary100,
   },
   postReqBody: {
     flex: 1,
   },
   postReqTitle: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.base,
     fontWeight: '700',
     color: COLORS.gray900,
   },
   postReqSub: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     color: COLORS.gray500,
     marginTop: 1,
-  },
-  searchGo: {
-    color: COLORS.primary,
-    fontWeight: '700',
-    fontSize: 15,
   },
   loader: {
     marginTop: SPACING.xxl,
@@ -458,10 +479,10 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     paddingHorizontal: SPACING.sm,
     backgroundColor: COLORS.warningBg,
-    borderRadius: 6,
+    borderRadius: RADIUS.sm,
   },
   offlineText: {
-    fontSize: 11,
+    fontSize: FONT_SIZE.xs,
     fontWeight: '600',
     color: COLORS.warningText,
   },
@@ -473,60 +494,59 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   seeAll: {
-    fontSize: 13,
+    fontSize: FONT_SIZE.sm,
     fontWeight: '700',
     color: COLORS.primary,
   },
-  sectionTitle: {
-    fontSize: 17,
+  kicker: {
+    fontSize: FONT_SIZE.sm,
     fontWeight: '700',
-    color: COLORS.dark,
+    color: COLORS.gray500,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  sectionTitle: {
+    fontSize: FONT_SIZE.lg,
+    fontWeight: '700',
+    color: COLORS.gray900,
+    marginTop: 2,
   },
   categoryList: {
     paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.sm,
-    gap: SPACING.sm,
+    paddingTop: SPACING.md,
+    gap: SPACING.xs,
   },
   categoryItem: {
-    width: 86,
+    flexDirection: 'row',
     alignItems: 'center',
-  },
-  categoryIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 18,
+    gap: 6,
+    height: 42,
+    paddingHorizontal: SPACING.md,
+    borderRadius: RADIUS.pill,
+    borderWidth: 1,
+    borderColor: COLORS.gray200,
     backgroundColor: COLORS.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
   },
   categoryName: {
-    marginTop: 6,
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     fontWeight: '600',
-    color: COLORS.dark,
-    textAlign: 'center',
+    color: COLORS.gray700,
+    maxWidth: 96,
   },
   vendorList: {
     paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.sm,
+    paddingTop: SPACING.md,
     gap: SPACING.sm,
   },
   vendorCard: {
-    width: 110,
+    width: 112,
     alignItems: 'center',
     backgroundColor: COLORS.white,
-    borderRadius: 14,
-    padding: SPACING.sm,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.gray100,
+    padding: SPACING.sm + 4,
+    ...SHADOW.card,
   },
   vendorAvatar: {
     width: 64,
@@ -534,17 +554,17 @@ const styles = StyleSheet.create({
     borderRadius: 32,
   },
   vendorName: {
-    marginTop: 6,
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.dark,
+    marginTop: SPACING.sm,
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '700',
+    color: COLORS.gray900,
     textAlign: 'center',
   },
   vendorRating: {
     marginTop: 2,
-    fontSize: 11,
+    fontSize: FONT_SIZE.xs,
     color: COLORS.accent,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   grid: {
     flexDirection: 'row',
@@ -555,9 +575,9 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     textAlign: 'center',
-    color: COLORS.slate500,
+    color: COLORS.gray500,
     padding: SPACING.xl,
-    fontSize: 14,
+    fontSize: FONT_SIZE.base,
   },
 });
 

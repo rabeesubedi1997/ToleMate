@@ -8,8 +8,6 @@ import {
   RefreshControl,
   Pressable,
   TextInput,
-  Modal,
-  Alert,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../../api/client';
@@ -17,7 +15,10 @@ import ScreenHeader from '../../components/ScreenHeader';
 import FilterChips from '../../components/FilterChips';
 import StatusBadge from '../../components/StatusBadge';
 import EmptyState from '../../components/EmptyState';
-import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme';
+import Modal from '../../components/Modal';
+import ConfirmDialog from '../../components/ConfirmDialog';
+import { useToast } from '../../context/ToastContext';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from '../../theme';
 
 interface Service {
   id: number;
@@ -34,6 +35,7 @@ interface Service {
 const STATUSES = ['pending', 'approved', 'rejected', 'draft'];
 
 const AdminModerationScreen: React.FC = () => {
+  const toast = useToast();
   const [services, setServices] = useState<Service[]>([]);
   const [filter, setFilter] = useState('pending');
   const [loading, setLoading] = useState(true);
@@ -41,6 +43,14 @@ const AdminModerationScreen: React.FC = () => {
   const [rejectTarget, setRejectTarget] = useState<Service | null>(null);
   const [reason, setReason] = useState('');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<{
+    title: string;
+    message: string;
+    tone?: 'danger' | 'primary' | 'warning';
+    confirmLabel?: string;
+    icon?: string;
+    fn: () => void;
+  } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -67,12 +77,23 @@ const AdminModerationScreen: React.FC = () => {
     try {
       await api.post(`/super-admin/services/${service.id}/approve`);
       load();
+      toast.success('Service approved.');
     } catch {
-      Alert.alert('Failed', 'Could not approve service.');
+      toast.error('Could not approve service.');
     } finally {
       setActionLoading(null);
     }
   };
+
+  const confirmApprove = (service: Service) =>
+    setConfirm({
+      title: 'Approve service',
+      message: `Approve "${service.name}" so it goes live?`,
+      confirmLabel: 'Approve',
+      icon: 'check-circle',
+      tone: 'primary',
+      fn: () => approve(service),
+    });
 
   const submitReject = async () => {
     if (!rejectTarget) return;
@@ -84,8 +105,9 @@ const AdminModerationScreen: React.FC = () => {
       setRejectTarget(null);
       setReason('');
       load();
+      toast.success('Service rejected.');
     } catch {
-      Alert.alert('Failed', 'Could not reject service.');
+      toast.error('Could not reject service.');
     } finally {
       setActionLoading(null);
     }
@@ -116,13 +138,13 @@ const AdminModerationScreen: React.FC = () => {
         <View style={styles.actions}>
           <Pressable
             style={[styles.btn, styles.approveBtn]}
-            onPress={() => approve(item)}
+            onPress={() => confirmApprove(item)}
             disabled={actionLoading === `approve-${item.id}`}
           >
             {actionLoading === `approve-${item.id}` ? (
               <ActivityIndicator size="small" color={COLORS.white} />
             ) : (
-              <Text style={styles.approveText}>Approve</Text>
+              <Text style={styles.btnText}>Approve</Text>
             )}
           </Pressable>
           <Pressable
@@ -130,7 +152,7 @@ const AdminModerationScreen: React.FC = () => {
             onPress={() => setRejectTarget(item)}
             disabled={actionLoading === `reject-${item.id}`}
           >
-            <Text style={styles.rejectText}>Reject</Text>
+            <Text style={styles.btnText}>Reject</Text>
           </Pressable>
         </View>
       ) : null}
@@ -175,44 +197,55 @@ const AdminModerationScreen: React.FC = () => {
 
       <Modal
         visible={rejectTarget !== null}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setRejectTarget(null)}
+        title="Reject service"
+        subtitle="Tell the vendor why this service was rejected."
+        icon="block"
+        onClose={() => setRejectTarget(null)}
       >
-        <View style={styles.modalWrap}>
-          <View style={styles.modal}>
-            <Text style={styles.modalTitle}>Reject service</Text>
-            <Text style={styles.modalHint}>
-              Tell the vendor why this service was rejected.
-            </Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Rejection reason"
-              placeholderTextColor={COLORS.gray400}
-              value={reason}
-              onChangeText={setReason}
-              multiline
-            />
-            <View style={styles.modalRow}>
-              <Pressable
-                style={[styles.modalBtn, styles.cancelBtn]}
-                onPress={() => setRejectTarget(null)}
-              >
-                <Text style={styles.cancelText}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.modalBtn, styles.saveBtn]}
-                onPress={submitReject}
-                disabled={actionLoading !== null}
-              >
-                <Text style={styles.saveText}>
-                  {actionLoading ? 'Rejecting...' : 'Reject'}
-                </Text>
-              </Pressable>
-            </View>
-          </View>
+        <Text style={styles.fieldLabel}>Rejection reason</Text>
+        <TextInput
+          style={[styles.input, styles.inputMultiline]}
+          placeholder="Why is this service being rejected?"
+          placeholderTextColor={COLORS.gray400}
+          value={reason}
+          onChangeText={setReason}
+          multiline
+        />
+        <View style={styles.modalRow}>
+          <Pressable
+            style={[styles.modalBtn, styles.cancelBtn]}
+            onPress={() => setRejectTarget(null)}
+          >
+            <Text style={styles.cancelText}>Cancel</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.modalBtn, styles.saveBtn]}
+            onPress={submitReject}
+            disabled={actionLoading !== null}
+          >
+            {actionLoading ? (
+              <ActivityIndicator size="small" color={COLORS.white} />
+            ) : (
+              <Text style={styles.saveText}>Reject</Text>
+            )}
+          </Pressable>
         </View>
       </Modal>
+
+      <ConfirmDialog
+        visible={!!confirm}
+        title={confirm?.title ?? ''}
+        message={confirm?.message ?? ''}
+        tone={confirm?.tone}
+        icon={confirm?.icon}
+        confirmLabel={confirm?.confirmLabel}
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => {
+          const c = confirm;
+          setConfirm(null);
+          c?.fn();
+        }}
+      />
     </View>
   );
 };
@@ -223,11 +256,12 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.light,
   },
   loader: {
-    marginTop: SPACING.xxl,
+    marginTop: 60,
   },
   list: {
     paddingHorizontal: SPACING.md,
-    paddingBottom: SPACING.xl,
+    paddingVertical: 4,
+    paddingBottom: SPACING.xl + 8,
   },
   card: {
     backgroundColor: COLORS.white,
@@ -235,34 +269,34 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.gray200,
     padding: SPACING.md,
-    marginBottom: SPACING.sm,
+    marginBottom: SPACING.md,
     ...SHADOW.card,
   },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: SPACING.sm,
     marginBottom: SPACING.xs,
   },
   title: {
     flex: 1,
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     fontWeight: '700',
     color: COLORS.gray900,
-    marginRight: SPACING.sm,
   },
   meta: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.xs,
     color: COLORS.gray500,
   },
   price: {
-    fontSize: 15,
+    fontSize: FONT_SIZE.md,
     fontWeight: '700',
     color: COLORS.primary700,
     marginTop: SPACING.xs,
   },
   desc: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     color: COLORS.gray600,
     marginTop: 2,
   },
@@ -280,70 +314,54 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   reasonText: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     color: COLORS.gray700,
     marginTop: 2,
   },
   actions: {
     flexDirection: 'row',
     gap: SPACING.sm,
-    marginTop: SPACING.sm,
+    marginTop: SPACING.md,
   },
   btn: {
     flex: 1,
-    borderRadius: RADIUS.md,
-    paddingVertical: 8,
+    maxWidth: 140,
+    height: 46,
+    borderRadius: RADIUS.pill,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   approveBtn: {
     backgroundColor: COLORS.primary,
   },
   rejectBtn: {
-    backgroundColor: COLORS.roseBg,
+    backgroundColor: COLORS.rose,
   },
-  approveText: {
+  btnText: {
     color: COLORS.white,
     fontWeight: '700',
-    fontSize: 13,
+    fontSize: FONT_SIZE.base,
   },
-  rejectText: {
-    color: COLORS.roseText,
+  fieldLabel: {
+    fontSize: FONT_SIZE.sm,
     fontWeight: '700',
-    fontSize: 13,
-  },
-  modalWrap: {
-    flex: 1,
-    backgroundColor: 'rgba(17,24,39,0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: SPACING.xl,
-  },
-  modal: {
-    width: '100%',
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.lg,
-  },
-  modalTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.gray900,
-  },
-  modalHint: {
-    fontSize: 12,
-    color: COLORS.gray500,
-    marginTop: 2,
-    marginBottom: SPACING.sm,
+    color: COLORS.gray600,
+    marginBottom: 6,
   },
   input: {
+    backgroundColor: COLORS.gray50,
     borderWidth: 1,
-    borderColor: COLORS.gray300,
+    borderColor: COLORS.gray200,
     borderRadius: RADIUS.md,
-    paddingHorizontal: SPACING.sm,
-    minHeight: 80,
-    fontSize: 14,
+    paddingHorizontal: SPACING.md,
+    fontSize: FONT_SIZE.base,
     color: COLORS.gray900,
+  },
+  inputMultiline: {
+    minHeight: 88,
+    height: 'auto',
     textAlignVertical: 'top',
+    paddingTop: SPACING.sm,
   },
   modalRow: {
     flexDirection: 'row',
@@ -352,25 +370,28 @@ const styles = StyleSheet.create({
   },
   modalBtn: {
     flex: 1,
-    borderRadius: RADIUS.md,
-    paddingVertical: 10,
+    height: 46,
+    borderRadius: RADIUS.pill,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   cancelBtn: {
     backgroundColor: COLORS.gray100,
+    borderWidth: 1,
+    borderColor: COLORS.gray200,
   },
   saveBtn: {
     backgroundColor: COLORS.rose,
   },
   cancelText: {
     color: COLORS.gray700,
-    fontWeight: '600',
-    fontSize: 13,
+    fontWeight: '700',
+    fontSize: FONT_SIZE.base,
   },
   saveText: {
     color: COLORS.white,
     fontWeight: '700',
-    fontSize: 13,
+    fontSize: FONT_SIZE.base,
   },
 });
 

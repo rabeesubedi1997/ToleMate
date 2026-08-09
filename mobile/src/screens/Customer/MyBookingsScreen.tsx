@@ -7,7 +7,6 @@ import {
   ActivityIndicator,
   RefreshControl,
   TouchableOpacity,
-  Alert,
   TextInput,
   ScrollView,
 } from 'react-native';
@@ -20,7 +19,9 @@ import FilterChips from '../../components/FilterChips';
 import EmptyState from '../../components/EmptyState';
 import Modal from '../../components/Modal';
 import StatusBadge from '../../components/StatusBadge';
-import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme';
+import ConfirmDialog from '../../components/ConfirmDialog';
+import { useToast } from '../../context/ToastContext';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from '../../theme';
 import { MainStackParamList } from '../../navigation/types';
 
 interface Booking {
@@ -48,15 +49,16 @@ interface Booking {
   package?: { id: number; name?: string } | null;
 }
 
-const STATUSES = ['all', 'pending', 'accepted', 'in_progress', 'completed', 'cancelled'];
+interface ConfirmState {
+  title: string;
+  message: string;
+  tone?: 'danger' | 'primary' | 'warning';
+  confirmLabel?: string;
+  icon?: string;
+  fn: () => void;
+}
 
-const STATUS_COLORS: Record<string, string> = {
-  pending: COLORS.warningBg,
-  accepted: COLORS.infoBg,
-  in_progress: COLORS.infoBg,
-  completed: COLORS.successBg,
-  cancelled: COLORS.roseBg,
-};
+const STATUSES = ['all', 'pending', 'accepted', 'in_progress', 'completed', 'cancelled'];
 
 const STATUS_TINTS: Record<string, string> = {
   pending: COLORS.warningText,
@@ -68,12 +70,14 @@ const STATUS_TINTS: Record<string, string> = {
 
 const MyBookingsScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>();
+  const toast = useToast();
   const [items, setItems] = useState<Booking[]>([]);
   const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selected, setSelected] = useState<Booking | null>(null);
   const [busy, setBusy] = useState(false);
+  const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [showReschedule, setShowReschedule] = useState(false);
   const [reschedDate, setReschedDate] = useState('');
   const [reschedTime, setReschedTime] = useState('');
@@ -101,38 +105,39 @@ const MyBookingsScreen: React.FC = () => {
     }, [load]),
   );
 
-  const cancelBooking = () => {
+  const askCancel = () => {
     if (!selected) return;
-    Alert.alert('Cancel booking', 'Cancel this booking? This cannot be undone.', [
-      { text: 'No', style: 'cancel' },
-      {
-        text: 'Cancel booking',
-        style: 'destructive',
-        onPress: async () => {
-          setBusy(true);
-          try {
-            await api.put(`/bookings/${selected.id}`, { status: 'cancelled' });
-            setSelected(null);
-            load();
-          } catch (e: any) {
-            Alert.alert('Failed', e?.response?.data?.message ?? 'Could not cancel booking.');
-          } finally {
-            setBusy(false);
-          }
-        },
+    setConfirm({
+      title: 'Cancel booking',
+      message: 'Cancel this booking? This cannot be undone.',
+      tone: 'danger',
+      confirmLabel: 'Cancel booking',
+      icon: 'cancel',
+      fn: async () => {
+        setBusy(true);
+        try {
+          await api.put(`/bookings/${selected.id}`, { status: 'cancelled' });
+          setSelected(null);
+          load();
+          toast.success('Booking cancelled');
+        } catch (e: any) {
+          toast.error(e?.response?.data?.message ?? 'Could not cancel booking.');
+        } finally {
+          setBusy(false);
+        }
       },
-    ]);
+    });
   };
 
   const sendReschedule = async () => {
     if (!selected) return;
     if (!reschedDate || !reschedTime) {
-      Alert.alert('Missing', 'Pick a new date and time.');
+      toast.info('Pick a new date and time.');
       return;
     }
     const scheduled = new Date(`${reschedDate}T${reschedTime}:00`);
     if (scheduled.getTime() <= Date.now()) {
-      Alert.alert('Invalid', 'Reschedule time must be in the future.');
+      toast.info('Reschedule time must be in the future.');
       return;
     }
     setBusy(true);
@@ -140,12 +145,12 @@ const MyBookingsScreen: React.FC = () => {
       await api.post(`/bookings/${selected.id}/reschedule`, {
         reschedule_to: scheduled.toISOString(),
       });
-      Alert.alert('Request sent', 'The vendor will confirm the new time.');
+      toast.success('The vendor will confirm the new time.');
       setShowReschedule(false);
       setSelected(null);
       load();
     } catch (e: any) {
-      Alert.alert('Failed', e?.response?.data?.message ?? 'Could not request reschedule.');
+      toast.error(e?.response?.data?.message ?? 'Could not request reschedule.');
     } finally {
       setBusy(false);
     }
@@ -160,12 +165,12 @@ const MyBookingsScreen: React.FC = () => {
         rating,
         comment: comment.trim() || undefined,
       });
-      Alert.alert('Thanks!', 'Your review was submitted.');
+      toast.success('Your review was submitted.');
       setShowReview(false);
       setSelected(null);
       load();
     } catch (e: any) {
-      Alert.alert('Failed', e?.response?.data?.message ?? 'Could not submit review.');
+      toast.error(e?.response?.data?.message ?? 'Could not submit review.');
     } finally {
       setBusy(false);
     }
@@ -181,45 +186,60 @@ const MyBookingsScreen: React.FC = () => {
     });
   };
 
-  const renderItem = ({ item }: { item: Booking }) => (
-    <TouchableOpacity
-      style={styles.card}
-      activeOpacity={0.7}
-      onPress={() => setSelected(item)}
-    >
-      <View style={styles.cardTop}>
-        <Text style={styles.cardTitle} numberOfLines={1}>
-          {item.service?.name ?? `Booking #${item.id}`}
-        </Text>
-        <View
-          style={[
-            styles.statusPill,
-            { backgroundColor: STATUS_COLORS[item.status] ?? COLORS.gray100 },
-          ]}
-        >
-          <Text style={[styles.statusText, { color: STATUS_TINTS[item.status] ?? COLORS.gray600 }]}>
-            {item.status}
+  const renderItem = ({ item }: { item: Booking }) => {
+    const tint = STATUS_TINTS[item.status] ?? COLORS.gray500;
+    return (
+      <TouchableOpacity
+        style={styles.card}
+        activeOpacity={0.7}
+        onPress={() => setSelected(item)}
+      >
+        <View style={styles.cardTop}>
+          <View style={styles.cardTitleBlock}>
+            <Text style={styles.cardTitle} numberOfLines={1}>
+              {item.service?.name ?? `Booking #${item.id}`}
+            </Text>
+            <Text style={styles.cardVendor} numberOfLines={1}>
+              {item.vendor?.business_name ?? item.vendor?.user?.name ?? 'Vendor'}
+            </Text>
+          </View>
+          <View style={styles.badgeCol}>
+            <StatusBadge status={item.status} />
+            <View style={styles.dotRow}>
+              <View style={[styles.statusDot, { backgroundColor: tint }]} />
+              <Text style={[styles.dotText, { color: tint }]}>{item.status}</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.divider} />
+
+        <View style={styles.metaRow}>
+          <MaterialIcons name="event" size={15} color={COLORS.gray400} />
+          <Text style={styles.metaText} numberOfLines={1}>
+            {item.scheduled_time
+              ? formatDate(item.scheduled_time)
+              : 'Date to be confirmed'}
           </Text>
         </View>
-      </View>
-      <Text style={styles.meta} numberOfLines={1}>
-        {item.vendor?.business_name ?? item.vendor?.user?.name ?? 'Vendor'}
-      </Text>
-      <View style={styles.cardBottom}>
-        <Text style={styles.time}>
-          {item.scheduled_time ? `📅 ${formatDate(item.scheduled_time)}` : 'Date to be confirmed'}
-        </Text>
-        {item.price !== null && item.price !== undefined ? (
-          <Text style={styles.price}>Rs {item.price}</Text>
-        ) : null}
-      </View>
-    </TouchableOpacity>
-  );
+
+        <View style={styles.cardBottom}>
+          {item.price !== null && item.price !== undefined ? (
+            <Text style={styles.price}>Rs {item.price}</Text>
+          ) : (
+            <Text style={styles.price}>Price on request</Text>
+          )}
+          <MaterialIcons name="chevron-right" size={20} color={COLORS.gray300} />
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   const selectedStatus = selected?.status;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Fixed header */}
       <View style={styles.header}>
         <View>
           <Text style={styles.brand}>ToleMate</Text>
@@ -240,6 +260,7 @@ const MyBookingsScreen: React.FC = () => {
           keyExtractor={item => String(item.id)}
           renderItem={renderItem}
           contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -248,6 +269,7 @@ const MyBookingsScreen: React.FC = () => {
                 load();
               }}
               tintColor={COLORS.primary}
+              colors={[COLORS.primary]}
             />
           }
           ListEmptyComponent={
@@ -260,59 +282,83 @@ const MyBookingsScreen: React.FC = () => {
       <Modal
         visible={!!selected}
         title={selected?.service?.name ?? 'Booking'}
+        subtitle={
+          selected?.vendor?.business_name ?? selected?.vendor?.user?.name
+        }
+        icon="event-note"
         onClose={() => setSelected(null)}
       >
-        <ScrollView>
+        <ScrollView showsVerticalScrollIndicator={false}>
           {selected ? (
             <>
-              <View style={styles.detailRow}>
-                <View style={styles.detailChip}>
-                  <Text style={styles.detailChipLabel}>Status</Text>
+              <View style={styles.detailStatusRow}>
+                <View style={styles.detailStatusCol}>
+                  <Text style={styles.detailLabel}>STATUS</Text>
                   <StatusBadge status={selected.status} />
                 </View>
                 {selected.payment_status ? (
-                  <View style={styles.detailChip}>
-                    <Text style={styles.detailChipLabel}>Payment</Text>
+                  <View style={styles.detailStatusCol}>
+                    <Text style={styles.detailLabel}>PAYMENT</Text>
                     <StatusBadge status={selected.payment_status} />
                   </View>
                 ) : null}
               </View>
 
-              <Text style={styles.detailLabel}>VENDOR</Text>
-              <Text style={styles.detailValue}>
-                {selected.vendor?.business_name ?? selected.vendor?.user?.name ?? '—'}
-              </Text>
-
-              <Text style={styles.detailLabel}>SCHEDULED</Text>
-              <Text style={styles.detailValue}>{formatDate(selected.scheduled_time)}</Text>
-
-              {selected.package?.name ? (
-                <>
-                  <Text style={styles.detailLabel}>PACKAGE</Text>
-                  <Text style={styles.detailValue}>{selected.package.name}</Text>
-                </>
-              ) : null}
-
-              {selected.reschedule_status ? (
-                <>
-                  <Text style={styles.detailLabel}>RESCHEDULE REQUEST</Text>
-                  <Text style={styles.detailValue}>
-                    {formatDate(selected.reschedule_to)} — {selected.reschedule_status}
+              <View style={styles.detailBox}>
+                <View style={styles.detailMetaRow}>
+                  <MaterialIcons name="event" size={16} color={COLORS.gray400} />
+                  <Text style={styles.detailMetaText}>
+                    Scheduled · {formatDate(selected.scheduled_time)}
                   </Text>
-                </>
-              ) : null}
+                </View>
+                {selected.package?.name ? (
+                  <View style={styles.detailMetaRow}>
+                    <MaterialIcons name="layers" size={16} color={COLORS.gray400} />
+                    <Text style={styles.detailMetaText}>
+                      Package · {selected.package.name}
+                    </Text>
+                  </View>
+                ) : null}
+                {selected.reschedule_status ? (
+                  <View style={styles.detailMetaRow}>
+                    <MaterialIcons name="schedule" size={16} color={COLORS.gray400} />
+                    <Text style={styles.detailMetaText}>
+                      Reschedule · {formatDate(selected.reschedule_to)} ·{' '}
+                      {selected.reschedule_status}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
 
-              <Text style={styles.detailLabel}>PRICE</Text>
-              <Text style={styles.detailPrice}>
-                {selected.price !== null && selected.price !== undefined
-                  ? `Rs ${selected.price}`
-                  : 'Price on request'}
-              </Text>
+              <View style={styles.priceRow}>
+                <Text style={styles.priceLabel}>Total</Text>
+                <Text style={styles.detailPrice}>
+                  {selected.price !== null && selected.price !== undefined
+                    ? `Rs ${selected.price}`
+                    : 'Price on request'}
+                </Text>
+              </View>
+
+              {selected.review ? (
+                <View style={styles.detailBox}>
+                  <View style={styles.detailMetaRow}>
+                    <MaterialIcons name="star" size={16} color={COLORS.accent} />
+                    <Text style={styles.detailMetaText}>
+                      {'★'.repeat(selected.review.rating)}
+                    </Text>
+                  </View>
+                  {selected.review.comment ? (
+                    <Text style={styles.reviewComment}>
+                      {selected.review.comment}
+                    </Text>
+                  ) : null}
+                </View>
+              ) : null}
 
               {selectedStatus === 'accepted' &&
               selected.payment_status === 'pending' ? (
                 <TouchableOpacity
-                  style={[styles.payBtn, busy && styles.btnDisabled]}
+                  style={[styles.primaryBtn, busy && styles.btnDisabled]}
                   disabled={busy}
                   onPress={() => {
                     setSelected(null);
@@ -322,38 +368,44 @@ const MyBookingsScreen: React.FC = () => {
                   }}
                 >
                   <MaterialIcons name="lock" size={16} color={COLORS.white} />
-                  <Text style={styles.payBtnText}>Pay now</Text>
+                  <Text style={styles.primaryBtnText}>Pay now</Text>
                 </TouchableOpacity>
               ) : null}
 
-              {selected.review ? (
-                <>
-                  <Text style={styles.detailLabel}>YOUR REVIEW</Text>
-                  <Text style={styles.detailValue}>
-                    {'★'.repeat(selected.review.rating)}{' '}
-                    {selected.review.comment ? `— ${selected.review.comment}` : ''}
-                  </Text>
-                </>
+              {selectedStatus === 'completed' && selected.service ? (
+                <TouchableOpacity
+                  style={[styles.primaryBtn, busy && styles.btnDisabled]}
+                  disabled={busy}
+                  onPress={() => {
+                    setSelected(null);
+                    navigation.navigate('BookingForm', {
+                      id: selected.service!.id,
+                    });
+                  }}
+                >
+                  <MaterialIcons name="replay" size={16} color={COLORS.white} />
+                  <Text style={styles.primaryBtnText}>Book again</Text>
+                </TouchableOpacity>
               ) : null}
 
               {['pending', 'accepted'].includes(selectedStatus ?? '') ? (
                 <View style={styles.actions}>
                   <TouchableOpacity
-                    style={[styles.actionBtn, busy && styles.btnDisabled]}
+                    style={[styles.outlineBtn, busy && styles.btnDisabled]}
                     disabled={busy}
                     onPress={() => {
                       setShowReschedule(true);
                     }}
                   >
                     <MaterialIcons name="schedule" size={16} color={COLORS.primary700} />
-                    <Text style={styles.actionBtnText}>Reschedule</Text>
+                    <Text style={styles.outlineBtnText}>Reschedule</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.cancelBtn, busy && styles.btnDisabled]}
                     disabled={busy}
-                    onPress={cancelBooking}
+                    onPress={askCancel}
                   >
-                    <MaterialIcons name="cancel" size={16} color={COLORS.white} />
+                    <MaterialIcons name="cancel" size={16} color={COLORS.rose} />
                     <Text style={styles.cancelBtnText}>Cancel</Text>
                   </TouchableOpacity>
                 </View>
@@ -439,6 +491,23 @@ const MyBookingsScreen: React.FC = () => {
           <Text style={styles.primaryBtnText}>Submit review</Text>
         </TouchableOpacity>
       </Modal>
+
+      {/* Cancel confirmation */}
+      <ConfirmDialog
+        visible={!!confirm}
+        title={confirm?.title ?? ''}
+        message={confirm?.message ?? ''}
+        tone={confirm?.tone}
+        icon={confirm?.icon}
+        confirmLabel={confirm?.confirmLabel}
+        loading={busy}
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => {
+          const c = confirm;
+          setConfirm(null);
+          c?.fn();
+        }}
+      />
     </SafeAreaView>
   );
 };
@@ -455,6 +524,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
     paddingTop: SPACING.sm,
     paddingBottom: SPACING.sm,
+    backgroundColor: COLORS.light,
   },
   brand: {
     fontSize: 13,
@@ -464,7 +534,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   title: {
-    fontSize: 22,
+    fontSize: FONT_SIZE.xxl,
     fontWeight: '800',
     color: COLORS.gray900,
   },
@@ -475,11 +545,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: COLORS.gray100,
+    ...SHADOW.card,
   },
   loader: {
     marginTop: SPACING.xxl,
@@ -487,92 +555,140 @@ const styles = StyleSheet.create({
   list: {
     paddingHorizontal: SPACING.md,
     paddingBottom: SPACING.xl,
+    paddingTop: SPACING.xs,
   },
   card: {
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.gray200,
+    borderColor: COLORS.gray100,
     padding: SPACING.md,
     marginBottom: SPACING.sm,
     ...SHADOW.card,
   },
   cardTop: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
+    gap: SPACING.sm,
+  },
+  cardTitleBlock: {
+    flex: 1,
   },
   cardTitle: {
-    flex: 1,
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     fontWeight: '700',
     color: COLORS.gray900,
-    marginRight: SPACING.sm,
   },
-  statusPill: {
-    borderRadius: RADIUS.pill,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  statusText: {
-    fontSize: 10,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-  },
-  meta: {
-    fontSize: 12,
+  cardVendor: {
+    fontSize: FONT_SIZE.sm,
     color: COLORS.gray500,
-    marginTop: 4,
+    marginTop: 3,
+  },
+  badgeCol: {
+    alignItems: 'flex-end',
+    gap: 6,
+  },
+  dotRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
+  dotText: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '700',
+    textTransform: 'capitalize',
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: COLORS.gray100,
+    marginVertical: SPACING.sm,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: SPACING.sm,
+  },
+  metaText: {
+    flex: 1,
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.gray600,
   },
   cardBottom: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: SPACING.sm,
-  },
-  time: {
-    fontSize: 12,
-    color: COLORS.gray600,
   },
   price: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     fontWeight: '700',
     color: COLORS.primary700,
   },
-  detailRow: {
+  detailStatusRow: {
     flexDirection: 'row',
     gap: SPACING.sm,
   },
-  detailChip: {
+  detailStatusCol: {
     flex: 1,
     backgroundColor: COLORS.gray50,
     borderRadius: RADIUS.md,
     borderWidth: 1,
     borderColor: COLORS.gray200,
-    padding: SPACING.sm,
-  },
-  detailChipLabel: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: COLORS.gray400,
-    letterSpacing: 1,
-    marginBottom: 4,
+    padding: SPACING.sm + 4,
+    gap: 6,
   },
   detailLabel: {
-    fontSize: 11,
+    fontSize: FONT_SIZE.xs,
     fontWeight: '800',
     color: COLORS.gray400,
     letterSpacing: 1,
-    marginTop: SPACING.md,
-    marginBottom: 4,
   },
-  detailValue: {
-    fontSize: 14,
+  detailBox: {
+    marginTop: SPACING.sm,
+    backgroundColor: COLORS.gray50,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.gray200,
+    padding: SPACING.md,
+    gap: SPACING.sm,
+  },
+  detailMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  detailMetaText: {
+    flex: 1,
+    fontSize: FONT_SIZE.base,
     color: COLORS.gray800,
     fontWeight: '600',
   },
+  reviewComment: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.gray600,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: SPACING.md,
+    paddingHorizontal: 2,
+  },
+  priceLabel: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
+    color: COLORS.gray500,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
   detailPrice: {
-    fontSize: 18,
+    fontSize: FONT_SIZE.xl,
     fontWeight: '800',
     color: COLORS.primary700,
   },
@@ -581,19 +697,21 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
     marginTop: SPACING.lg,
   },
-  actionBtn: {
+  outlineBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: COLORS.primary100,
-    borderRadius: RADIUS.md,
-    height: 44,
+    backgroundColor: COLORS.primary50,
+    borderWidth: 1,
+    borderColor: COLORS.primary200,
+    borderRadius: RADIUS.pill,
+    height: 46,
   },
-  actionBtnText: {
+  outlineBtnText: {
     color: COLORS.primary700,
-    fontSize: 13,
+    fontSize: FONT_SIZE.base,
     fontWeight: '700',
   },
   cancelBtn: {
@@ -602,28 +720,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: COLORS.rose,
-    borderRadius: RADIUS.md,
-    height: 44,
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.roseBg,
+    borderRadius: RADIUS.pill,
+    height: 46,
   },
   cancelBtnText: {
-    color: COLORS.white,
-    fontSize: 13,
+    color: COLORS.rose,
+    fontSize: FONT_SIZE.base,
     fontWeight: '700',
   },
-  payBtn: {
+  primaryBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
     marginTop: SPACING.lg,
     backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.md,
+    borderRadius: RADIUS.pill,
     height: 46,
   },
-  payBtnText: {
+  primaryBtnText: {
     color: COLORS.white,
-    fontSize: 14,
+    fontSize: FONT_SIZE.md,
     fontWeight: '700',
   },
   reviewBtn: {
@@ -633,16 +753,16 @@ const styles = StyleSheet.create({
     gap: 6,
     marginTop: SPACING.lg,
     backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.md,
-    height: 44,
+    borderRadius: RADIUS.pill,
+    height: 46,
   },
   reviewBtnText: {
     color: COLORS.white,
-    fontSize: 13,
+    fontSize: FONT_SIZE.base,
     fontWeight: '700',
   },
   modalLabel: {
-    fontSize: 11,
+    fontSize: FONT_SIZE.xs,
     fontWeight: '800',
     color: COLORS.gray600,
     marginTop: SPACING.md,
@@ -655,8 +775,8 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
     backgroundColor: COLORS.gray50,
     paddingHorizontal: SPACING.md,
-    height: 44,
-    fontSize: 14,
+    height: 46,
+    fontSize: FONT_SIZE.base,
     color: COLORS.gray900,
   },
   inputMultiline: {
@@ -666,20 +786,8 @@ const styles = StyleSheet.create({
   },
   starsRow: {
     flexDirection: 'row',
-    gap: SPACING.xs,
-  },
-  primaryBtn: {
-    marginTop: SPACING.lg,
-    backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.md,
-    height: 46,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primaryBtnText: {
-    color: COLORS.white,
-    fontSize: 15,
-    fontWeight: '700',
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.xs,
   },
   btnDisabled: {
     opacity: 0.6,

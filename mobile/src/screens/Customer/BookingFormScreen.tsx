@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,6 +15,7 @@ import api from '../../api/client';
 import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme';
 import AppImage from '../../components/AppImage';
 import ScreenHeader from '../../components/ScreenHeader';
+import { useToast } from '../../context/ToastContext';
 import { MainStackParamList } from '../../navigation/types';
 
 type Props = NativeStackScreenProps<MainStackParamList, 'BookingForm'>;
@@ -79,6 +79,7 @@ function buildTimeSlots(start: string, end: string): string[] {
 
 const BookingFormScreen: React.FC<Props> = ({ route, navigation }) => {
   const { id, packageId, packageName, packagePrice } = route.params;
+  const toast = useToast();
   const [service, setService] = useState<ServiceInfo | null>(null);
   const [availability, setAvailability] = useState<Slot[]>([]);
   const [loading, setLoading] = useState(true);
@@ -110,13 +111,13 @@ const BookingFormScreen: React.FC<Props> = ({ route, navigation }) => {
         }
       })
       .catch(() => {
-        Alert.alert('Error', 'Could not load booking details.');
+        toast.error('Could not load booking details.');
       })
       .finally(() => mounted && setLoading(false));
     return () => {
       mounted = false;
     };
-  }, [id]);
+  }, [id, toast]);
 
   const pickDate = useCallback(
     (ds: string) => {
@@ -137,16 +138,16 @@ const BookingFormScreen: React.FC<Props> = ({ route, navigation }) => {
   const submit = async () => {
     if (!service) return;
     if (!selectedDate || !selectedSlot) {
-      Alert.alert('Missing', 'Please choose a date and time slot.');
+      toast.error('Please choose a date and time slot.');
       return;
     }
     const scheduled = new Date(`${selectedDate}T${selectedSlot}:00`);
     if (scheduled.getTime() <= Date.now()) {
-      Alert.alert('Invalid time', 'Please pick a future date and time.');
+      toast.error('Please pick a future date and time.');
       return;
     }
     if (bookingType === 'quote' && (!price || Number(price) <= 0)) {
-      Alert.alert('Missing', 'Please enter your suggested price for a quote.');
+      toast.error('Please enter your suggested price for a quote.');
       return;
     }
 
@@ -166,16 +167,14 @@ const BookingFormScreen: React.FC<Props> = ({ route, navigation }) => {
         scheduled_time: scheduled.toISOString(),
         message: message.trim() || undefined,
       });
-      Alert.alert(
-        'Booking created',
+      toast.success(
         bookingType === 'quote'
-          ? 'Your quote request was sent to the vendor. They will confirm the price.'
-          : 'Your booking was created. The vendor will confirm shortly.',
-        [{ text: 'OK', onPress: () => navigation.replace('MyBookings') }],
+          ? 'Quote request sent to the vendor.'
+          : 'Booking created — pending vendor confirmation.',
       );
+      navigation.replace('MyBookings');
     } catch (e: any) {
-      Alert.alert(
-        'Failed',
+      toast.error(
         e?.response?.data?.message ??
           Object.values(e?.response?.data?.errors ?? {}).flat()[0] ??
           'Could not create booking.',
@@ -233,114 +232,125 @@ const BookingFormScreen: React.FC<Props> = ({ route, navigation }) => {
         </View>
 
         {/* Booking type */}
-        <Text style={styles.label}>BOOKING TYPE</Text>
-        <View style={styles.typeRow}>
-          {BOOKING_TYPES.map(t => {
-            const active = bookingType === t.key;
-            return (
-              <TouchableOpacity
-                key={t.key}
-                style={[styles.typeBtn, active && styles.typeBtnActive]}
-                onPress={() => setBookingType(t.key as 'instant' | 'quote')}
-              >
-                <MaterialIcons
-                  name={t.icon as never}
-                  size={18}
-                  color={active ? COLORS.primary : COLORS.gray500}
-                />
-                <Text style={[styles.typeText, active && styles.typeTextActive]}>
-                  {t.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-        <Text style={styles.hint}>
-          {bookingType === 'instant'
-            ? 'Book at the listed price — the vendor will confirm.'
-            : 'Request a custom price — the vendor will confirm your quote.'}
-        </Text>
-
-        {bookingType === 'quote' ? (
-          <View style={styles.inputBlock}>
-            <Text style={styles.label}>YOUR PRICE (RS.)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. 1500"
-              placeholderTextColor={COLORS.gray400}
-              value={price}
-              onChangeText={setPrice}
-              keyboardType="numeric"
-            />
-          </View>
-        ) : null}
-
-        {/* Date picker */}
-        <Text style={styles.label}>SELECT DATE</Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.datesRow}
-        >
-          {dates.map(d => {
-            const ds = toDateStr(d);
-            const active = selectedDate === ds;
-            const day = d.getDay();
-            const slot = availability.find(s => s.day_of_week === day);
-            const disabled = slot?.is_available === false;
-            return (
-              <TouchableOpacity
-                key={ds}
-                disabled={disabled}
-                style={[styles.dateChip, active && styles.dateChipActive, disabled && styles.dateChipOff]}
-                onPress={() => pickDate(ds)}
-              >
-                <Text style={[styles.dateDay, active && styles.dateDayActive]}>
-                  {DAY_SHORT[day]}
-                </Text>
-                <Text style={[styles.dateNum, active && styles.dateNumActive]}>
-                  {d.getDate()}
-                </Text>
-                <Text style={[styles.dateMonth, active && styles.dateMonthActive]}>
-                  {d.toLocaleString('en', { month: 'short' })}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-
-        {/* Time slots */}
-        <Text style={styles.label}>SELECT TIME</Text>
-        {slots.length === 0 ? (
-          <Text style={styles.hint}>No slots available for the selected date.</Text>
-        ) : (
-          <View style={styles.slotsWrap}>
-            {slots.map(t => {
-              const active = selectedSlot === t;
+        <View style={styles.card}>
+          <Text style={styles.label}>Booking type</Text>
+          <View style={styles.segment}>
+            {BOOKING_TYPES.map(t => {
+              const active = bookingType === t.key;
               return (
                 <TouchableOpacity
-                  key={t}
-                  style={[styles.slotChip, active && styles.slotChipActive]}
-                  onPress={() => setSelectedSlot(t)}
+                  key={t.key}
+                  style={[styles.segmentItem, active && styles.segmentItemActive]}
+                  onPress={() => setBookingType(t.key as 'instant' | 'quote')}
+                  activeOpacity={0.8}
                 >
-                  <Text style={[styles.slotText, active && styles.slotTextActive]}>{t}</Text>
+                  <MaterialIcons
+                    name={t.icon as never}
+                    size={18}
+                    color={active ? COLORS.white : COLORS.gray500}
+                  />
+                  <Text style={[styles.segmentText, active && styles.segmentTextActive]}>
+                    {t.label}
+                  </Text>
                 </TouchableOpacity>
               );
             })}
           </View>
-        )}
+          <Text style={styles.hint}>
+            {bookingType === 'instant'
+              ? 'Book at the listed price — the vendor will confirm.'
+              : 'Request a custom price — the vendor will confirm your quote.'}
+          </Text>
+
+          {bookingType === 'quote' ? (
+            <View style={styles.quoteBlock}>
+              <Text style={styles.label}>Your price (Rs.)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. 1500"
+                placeholderTextColor={COLORS.gray400}
+                value={price}
+                onChangeText={setPrice}
+                keyboardType="numeric"
+              />
+            </View>
+          ) : null}
+        </View>
+
+        {/* Date picker */}
+        <View style={styles.card}>
+          <Text style={styles.label}>Select date</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.datesRow}
+          >
+            {dates.map(d => {
+              const ds = toDateStr(d);
+              const active = selectedDate === ds;
+              const day = d.getDay();
+              const slot = availability.find(s => s.day_of_week === day);
+              const disabled = slot?.is_available === false;
+              return (
+                <TouchableOpacity
+                  key={ds}
+                  disabled={disabled}
+                  style={[styles.dateChip, active && styles.dateChipActive, disabled && styles.dateChipOff]}
+                  onPress={() => pickDate(ds)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.dateDay, active && styles.dateDayActive]}>
+                    {DAY_SHORT[day]}
+                  </Text>
+                  <Text style={[styles.dateNum, active && styles.dateNumActive]}>
+                    {d.getDate()}
+                  </Text>
+                  <Text style={[styles.dateMonth, active && styles.dateMonthActive]}>
+                    {d.toLocaleString('en', { month: 'short' })}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        {/* Time slots */}
+        <View style={styles.card}>
+          <Text style={styles.label}>Select time</Text>
+          {slots.length === 0 ? (
+            <Text style={styles.hint}>No slots available for the selected date.</Text>
+          ) : (
+            <View style={styles.slotsWrap}>
+              {slots.map(t => {
+                const active = selectedSlot === t;
+                return (
+                  <TouchableOpacity
+                    key={t}
+                    style={[styles.slotChip, active && styles.slotChipActive]}
+                    onPress={() => setSelectedSlot(t)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.slotText, active && styles.slotTextActive]}>{t}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+        </View>
 
         {/* Notes */}
-        <Text style={styles.label}>NOTES FOR VENDOR (OPTIONAL)</Text>
-        <TextInput
-          style={[styles.input, styles.inputMultiline]}
-          placeholder="Describe your job, address, preferences..."
-          placeholderTextColor={COLORS.gray400}
-          value={message}
-          onChangeText={setMessage}
-          multiline
-          numberOfLines={3}
-        />
+        <View style={styles.card}>
+          <Text style={styles.label}>Notes for vendor (optional)</Text>
+          <TextInput
+            style={[styles.input, styles.inputMultiline]}
+            placeholder="Describe your job, address, preferences..."
+            placeholderTextColor={COLORS.gray400}
+            value={message}
+            onChangeText={setMessage}
+            multiline
+            numberOfLines={3}
+          />
+        </View>
       </ScrollView>
 
       <View style={styles.ctaBar}>
@@ -348,6 +358,7 @@ const BookingFormScreen: React.FC<Props> = ({ route, navigation }) => {
           style={[styles.bookBtn, submitting && styles.btnDisabled]}
           onPress={submit}
           disabled={submitting}
+          activeOpacity={0.85}
         >
           {submitting ? (
             <ActivityIndicator color={COLORS.white} />
@@ -386,8 +397,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.gray200,
-    padding: SPACING.sm,
+    borderColor: COLORS.gray100,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
     ...SHADOW.card,
   },
   thumb: {
@@ -397,12 +409,13 @@ const styles = StyleSheet.create({
   },
   summaryBody: {
     flex: 1,
-    marginLeft: SPACING.sm,
+    marginLeft: SPACING.md,
   },
   summaryName: {
     fontSize: 15,
     fontWeight: '700',
     color: COLORS.gray900,
+    lineHeight: 20,
   },
   summaryVendor: {
     fontSize: 12,
@@ -415,7 +428,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     gap: 4,
     backgroundColor: COLORS.primary100,
-    borderRadius: 999,
+    borderRadius: RADIUS.pill,
     paddingHorizontal: 8,
     paddingVertical: 3,
     marginTop: 4,
@@ -431,41 +444,51 @@ const styles = StyleSheet.create({
     color: COLORS.primary700,
     marginTop: 4,
   },
+  card: {
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.gray100,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
+    ...SHADOW.card,
+  },
   label: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: COLORS.gray600,
-    marginTop: SPACING.lg,
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    color: COLORS.gray500,
     marginBottom: SPACING.sm,
-    letterSpacing: 1,
   },
-  typeRow: {
+  segment: {
     flexDirection: 'row',
-    gap: SPACING.sm,
+    backgroundColor: COLORS.gray100,
+    borderRadius: RADIUS.pill,
+    padding: 3,
   },
-  typeBtn: {
+  segmentItem: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 12,
-    borderRadius: RADIUS.md,
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.gray200,
+    height: 40,
+    borderRadius: RADIUS.pill,
   },
-  typeBtnActive: {
-    backgroundColor: COLORS.primary50,
-    borderColor: COLORS.primary,
+  segmentItemActive: {
+    backgroundColor: COLORS.primary,
   },
-  typeText: {
+  segmentText: {
     fontSize: 14,
     fontWeight: '700',
     color: COLORS.gray600,
   },
-  typeTextActive: {
-    color: COLORS.primary700,
+  segmentTextActive: {
+    color: COLORS.white,
+  },
+  quoteBlock: {
+    marginTop: SPACING.md,
   },
   hint: {
     fontSize: 12,
@@ -473,16 +496,13 @@ const styles = StyleSheet.create({
     marginTop: 6,
     lineHeight: 17,
   },
-  inputBlock: {
-    marginTop: SPACING.md,
-  },
   input: {
     borderWidth: 1,
     borderColor: COLORS.gray200,
     borderRadius: RADIUS.md,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.gray50,
     paddingHorizontal: SPACING.md,
-    height: 46,
+    height: 50,
     fontSize: 15,
     color: COLORS.gray900,
   },
@@ -493,13 +513,13 @@ const styles = StyleSheet.create({
   },
   datesRow: {
     gap: SPACING.sm,
-    paddingRight: SPACING.md,
+    paddingRight: SPACING.sm,
   },
   dateChip: {
     width: 62,
     alignItems: 'center',
     paddingVertical: 10,
-    borderRadius: RADIUS.md,
+    borderRadius: RADIUS.pill,
     backgroundColor: COLORS.white,
     borderWidth: 1,
     borderColor: COLORS.gray200,
@@ -544,7 +564,7 @@ const styles = StyleSheet.create({
   },
   slotChip: {
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 9,
     borderRadius: RADIUS.pill,
     backgroundColor: COLORS.white,
     borderWidth: 1,
@@ -566,11 +586,11 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     backgroundColor: COLORS.white,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: COLORS.gray200,
+    borderTopColor: COLORS.gray100,
   },
   bookBtn: {
     backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.md,
+    borderRadius: RADIUS.pill,
     height: 50,
     alignItems: 'center',
     justifyContent: 'center',

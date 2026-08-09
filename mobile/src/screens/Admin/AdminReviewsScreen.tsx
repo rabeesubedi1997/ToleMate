@@ -6,15 +6,16 @@ import {
   FlatList,
   ActivityIndicator,
   RefreshControl,
-  Alert,
-  Pressable,
+  TouchableOpacity,
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../../api/client';
 import ScreenHeader from '../../components/ScreenHeader';
 import EmptyState from '../../components/EmptyState';
-import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme';
+import ConfirmDialog from '../../components/ConfirmDialog';
+import { useToast } from '../../context/ToastContext';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from '../../theme';
 
 interface Review {
   id: number;
@@ -31,6 +32,15 @@ const AdminReviewsScreen: React.FC = () => {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [confirm, setConfirm] = useState<{
+    title: string;
+    message: string;
+    tone?: 'danger' | 'primary' | 'warning';
+    confirmLabel?: string;
+    icon?: string;
+    fn?: () => void;
+  } | null>(null);
+  const toast = useToast();
 
   const load = useCallback(async () => {
     try {
@@ -51,24 +61,21 @@ const AdminReviewsScreen: React.FC = () => {
   );
 
   const remove = (item: Review) => {
-    Alert.alert('Remove review', 'Remove this review?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await api.delete(`/admin/reviews/${item.id}`);
-            load();
-          } catch (e: any) {
-            Alert.alert(
-              'Failed',
-              e?.response?.data?.message ?? 'Could not remove review.',
-            );
-          }
-        },
+    setConfirm({
+      title: 'Remove review',
+      message: 'Remove this review?',
+      tone: 'danger',
+      confirmLabel: 'Remove',
+      icon: 'delete-outline',
+      fn: async () => {
+        try {
+          await api.delete(`/admin/reviews/${item.id}`);
+          load();
+        } catch (e: any) {
+          toast.error(e?.response?.data?.message ?? 'Could not remove review.');
+        }
       },
-    ]);
+    });
   };
 
   const renderItem = ({ item }: { item: Review }) => (
@@ -88,12 +95,13 @@ const AdminReviewsScreen: React.FC = () => {
           <Text style={styles.time}>
             {new Date(item.created_at).toLocaleDateString()}
           </Text>
-          <Pressable
+          <TouchableOpacity
+            style={styles.iconBtnDelete}
             onPress={() => remove(item)}
             hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           >
             <MaterialIcons name="delete-outline" size={18} color={COLORS.rose} />
-          </Pressable>
+          </TouchableOpacity>
         </View>
       </View>
       <Text style={styles.comment}>{item.comment || '—'}</Text>
@@ -124,6 +132,7 @@ const AdminReviewsScreen: React.FC = () => {
         />
       ) : (
         <FlatList
+          style={styles.flatList}
           data={reviews}
           keyExtractor={item => String(item.id)}
           renderItem={renderItem}
@@ -143,6 +152,21 @@ const AdminReviewsScreen: React.FC = () => {
           }
         />
       )}
+
+      <ConfirmDialog
+        visible={!!confirm}
+        title={confirm?.title ?? ''}
+        message={confirm?.message ?? ''}
+        icon={confirm?.icon}
+        tone={confirm?.tone}
+        confirmLabel={confirm?.confirmLabel}
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => {
+          const c = confirm;
+          setConfirm(null);
+          c?.fn?.();
+        }}
+      />
     </View>
   );
 };
@@ -155,17 +179,20 @@ const styles = StyleSheet.create({
   loader: {
     marginTop: SPACING.xxl,
   },
+  flatList: {
+    flex: 1,
+  },
   list: {
     paddingHorizontal: SPACING.md,
-    paddingBottom: SPACING.xl,
+    paddingBottom: 40,
+    gap: 12,
   },
   card: {
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.gray200,
+    borderColor: COLORS.gray100,
     padding: SPACING.md,
-    marginBottom: SPACING.sm,
     ...SHADOW.card,
   },
   topRow: {
@@ -177,13 +204,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   time: {
-    fontSize: 11,
+    fontSize: FONT_SIZE.xs,
     color: COLORS.gray400,
   },
   topRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.md,
+    gap: SPACING.sm,
+  },
+  iconBtnDelete: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.roseBg,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   comment: {
     fontSize: 13,
@@ -192,13 +227,13 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   meta: {
-    fontSize: 11,
+    fontSize: FONT_SIZE.xs,
     color: COLORS.gray500,
     marginTop: SPACING.sm,
     fontWeight: '500',
   },
   service: {
-    fontSize: 11,
+    fontSize: FONT_SIZE.xs,
     color: COLORS.gray400,
     marginTop: 2,
   },
@@ -216,7 +251,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   replyText: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     color: COLORS.gray700,
     marginTop: 2,
   },

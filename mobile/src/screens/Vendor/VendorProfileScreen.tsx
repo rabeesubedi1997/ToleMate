@@ -76,19 +76,7 @@ const VendorProfileScreen: React.FC = () => {
   const kyc = profile?.kyc_status ?? 'not_submitted';
 
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={() => {
-            setRefreshing(true);
-            load();
-          }}
-          tintColor={COLORS.primary}
-        />
-      }
-    >
+    <View style={styles.container}>
       <View style={styles.hero}>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>
@@ -108,6 +96,21 @@ const VendorProfileScreen: React.FC = () => {
         </View>
         <Text style={styles.rating}>★ {Number(profile?.rating ?? 0).toFixed(1)}</Text>
       </View>
+
+      <ScrollView
+        style={styles.body}
+        contentContainerStyle={styles.bodyContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              load();
+            }}
+            tintColor={COLORS.primary}
+          />
+        }
+      >
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Business</Text>
@@ -191,7 +194,8 @@ const VendorProfileScreen: React.FC = () => {
           load();
         }}
       />
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 };
 
@@ -230,6 +234,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.light,
   },
+  body: {
+    flex: 1,
+  },
+  bodyContent: {
+    paddingBottom: SPACING.xl,
+  },
   center: {
     flex: 1,
     alignItems: 'center',
@@ -238,18 +248,20 @@ const styles = StyleSheet.create({
   },
   hero: {
     alignItems: 'center',
-    paddingVertical: SPACING.xl,
+    paddingVertical: SPACING.lg,
     backgroundColor: COLORS.gray900,
     borderBottomLeftRadius: RADIUS.xl,
     borderBottomRightRadius: RADIUS.xl,
   },
   avatar: {
-    width: 72,
-    height: 72,
+    width: 76,
+    height: 76,
     borderRadius: RADIUS.pill,
     backgroundColor: COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: COLORS.primary200,
   },
   avatarText: {
     color: COLORS.white,
@@ -279,7 +291,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.gray200,
+    borderColor: COLORS.gray100,
     padding: SPACING.md,
     marginHorizontal: SPACING.md,
     marginTop: SPACING.md,

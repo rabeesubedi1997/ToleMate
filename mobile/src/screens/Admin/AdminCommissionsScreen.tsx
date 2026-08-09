@@ -8,8 +8,6 @@ import {
   RefreshControl,
   Pressable,
   TextInput,
-  Modal,
-  Alert,
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -18,6 +16,8 @@ import ScreenHeader from '../../components/ScreenHeader';
 import FilterChips from '../../components/FilterChips';
 import StatusBadge from '../../components/StatusBadge';
 import EmptyState from '../../components/EmptyState';
+import Modal from '../../components/Modal';
+import { useToast } from '../../context/ToastContext';
 import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme';
 
 interface Commission {
@@ -42,6 +42,7 @@ interface CommissionStats {
 const STATUSES = ['all', 'pending', 'paid', 'refunded'];
 
 const AdminCommissionsScreen: React.FC = () => {
+  const toast = useToast();
   const [commissions, setCommissions] = useState<Commission[]>([]);
   const [stats, setStats] = useState<CommissionStats | null>(null);
   const [filter, setFilter] = useState('all');
@@ -85,8 +86,9 @@ const AdminCommissionsScreen: React.FC = () => {
     try {
       await api.put(`/super-admin/commissions/${commission.id}/pay`);
       load();
+      toast.success('Marked as paid.');
     } catch {
-      Alert.alert('Failed', 'Could not mark as paid.');
+      toast.error('Could not mark as paid.');
     } finally {
       setActionLoading(null);
     }
@@ -99,8 +101,9 @@ const AdminCommissionsScreen: React.FC = () => {
       await api.post('/super-admin/commissions/rate', { rate });
       setRateModal(false);
       load();
+      toast.success('Commission rate updated.');
     } catch {
-      Alert.alert('Failed', 'Could not update commission rate.');
+      toast.error('Could not update commission rate.');
     }
   };
 
@@ -168,7 +171,7 @@ const AdminCommissionsScreen: React.FC = () => {
       ) : null}
 
       <Pressable style={styles.rateBtn} onPress={() => setRateModal(true)}>
-        <MaterialIcons name="tune" size={16} color={COLORS.primary700} />
+        <MaterialIcons name="tune" size={16} color={COLORS.gray600} />
         <Text style={styles.rateText}>
           Commission rate: {stats?.default_rate ?? '—'}%
         </Text>
@@ -209,39 +212,33 @@ const AdminCommissionsScreen: React.FC = () => {
 
       <Modal
         visible={rateModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setRateModal(false)}
+        title="Set commission rate"
+        subtitle="Percentage taken from each booking."
+        icon="tune"
+        onClose={() => setRateModal(false)}
       >
-        <View style={styles.modalWrap}>
-          <View style={styles.modal}>
-            <Text style={styles.modalTitle}>Set commission rate</Text>
-            <Text style={styles.modalHint}>
-              Percentage taken from each booking.
-            </Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. 10"
-              placeholderTextColor={COLORS.gray400}
-              value={newRate}
-              onChangeText={setNewRate}
-              keyboardType="decimal-pad"
-            />
-            <View style={styles.modalRow}>
-              <Pressable
-                style={[styles.modalBtn, styles.cancelBtn]}
-                onPress={() => setRateModal(false)}
-              >
-                <Text style={styles.cancelText}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.modalBtn, styles.saveBtn]}
-                onPress={saveRate}
-              >
-                <Text style={styles.saveText}>Save</Text>
-              </Pressable>
-            </View>
-          </View>
+        <Text style={styles.label}>Commission rate (%)</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="e.g. 10"
+          placeholderTextColor={COLORS.gray400}
+          value={newRate}
+          onChangeText={setNewRate}
+          keyboardType="decimal-pad"
+        />
+        <View style={styles.modalRow}>
+          <Pressable
+            style={[styles.modalBtn, styles.cancelBtn]}
+            onPress={() => setRateModal(false)}
+          >
+            <Text style={styles.cancelText}>Cancel</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.modalBtn, styles.saveBtn]}
+            onPress={saveRate}
+          >
+            <Text style={styles.saveText}>Save</Text>
+          </Pressable>
         </View>
       </Modal>
     </View>
@@ -255,7 +252,7 @@ const styles = StyleSheet.create({
   },
   statsRow: {
     flexDirection: 'row',
-    gap: SPACING.sm,
+    gap: 12,
     paddingHorizontal: SPACING.md,
     marginBottom: SPACING.sm,
   },
@@ -264,18 +261,18 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.gray200,
-    padding: SPACING.sm,
+    borderColor: COLORS.gray100,
+    padding: SPACING.md,
     alignItems: 'center',
     ...SHADOW.card,
   },
   statValue: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '800',
     color: COLORS.gray900,
   },
   statLabel: {
-    fontSize: 10,
+    fontSize: 12,
     color: COLORS.gray500,
     marginTop: 2,
     fontWeight: '600',
@@ -284,143 +281,136 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    backgroundColor: COLORS.primary50,
-    borderRadius: RADIUS.md,
-    paddingVertical: 8,
+    gap: 8,
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.gray200,
+    borderRadius: RADIUS.pill,
+    height: 44,
     marginHorizontal: SPACING.md,
     marginBottom: SPACING.sm,
+    paddingHorizontal: SPACING.md,
   },
   rateText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
-    color: COLORS.primary700,
+    color: COLORS.gray700,
   },
   loader: {
     marginTop: SPACING.xxl,
   },
   list: {
     paddingHorizontal: SPACING.md,
-    paddingBottom: SPACING.xl,
+    paddingTop: 4,
+    paddingBottom: 40,
+    gap: 12,
   },
   card: {
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.gray200,
+    borderColor: COLORS.gray100,
     padding: SPACING.md,
-    marginBottom: SPACING.sm,
+    marginBottom: 12,
     ...SHADOW.card,
   },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: SPACING.xs,
+    marginBottom: 4,
   },
   title: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
     color: COLORS.gray900,
     marginRight: SPACING.sm,
   },
   meta: {
-    fontSize: 11,
+    fontSize: 13,
     color: COLORS.gray500,
+    marginTop: 2,
   },
   amountRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: SPACING.sm,
+    marginTop: 12,
   },
   amount: {
     fontSize: 16,
-    fontWeight: '800',
-    color: COLORS.primary700,
+    fontWeight: '700',
+    color: COLORS.gray900,
   },
   sub: {
-    fontSize: 11,
+    fontSize: 12,
     color: COLORS.gray400,
+    marginTop: 2,
   },
   payBtn: {
     backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.md,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     minWidth: 90,
     alignItems: 'center',
   },
   payText: {
     color: COLORS.white,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
   },
   date: {
-    marginTop: SPACING.xs,
-    fontSize: 10,
+    marginTop: 8,
+    fontSize: 11,
     color: COLORS.gray400,
   },
-  modalWrap: {
-    flex: 1,
-    backgroundColor: 'rgba(17,24,39,0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: SPACING.xl,
-  },
-  modal: {
-    width: '100%',
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.lg,
-  },
-  modalTitle: {
-    fontSize: 16,
+  label: {
+    fontSize: 13,
     fontWeight: '700',
-    color: COLORS.gray900,
-  },
-  modalHint: {
-    fontSize: 12,
-    color: COLORS.gray500,
-    marginTop: 2,
-    marginBottom: SPACING.sm,
+    color: COLORS.gray600,
+    marginBottom: 6,
   },
   input: {
+    backgroundColor: COLORS.gray50,
     borderWidth: 1,
-    borderColor: COLORS.gray300,
+    borderColor: COLORS.gray200,
     borderRadius: RADIUS.md,
-    paddingHorizontal: SPACING.sm,
-    height: 42,
+    paddingHorizontal: 14,
+    height: 46,
     fontSize: 14,
     color: COLORS.gray900,
   },
   modalRow: {
     flexDirection: 'row',
-    gap: SPACING.sm,
-    marginTop: SPACING.md,
+    gap: 12,
+    marginTop: SPACING.lg,
   },
   modalBtn: {
     flex: 1,
-    borderRadius: RADIUS.md,
-    paddingVertical: 10,
+    height: 46,
+    borderRadius: RADIUS.pill,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   cancelBtn: {
-    backgroundColor: COLORS.gray100,
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.gray200,
   },
   saveBtn: {
     backgroundColor: COLORS.primary,
   },
   cancelText: {
     color: COLORS.gray700,
-    fontWeight: '600',
-    fontSize: 13,
+    fontWeight: '700',
+    fontSize: 14,
   },
   saveText: {
     color: COLORS.white,
     fontWeight: '700',
-    fontSize: 13,
+    fontSize: 14,
   },
 });
 

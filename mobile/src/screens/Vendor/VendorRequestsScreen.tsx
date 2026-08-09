@@ -7,7 +7,6 @@ import {
   ActivityIndicator,
   RefreshControl,
   TouchableOpacity,
-  Alert,
   TextInput,
   ScrollView,
 } from 'react-native';
@@ -18,6 +17,7 @@ import api from '../../api/client';
 import FilterChips from '../../components/FilterChips';
 import EmptyState from '../../components/EmptyState';
 import Modal from '../../components/Modal';
+import { useToast } from '../../context/ToastContext';
 import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme';
 
 interface RequestItem {
@@ -47,6 +47,7 @@ const URGENCY_COLORS: Record<string, { bg: string; text: string }> = {
 };
 
 const VendorRequestsScreen: React.FC = () => {
+  const toast = useToast();
   const [items, setItems] = useState<RequestItem[]>([]);
   const [categories, setCategories] = useState<{ id: number; name: string }[]>([]);
   const [filter, setFilter] = useState('all');
@@ -102,11 +103,11 @@ const VendorRequestsScreen: React.FC = () => {
   const respond = async () => {
     if (!selected) return;
     if (!serviceId) {
-      Alert.alert('Missing', 'Pick one of your services for the quote.');
+      toast.info('Pick one of your services for the quote.');
       return;
     }
     if (!price || Number(price) <= 0) {
-      Alert.alert('Missing', 'Enter a quote price.');
+      toast.info('Enter a quote price.');
       return;
     }
     setBusy(true);
@@ -116,12 +117,11 @@ const VendorRequestsScreen: React.FC = () => {
         price: Number(price),
         message: message.trim() || undefined,
       });
-      Alert.alert('Quote sent', 'The customer will be notified of your quote.');
+      toast.success('Quote sent.');
       setSelected(null);
       load();
     } catch (e: any) {
-      Alert.alert(
-        'Failed',
+      toast.error(
         e?.response?.data?.message ??
           Object.values(e?.response?.data?.errors ?? {}).flat()[0] ??
           'Could not send quote.',
@@ -215,6 +215,8 @@ const VendorRequestsScreen: React.FC = () => {
       <Modal
         visible={!!selected}
         title="Send a Quote"
+        subtitle={selected?.title}
+        icon="assignment"
         onClose={() => setSelected(null)}
       >
         <ScrollView>
@@ -330,15 +332,16 @@ const styles = StyleSheet.create({
   },
   list: {
     paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.xs,
     paddingBottom: SPACING.xl,
+    gap: 12,
   },
   card: {
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.gray200,
+    borderColor: COLORS.gray100,
     padding: SPACING.md,
-    marginBottom: SPACING.sm,
     ...SHADOW.card,
   },
   cardTop: {
@@ -447,20 +450,20 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
     backgroundColor: COLORS.gray50,
     paddingHorizontal: SPACING.md,
-    height: 44,
+    height: 46,
     fontSize: 14,
     color: COLORS.gray900,
   },
   inputMultiline: {
-    height: 80,
+    height: 84,
     textAlignVertical: 'top',
     paddingTop: SPACING.sm,
   },
   sendBtn: {
     marginTop: SPACING.lg,
     backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.md,
-    height: 46,
+    borderRadius: RADIUS.pill,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
   },

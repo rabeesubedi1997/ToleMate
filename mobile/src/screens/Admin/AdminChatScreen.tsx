@@ -15,7 +15,8 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
-import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme';
+import EmptyState from '../../components/EmptyState';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from '../../theme';
 import { MainStackParamList } from '../../navigation/types';
 
 type Route = RouteProp<MainStackParamList, 'AdminChat'>;
@@ -171,9 +172,11 @@ const AdminChatScreen: React.FC = () => {
             listRef.current?.scrollToEnd({ animated: true })
           }
           ListEmptyComponent={
-            <Text style={styles.emptyText}>
-              No messages yet. Say hello to start the conversation.
-            </Text>
+            <EmptyState
+              title="No messages yet"
+              message="Say hello to start the conversation."
+              icon="chat-bubble-outline"
+            />
           }
         />
       )}
@@ -227,17 +230,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerTitle: {
-    fontSize: 16,
+    fontSize: FONT_SIZE.lg,
     fontWeight: '700',
     color: COLORS.gray900,
   },
   headerSub: {
-    fontSize: 11,
+    fontSize: FONT_SIZE.xs,
     color: COLORS.gray500,
     marginTop: 1,
   },
   loader: {
-    marginTop: SPACING.xxl,
+    marginTop: 60,
   },
   list: {
     padding: SPACING.md,
@@ -255,8 +258,8 @@ const styles = StyleSheet.create({
   bubble: {
     maxWidth: '78%',
     borderRadius: RADIUS.lg,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 8,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm + 2,
     ...SHADOW.card,
   },
   bubbleMine: {
@@ -276,7 +279,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   bubbleText: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.base,
     color: COLORS.gray900,
     lineHeight: 19,
   },
@@ -292,12 +295,6 @@ const styles = StyleSheet.create({
   timeMine: {
     color: 'rgba(255,255,255,0.75)',
   },
-  emptyText: {
-    textAlign: 'center',
-    color: COLORS.gray400,
-    fontSize: 13,
-    marginTop: SPACING.xl,
-  },
   inputBar: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -310,14 +307,15 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
+    minHeight: 46,
+    maxHeight: 100,
     backgroundColor: COLORS.gray50,
     borderRadius: RADIUS.pill,
     borderWidth: 1,
     borderColor: COLORS.gray200,
     paddingHorizontal: SPACING.md,
-    paddingVertical: 8,
-    maxHeight: 100,
-    fontSize: 14,
+    paddingVertical: 10,
+    fontSize: FONT_SIZE.base,
     color: COLORS.gray900,
   },
   sendBtn: {

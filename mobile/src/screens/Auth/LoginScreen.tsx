@@ -13,7 +13,7 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, SPACING } from '../../theme';
+import { COLORS, SPACING, RADIUS } from '../../theme';
 import { useAuth } from '../../context/AuthContext';
 import { validateEmail } from '../../utils/security';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
   },
   loginButton: {
     marginTop: SPACING.md,
-    borderRadius: 8,
+    borderRadius: RADIUS.pill,
     overflow: 'hidden',
   },
   buttonGradient: {

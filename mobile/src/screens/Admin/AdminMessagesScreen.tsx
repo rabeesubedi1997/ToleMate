@@ -14,8 +14,9 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import api from '../../api/client';
 import ScreenHeader from '../../components/ScreenHeader';
 import FilterChips from '../../components/FilterChips';
+import StatusBadge from '../../components/StatusBadge';
 import EmptyState from '../../components/EmptyState';
-import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from '../../theme';
 import { MainStackParamList } from '../../navigation/types';
 
 type Nav = NativeStackNavigationProp<MainStackParamList>;
@@ -100,17 +101,15 @@ const AdminMessagesScreen: React.FC = () => {
         activeOpacity={0.7}
         onPress={() => openBookingChat(item)}
       >
-        <View style={styles.icon}>
-          <MaterialIcons name="event" size={16} color={COLORS.primary} />
+        <View style={[styles.icon, styles.iconBooking]}>
+          <MaterialIcons name="event" size={18} color={COLORS.primary700} />
         </View>
         <View style={styles.body}>
           <View style={styles.topRow}>
             <Text style={styles.sender} numberOfLines={1}>
               {item.service?.name ?? 'Booking'} #{item.id}
             </Text>
-            <View style={styles.statusPill}>
-              <Text style={styles.statusText}>{item.status}</Text>
-            </View>
+            <StatusBadge status={item.status} />
           </View>
           <Text style={styles.meta} numberOfLines={1}>
             {item.customer?.name ?? 'Customer'} · {item.vendor?.user?.name ?? item.vendor?.business_name ?? 'Vendor'}
@@ -130,8 +129,8 @@ const AdminMessagesScreen: React.FC = () => {
       activeOpacity={0.7}
       onPress={() => openDirectChat(item)}
     >
-      <View style={styles.icon}>
-        <MaterialIcons name="chat" size={16} color={COLORS.infoText} />
+      <View style={[styles.icon, styles.iconDirect]}>
+        <MaterialIcons name="chat" size={18} color={COLORS.infoText} />
       </View>
       <View style={styles.body}>
         <View style={styles.topRow}>
@@ -217,11 +216,12 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.light,
   },
   loader: {
-    marginTop: SPACING.xxl,
+    marginTop: 60,
   },
   list: {
     paddingHorizontal: SPACING.md,
-    paddingBottom: SPACING.xl,
+    paddingVertical: 4,
+    paddingBottom: SPACING.xl + 8,
   },
   card: {
     flexDirection: 'row',
@@ -230,18 +230,23 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.lg,
     borderWidth: 1,
     borderColor: COLORS.gray200,
-    padding: SPACING.sm,
-    marginBottom: SPACING.sm,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
     ...SHADOW.card,
   },
   icon: {
-    width: 34,
-    height: 34,
-    borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.primary50,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: SPACING.sm,
+  },
+  iconBooking: {
+    backgroundColor: COLORS.primary100,
+  },
+  iconDirect: {
+    backgroundColor: COLORS.infoBg,
   },
   body: {
     flex: 1,
@@ -250,23 +255,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: SPACING.sm,
   },
   sender: {
     flex: 1,
-    fontSize: 13,
+    fontSize: FONT_SIZE.base,
     fontWeight: '700',
     color: COLORS.gray800,
-    marginRight: SPACING.sm,
   },
   meta: {
-    fontSize: 11,
+    fontSize: FONT_SIZE.xs,
     color: COLORS.gray500,
     marginTop: 2,
   },
   message: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     color: COLORS.gray600,
-    marginTop: 3,
+    marginTop: 4,
   },
   time: {
     fontSize: 10,
@@ -279,30 +284,18 @@ const styles = StyleSheet.create({
     color: COLORS.infoText,
     textTransform: 'capitalize',
   },
-  statusPill: {
-    backgroundColor: COLORS.neutralBg,
-    borderRadius: RADIUS.pill,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  statusText: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: COLORS.neutralText,
-    textTransform: 'capitalize',
-  },
   badge: {
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
     backgroundColor: COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 5,
+    paddingHorizontal: 6,
     marginLeft: SPACING.xs,
   },
   badgeText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
     color: COLORS.white,
   },

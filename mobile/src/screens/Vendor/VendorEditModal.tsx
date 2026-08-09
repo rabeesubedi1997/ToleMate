@@ -6,13 +6,13 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   ScrollView,
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import api from '../../api/client';
 import Modal from '../../components/Modal';
-import { COLORS, SPACING, RADIUS } from '../../theme';
+import { useToast } from '../../context/ToastContext';
+import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme';
 
 interface VendorProfile {
   business_name?: string;
@@ -55,6 +55,7 @@ const VendorEditModal: React.FC<{
   const [availability, setAvailability] = useState<DaySlot[]>([]);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
+  const toast = useToast();
 
   useEffect(() => {
     if (visible) {
@@ -80,7 +81,14 @@ const VendorEditModal: React.FC<{
 
   const save = async () => {
     if (!form.business_name.trim()) {
-      Alert.alert('Missing', 'Business name is required.');
+      toast.error('Business name is required.');
+      return;
+    }
+    const bad = availability.find(
+      d => !/^\d{2}:\d{2}$/.test(d.start_time) || !/^\d{2}:\d{2}$/.test(d.end_time),
+    );
+    if (bad) {
+      toast.error('Availability times must be in HH:MM format.');
       return;
     }
     setSaving(true);
@@ -96,20 +104,11 @@ const VendorEditModal: React.FC<{
         facebook: form.facebook.trim() || undefined,
         whatsapp_number: form.whatsapp_number.trim() || undefined,
       });
-      const bad = availability.find(
-        d => !/^\d{2}:\d{2}$/.test(d.start_time) || !/^\d{2}:\d{2}$/.test(d.end_time),
-      );
-      if (bad) {
-        Alert.alert('Invalid time', 'Availability times must be in HH:MM format.');
-        setSaving(false);
-        return;
-      }
       await api.put('/vendor/availability', { availability });
-      Alert.alert('Saved', 'Business profile updated.');
+      toast.success('Business profile updated.');
       onSaved();
     } catch (e: any) {
-      Alert.alert(
-        'Failed',
+      toast.error(
         e?.response?.data?.message ??
           Object.values(e?.response?.data?.errors ?? {}).flat()[0] ??
           'Could not save profile.',
@@ -295,9 +294,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.gray200,
     borderRadius: RADIUS.md,
-    backgroundColor: COLORS.gray50,
+    backgroundColor: COLORS.white,
     paddingHorizontal: SPACING.md,
-    height: 44,
+    height: 46,
     fontSize: 14,
     color: COLORS.gray900,
   },
@@ -334,7 +333,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.gray200,
     borderRadius: RADIUS.md,
-    backgroundColor: COLORS.gray50,
+    backgroundColor: COLORS.white,
     paddingHorizontal: 6,
     height: 36,
     fontSize: 13,
@@ -351,10 +350,11 @@ const styles = StyleSheet.create({
   saveBtn: {
     marginTop: SPACING.lg,
     backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.md,
-    height: 46,
+    borderRadius: RADIUS.pill,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
+    ...SHADOW.card,
   },
   saveBtnText: {
     color: COLORS.white,

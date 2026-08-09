@@ -162,6 +162,7 @@ const NotificationsScreen: React.FC = () => {
         activeOpacity={0.7}
         onPress={() => markRead(item)}
       >
+        {!item.is_read ? <View style={styles.unreadBar} /> : null}
         <View style={[styles.icon, !item.is_read && styles.iconUnread]}>
           <MaterialIcons
             name={icon}
@@ -418,7 +419,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.gray200,
+    borderColor: COLORS.gray100,
     paddingHorizontal: SPACING.md,
     marginBottom: SPACING.sm,
     ...SHADOW.card,
@@ -476,26 +477,38 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.gray200,
-    padding: SPACING.sm,
+    borderColor: COLORS.gray100,
+    padding: SPACING.sm + 4,
     marginBottom: SPACING.sm,
+    overflow: 'hidden',
     ...SHADOW.card,
   },
   cardUnread: {
     borderColor: COLORS.primary200,
     backgroundColor: COLORS.primary50,
   },
+  unreadBar: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 3,
+    backgroundColor: COLORS.primary,
+  },
   icon: {
-    width: 34,
-    height: 34,
+    width: 36,
+    height: 36,
     borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.gray100,
+    backgroundColor: COLORS.white,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: SPACING.sm,
+    borderWidth: 1,
+    borderColor: COLORS.gray100,
   },
   iconUnread: {
     backgroundColor: COLORS.primary100,
+    borderColor: COLORS.primary200,
   },
   body: {
     flex: 1,
@@ -522,15 +535,15 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
   },
   message: {
-    fontSize: 12,
+    fontSize: 13,
     color: COLORS.gray600,
     marginTop: 2,
-    lineHeight: 17,
+    lineHeight: 18,
   },
   time: {
-    fontSize: 10,
+    fontSize: 12,
     color: COLORS.gray400,
-    marginTop: 3,
+    marginTop: 4,
   },
 });
 

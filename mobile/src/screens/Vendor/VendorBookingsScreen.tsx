@@ -7,7 +7,6 @@ import {
   ActivityIndicator,
   RefreshControl,
   TouchableOpacity,
-  Alert,
   TextInput,
   ScrollView,
 } from 'react-native';
@@ -18,7 +17,9 @@ import api from '../../api/client';
 import FilterChips from '../../components/FilterChips';
 import EmptyState from '../../components/EmptyState';
 import Modal from '../../components/Modal';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import StatusBadge from '../../components/StatusBadge';
+import { useToast } from '../../context/ToastContext';
 import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme';
 
 interface Booking {
@@ -51,6 +52,7 @@ const NEXT_ACTIONS: Record<string, { status: string; label: string; icon: string
 };
 
 const VendorBookingsScreen: React.FC = () => {
+  const toast = useToast();
   const [items, setItems] = useState<Booking[]>([]);
   const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(true);
@@ -59,6 +61,14 @@ const VendorBookingsScreen: React.FC = () => {
   const [busy, setBusy] = useState(false);
   const [showPrice, setShowPrice] = useState(false);
   const [price, setPrice] = useState('');
+  const [confirm, setConfirm] = useState<{
+    title: string;
+    message: string;
+    tone?: 'danger' | 'primary' | 'warning';
+    confirmLabel?: string;
+    icon?: string;
+    fn: () => void;
+  } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -92,7 +102,7 @@ const VendorBookingsScreen: React.FC = () => {
       setShowPrice(false);
       load();
     } catch (e: any) {
-      Alert.alert('Failed', e?.response?.data?.message ?? 'Could not update booking.');
+      toast.error(e?.response?.data?.message ?? 'Could not update booking.');
     } finally {
       setBusy(false);
     }
@@ -100,10 +110,14 @@ const VendorBookingsScreen: React.FC = () => {
 
   const confirmChange = (status: string) => {
     if (status === 'cancelled') {
-      Alert.alert('Cancel booking', 'Mark this booking as cancelled?', [
-        { text: 'No', style: 'cancel' },
-        { text: 'Yes, cancel', style: 'destructive', onPress: () => changeStatus(status) },
-      ]);
+      setConfirm({
+        title: 'Cancel booking?',
+        message: 'Mark this booking as cancelled?',
+        confirmLabel: 'Yes, cancel',
+        tone: 'danger',
+        icon: 'cancel',
+        fn: () => changeStatus(status),
+      });
     } else if (status === 'accepted' && selected?.booking_type === 'quote') {
       setShowPrice(true);
     } else {
@@ -113,29 +127,27 @@ const VendorBookingsScreen: React.FC = () => {
 
   const respondReschedule = (action: 'accept' | 'decline') => {
     if (!selected) return;
-    Alert.alert(
-      'Reschedule request',
-      `Customer asked to move to ${formatDate(selected.reschedule_to)}. ${action === 'accept' ? 'Accept' : 'Decline'}?`,
-      [
-        { text: 'No', style: 'cancel' },
-        {
-          text: action === 'accept' ? 'Accept' : 'Decline',
-          style: action === 'accept' ? 'default' : 'destructive',
-          onPress: async () => {
-            setBusy(true);
-            try {
-              await api.post(`/bookings/${selected.id}/reschedule-respond`, { action });
-              setSelected(null);
-              load();
-            } catch (e: any) {
-              Alert.alert('Failed', e?.response?.data?.message ?? 'Could not respond.');
-            } finally {
-              setBusy(false);
-            }
-          },
-        },
-      ],
-    );
+    setConfirm({
+      title: 'Reschedule request',
+      message: `Customer asked to move to ${formatDate(selected.reschedule_to)}. ${
+        action === 'accept' ? 'Accept' : 'Decline'
+      }?`,
+      confirmLabel: action === 'accept' ? 'Accept' : 'Decline',
+      tone: action === 'accept' ? 'primary' : 'danger',
+      icon: action === 'accept' ? 'event-available' : 'event-busy',
+      fn: async () => {
+        setBusy(true);
+        try {
+          await api.post(`/bookings/${selected.id}/reschedule-respond`, { action });
+          setSelected(null);
+          load();
+        } catch (e: any) {
+          toast.error(e?.response?.data?.message ?? 'Could not respond.');
+        } finally {
+          setBusy(false);
+        }
+      },
+    });
   };
 
   const formatDate = (iso?: string | null) => {
@@ -165,7 +177,9 @@ const VendorBookingsScreen: React.FC = () => {
       </Text>
       <View style={styles.cardBottom}>
         <Text style={styles.time}>
-          {item.scheduled_time ? `📅 ${formatDate(item.scheduled_time)}` : 'Date to be confirmed'}
+          {item.scheduled_time
+            ? `${formatDate(item.scheduled_time)}`
+            : 'Date to be confirmed'}
         </Text>
         {item.price !== null && item.price !== undefined ? (
           <Text style={styles.price}>Rs {item.price}</Text>
@@ -223,6 +237,8 @@ const VendorBookingsScreen: React.FC = () => {
       <Modal
         visible={!!selected}
         title={selected?.service?.name ?? 'Booking'}
+        subtitle={`Booking #${selected?.id ?? ''}`}
+        icon="event-note"
         onClose={() => setSelected(null)}
       >
         <ScrollView>
@@ -318,7 +334,13 @@ const VendorBookingsScreen: React.FC = () => {
         </ScrollView>
       </Modal>
 
-      <Modal visible={showPrice} title="Set Quote Price" onClose={() => setShowPrice(false)}>
+      <Modal
+        visible={showPrice}
+        title="Set Quote Price"
+        subtitle="Confirm the price to accept this request"
+        icon="payments"
+        onClose={() => setShowPrice(false)}
+      >
         <Text style={styles.modalLabel}>PRICE (RS.) *</Text>
         <TextInput
           style={styles.input}
@@ -336,6 +358,21 @@ const VendorBookingsScreen: React.FC = () => {
           <Text style={styles.primaryBtnText}>Accept with price</Text>
         </TouchableOpacity>
       </Modal>
+
+      <ConfirmDialog
+        visible={!!confirm}
+        title={confirm?.title ?? ''}
+        message={confirm?.message ?? ''}
+        confirmLabel={confirm?.confirmLabel}
+        tone={confirm?.tone}
+        icon={confirm?.icon}
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => {
+          const c = confirm;
+          setConfirm(null);
+          c?.fn();
+        }}
+      />
     </SafeAreaView>
   );
 };
@@ -383,15 +420,16 @@ const styles = StyleSheet.create({
   },
   list: {
     paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.xs,
     paddingBottom: SPACING.xl,
+    gap: 12,
   },
   card: {
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.gray200,
+    borderColor: COLORS.gray100,
     padding: SPACING.md,
-    marginBottom: SPACING.sm,
     ...SHADOW.card,
   },
   cardTop: {
@@ -495,8 +533,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.md,
-    height: 42,
+    borderRadius: RADIUS.pill,
+    height: 44,
   },
   acceptBtnText: {
     color: COLORS.white,
@@ -507,11 +545,11 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: COLORS.gray100,
+    backgroundColor: COLORS.white,
     borderWidth: 1,
     borderColor: COLORS.gray200,
-    borderRadius: RADIUS.md,
-    height: 42,
+    borderRadius: RADIUS.pill,
+    height: 44,
   },
   declineBtnText: {
     color: COLORS.gray700,
@@ -530,8 +568,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     backgroundColor: COLORS.primary100,
-    borderRadius: RADIUS.md,
-    height: 44,
+    borderRadius: RADIUS.pill,
+    height: 46,
   },
   actionBtnText: {
     color: COLORS.primary700,
@@ -545,8 +583,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     backgroundColor: COLORS.rose,
-    borderRadius: RADIUS.md,
-    height: 44,
+    borderRadius: RADIUS.pill,
+    height: 46,
   },
   cancelBtnText: {
     color: COLORS.white,
@@ -567,15 +605,15 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
     backgroundColor: COLORS.gray50,
     paddingHorizontal: SPACING.md,
-    height: 44,
+    height: 46,
     fontSize: 14,
     color: COLORS.gray900,
   },
   primaryBtn: {
     marginTop: SPACING.lg,
     backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.md,
-    height: 46,
+    borderRadius: RADIUS.pill,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -7,7 +7,6 @@ import {
   ActivityIndicator,
   RefreshControl,
   TouchableOpacity,
-  Alert,
   TextInput,
   ScrollView,
 } from 'react-native';
@@ -17,6 +16,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import api from '../../api/client';
 import EmptyState from '../../components/EmptyState';
 import Modal from '../../components/Modal';
+import ConfirmDialog from '../../components/ConfirmDialog';
+import { useToast } from '../../context/ToastContext';
 import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme';
 
 interface Bundle {
@@ -51,6 +52,8 @@ const VendorBundlesScreen: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [toDelete, setToDelete] = useState<Bundle | null>(null);
+  const toast = useToast();
 
   const load = useCallback(async () => {
     try {
@@ -90,15 +93,15 @@ const VendorBundlesScreen: React.FC = () => {
 
   const save = async () => {
     if (!form.name.trim()) {
-      Alert.alert('Missing', 'Bundle name is required.');
+      toast.error('Bundle name is required.');
       return;
     }
     if (form.service_ids.length < 2) {
-      Alert.alert('Missing', 'Select at least 2 services for the bundle.');
+      toast.error('Select at least 2 services for the bundle.');
       return;
     }
     if (!form.bundle_price || Number(form.bundle_price) <= 0) {
-      Alert.alert('Missing', 'Enter a bundle price.');
+      toast.error('Enter a bundle price.');
       return;
     }
     setSaving(true);
@@ -112,12 +115,11 @@ const VendorBundlesScreen: React.FC = () => {
           ? Number(form.discount_percent)
           : 0,
       });
-      Alert.alert('Bundle created', 'Your bundle is now live.');
+      toast.success('Bundle created.');
       setShowForm(false);
       load();
     } catch (e: any) {
-      Alert.alert(
-        'Failed',
+      toast.error(
         e?.response?.data?.message ??
           Object.values(e?.response?.data?.errors ?? {}).flat()[0] ??
           'Could not create bundle.',
@@ -127,22 +129,19 @@ const VendorBundlesScreen: React.FC = () => {
     }
   };
 
-  const remove = (item: Bundle) => {
-    Alert.alert('Delete bundle', `Delete "${item.name}"?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await api.delete(`/vendor/bundles/${item.id}`);
-            load();
-          } catch (e: any) {
-            Alert.alert('Failed', e?.response?.data?.message ?? 'Could not delete bundle.');
-          }
-        },
-      },
-    ]);
+  const confirmDelete = () => {
+    if (!toDelete) return;
+    api
+      .delete(`/vendor/bundles/${toDelete.id}`)
+      .then(() => {
+        toast.success('Bundle deleted.');
+        setToDelete(null);
+        load();
+      })
+      .catch((e: any) => {
+        toast.error(e?.response?.data?.message ?? 'Could not delete bundle.');
+        setToDelete(null);
+      });
   };
 
   const renderBundle = ({ item }: { item: Bundle }) => (
@@ -151,7 +150,7 @@ const VendorBundlesScreen: React.FC = () => {
         <Text style={styles.cardTitle} numberOfLines={1}>
           {item.name}
         </Text>
-        <TouchableOpacity onPress={() => remove(item)} hitSlop={6}>
+        <TouchableOpacity onPress={() => setToDelete(item)} hitSlop={6}>
           <MaterialIcons name="delete-outline" size={18} color={COLORS.rose} />
         </TouchableOpacity>
       </View>
@@ -305,6 +304,16 @@ const VendorBundlesScreen: React.FC = () => {
           </TouchableOpacity>
         </ScrollView>
       </Modal>
+
+      <ConfirmDialog
+        visible={toDelete !== null}
+        title="Delete bundle"
+        message={`Delete "${toDelete?.name}"?`}
+        confirmLabel="Delete"
+        tone="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => setToDelete(null)}
+      />
     </SafeAreaView>
   );
 };
@@ -339,9 +348,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.md,
+    borderRadius: RADIUS.pill,
     paddingHorizontal: SPACING.md,
     height: 38,
+    ...SHADOW.card,
   },
   addBtnText: {
     color: COLORS.white,
@@ -359,7 +369,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.gray200,
+    borderColor: COLORS.gray100,
     padding: SPACING.md,
     marginBottom: SPACING.sm,
     ...SHADOW.card,
@@ -407,19 +417,21 @@ const styles = StyleSheet.create({
     maxWidth: 140,
   },
   label: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 11,
+    fontWeight: '800',
     color: COLORS.gray600,
     marginTop: SPACING.sm,
     marginBottom: 6,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
   },
   input: {
     borderWidth: 1,
     borderColor: COLORS.gray200,
     borderRadius: RADIUS.md,
-    backgroundColor: COLORS.gray50,
+    backgroundColor: COLORS.white,
     paddingHorizontal: SPACING.md,
-    height: 44,
+    height: 46,
     fontSize: 14,
     color: COLORS.gray900,
   },
@@ -467,10 +479,11 @@ const styles = StyleSheet.create({
   saveBtn: {
     marginTop: SPACING.md,
     backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.md,
-    height: 46,
+    borderRadius: RADIUS.pill,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
+    ...SHADOW.card,
   },
   saveBtnText: {
     color: COLORS.white,

@@ -63,24 +63,25 @@ const VendorDashboardScreen: React.FC = () => {
   const maxBookings = Math.max(1, ...monthly.map(m => m.bookings));
 
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={() => {
-            setRefreshing(true);
-            load();
-          }}
-          tintColor={COLORS.primary}
-        />
-      }
-    >
+    <View style={styles.container}>
       <AdminHeader
         title="Dashboard"
         subtitle="Your business at a glance"
         brand="ToleMate Partner"
       />
+      <ScrollView
+        style={styles.body}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              load();
+            }}
+            tintColor={COLORS.primary}
+          />
+        }
+      >
 
       {loading ? (
         <ActivityIndicator
@@ -205,7 +206,8 @@ const VendorDashboardScreen: React.FC = () => {
           </View>
         </>
       )}
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 };
 
@@ -213,6 +215,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.light,
+  },
+  body: {
+    flex: 1,
   },
   loader: {
     marginTop: SPACING.xxl,
@@ -226,10 +231,10 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.gray200,
+    borderColor: COLORS.gray100,
     padding: SPACING.md,
     marginHorizontal: SPACING.md,
-    marginTop: SPACING.md,
+    marginBottom: SPACING.md,
     ...SHADOW.card,
   },
   cardTitle: {

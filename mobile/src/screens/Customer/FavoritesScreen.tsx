@@ -13,10 +13,11 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../api/client';
-import { COLORS, SPACING } from '../../theme';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from '../../theme';
 import ServiceCard, { Service } from '../../components/ServiceCard';
 import AppImage from '../../components/AppImage';
 import EmptyState from '../../components/EmptyState';
+import { useToast } from '../../context/ToastContext';
 import { MainStackParamList } from '../../navigation/types';
 
 type Props = NativeStackScreenProps<MainStackParamList, 'Favorites'>;
@@ -32,6 +33,7 @@ interface FavVendor {
 }
 
 const FavoritesScreen: React.FC<Props> = ({ navigation }) => {
+  const toast = useToast();
   const [tab, setTab] = useState<'services' | 'vendors'>('services');
   const [services, setServices] = useState<Service[]>([]);
   const [vendors, setVendors] = useState<FavVendor[]>([]);
@@ -85,17 +87,25 @@ const FavoritesScreen: React.FC<Props> = ({ navigation }) => {
       } else {
         setVendors(prev => prev.filter(v => v.id !== id));
       }
+      toast.info('Removed from favorites');
     },
-    [],
+    [toast],
   );
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Fixed header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <MaterialIcons name="arrow-back" size={24} color={COLORS.dark} />
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => navigation.goBack()}
+        >
+          <MaterialIcons name="arrow-back" size={22} color={COLORS.gray900} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Favorites</Text>
+        <View style={styles.headerTitleWrap}>
+          <Text style={styles.kicker}>Saved for later</Text>
+          <Text style={styles.headerTitle}>Favorites</Text>
+        </View>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -122,6 +132,7 @@ const FavoritesScreen: React.FC<Props> = ({ navigation }) => {
           numColumns={2}
           columnWrapperStyle={styles.row}
           contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <EmptyState
               title="No favorite services"
@@ -138,6 +149,7 @@ const FavoritesScreen: React.FC<Props> = ({ navigation }) => {
               />
               <TouchableOpacity
                 style={styles.removeBtn}
+                activeOpacity={0.8}
                 onPress={() => removeFav(item.id, true)}
               >
                 <MaterialIcons name="heart-broken" size={14} color={COLORS.rose} />
@@ -151,6 +163,7 @@ const FavoritesScreen: React.FC<Props> = ({ navigation }) => {
           data={vendors}
           keyExtractor={item => String(item.id)}
           contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <EmptyState
               title="No favorite vendors"
@@ -159,7 +172,7 @@ const FavoritesScreen: React.FC<Props> = ({ navigation }) => {
           }
           renderItem={({ item }) => (
             <TouchableOpacity
-              style={styles.vendorRow}
+              style={styles.vendorCard}
               activeOpacity={0.85}
               onPress={() =>
                 navigation.navigate('VendorPublic', { id: item.id })
@@ -172,7 +185,10 @@ const FavoritesScreen: React.FC<Props> = ({ navigation }) => {
                   ★ {item.rating ? Number(item.rating).toFixed(1) : 'New'}
                 </Text>
               </View>
-              <TouchableOpacity onPress={() => removeFav(item.id, false)}>
+              <TouchableOpacity
+                style={styles.removeIcon}
+                onPress={() => removeFav(item.id, false)}
+              >
                 <MaterialIcons name="heart-broken" size={18} color={COLORS.rose} />
               </TouchableOpacity>
             </TouchableOpacity>
@@ -194,39 +210,67 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: SPACING.md,
     paddingTop: SPACING.sm,
+    paddingBottom: SPACING.xs,
+    backgroundColor: COLORS.light,
+  },
+  backBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: COLORS.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.gray100,
+    ...SHADOW.card,
+  },
+  headerTitleWrap: {
+    alignItems: 'center',
+  },
+  kicker: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '700',
+    color: COLORS.gray500,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: FONT_SIZE.xl,
     fontWeight: '700',
-    color: COLORS.dark,
+    color: COLORS.gray900,
   },
   headerSpacer: {
-    width: 24,
+    width: 42,
   },
   tabsRow: {
     flexDirection: 'row',
     marginHorizontal: SPACING.md,
     marginTop: SPACING.sm,
-    backgroundColor: COLORS.gray200,
-    borderRadius: 10,
-    padding: 3,
+    backgroundColor: COLORS.gray100,
+    borderRadius: RADIUS.md,
+    padding: 4,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: COLORS.gray200,
   },
   tab: {
     flex: 1,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingVertical: 9,
+    borderRadius: RADIUS.sm + 1,
     alignItems: 'center',
   },
   tabActive: {
     backgroundColor: COLORS.white,
+    ...SHADOW.card,
   },
   tabText: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.base,
     fontWeight: '600',
-    color: COLORS.slate600,
+    color: COLORS.gray600,
   },
   tabTextActive: {
-    color: COLORS.primary,
+    color: COLORS.primary700,
+    fontWeight: '700',
   },
   loader: {
     marginTop: SPACING.xxl,
@@ -236,34 +280,38 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
   },
   listContent: {
-    padding: SPACING.md,
+    paddingTop: SPACING.md,
     paddingBottom: SPACING.xl,
   },
   removeBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    alignSelf: 'flex-start',
+    marginLeft: SPACING.md + SPACING.xs,
     gap: 4,
+    paddingHorizontal: 10,
     paddingVertical: 4,
     marginBottom: SPACING.md,
+    borderRadius: RADIUS.pill,
+    backgroundColor: COLORS.roseBg,
   },
   removeText: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     color: COLORS.rose,
     fontWeight: '600',
   },
-  vendorRow: {
+  vendorCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.white,
-    borderRadius: 12,
-    padding: SPACING.sm,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.gray100,
+    padding: SPACING.sm + 4,
     marginBottom: SPACING.sm,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 1,
+    gap: SPACING.sm,
+    ...SHADOW.card,
   },
   vendorAvatar: {
     width: 48,
@@ -272,18 +320,25 @@ const styles = StyleSheet.create({
   },
   vendorInfo: {
     flex: 1,
-    marginLeft: SPACING.sm,
   },
   vendorName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: COLORS.dark,
+    fontSize: FONT_SIZE.md,
+    fontWeight: '700',
+    color: COLORS.gray900,
   },
   vendorRating: {
     marginTop: 2,
-    fontSize: 13,
+    fontSize: FONT_SIZE.sm,
     color: COLORS.accent,
-    fontWeight: '600',
+    fontWeight: '700',
+  },
+  removeIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.roseBg,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 

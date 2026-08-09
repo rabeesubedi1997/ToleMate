@@ -6,7 +6,6 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,6 +14,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import api from '../../api/client';
 import ScreenHeader from '../../components/ScreenHeader';
+import { useToast } from '../../context/ToastContext';
 import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme';
 import { MainStackParamList } from '../../navigation/types';
 
@@ -29,6 +29,7 @@ const URGENCIES = ['asap', 'this_week', 'this_month', 'flexible'];
 
 const PostRequestScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
+  const toast = useToast();
   const [categories, setCategories] = useState<Category[]>([]);
   const [title, setTitle] = useState('');
   const [text, setText] = useState('');
@@ -49,11 +50,11 @@ const PostRequestScreen: React.FC = () => {
 
   const submit = async () => {
     if (!title.trim()) {
-      Alert.alert('Missing', 'Please enter a title for your request.');
+      toast.error('Please enter a title for your request.');
       return;
     }
     if (!categoryId) {
-      Alert.alert('Missing', 'Please pick a category.');
+      toast.error('Please pick a category.');
       return;
     }
     setSubmitting(true);
@@ -66,14 +67,10 @@ const PostRequestScreen: React.FC = () => {
         preferred_date: preferredDate.trim() || undefined,
         urgency,
       });
-      Alert.alert(
-        'Request posted',
-        'Vendors can now see your request and send quotes.',
-        [{ text: 'OK', onPress: () => navigation.goBack() }],
-      );
+      toast.success('Request posted — vendors can now send quotes.');
+      navigation.goBack();
     } catch (e: any) {
-      Alert.alert(
-        'Failed',
+      toast.error(
         e?.response?.data?.message ??
           Object.values(e?.response?.data?.errors ?? {}).flat()[0] ??
           'Could not post request.',
@@ -88,7 +85,7 @@ const PostRequestScreen: React.FC = () => {
       <ScreenHeader title="Post a Request" subtitle="Tell vendors what you need" />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         <View style={styles.card}>
-          <Text style={styles.label}>WHAT DO YOU NEED? *</Text>
+          <Text style={styles.label}>What do you need? *</Text>
           <TextInput
             style={styles.input}
             placeholder="e.g. Sofa deep cleaning"
@@ -97,18 +94,22 @@ const PostRequestScreen: React.FC = () => {
             onChangeText={setTitle}
           />
 
-          <Text style={styles.label}>DESCRIPTION</Text>
-          <TextInput
-            style={[styles.input, styles.inputMultiline]}
-            placeholder="Describe the job in detail..."
-            placeholderTextColor={COLORS.gray400}
-            value={text}
-            onChangeText={setText}
-            multiline
-            numberOfLines={4}
-          />
+          <View style={styles.field}>
+            <Text style={styles.label}>Description</Text>
+            <TextInput
+              style={[styles.input, styles.inputMultiline]}
+              placeholder="Describe the job in detail..."
+              placeholderTextColor={COLORS.gray400}
+              value={text}
+              onChangeText={setText}
+              multiline
+              numberOfLines={4}
+            />
+          </View>
+        </View>
 
-          <Text style={styles.label}>CATEGORY *</Text>
+        <View style={styles.card}>
+          <Text style={styles.label}>Category *</Text>
           <View style={styles.chipsRow}>
             {categories.map(c => {
               const active = categoryId === String(c.id);
@@ -117,24 +118,30 @@ const PostRequestScreen: React.FC = () => {
                   key={c.id}
                   style={[styles.chip, active && styles.chipActive]}
                   onPress={() => setCategoryId(String(c.id))}
+                  activeOpacity={0.8}
                 >
                   <Text style={[styles.chipText, active && styles.chipTextActive]}>{c.name}</Text>
                 </TouchableOpacity>
               );
             })}
           </View>
+        </View>
 
-          <Text style={styles.label}>BUDGET (RS., OPTIONAL)</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="e.g. 3000"
-            placeholderTextColor={COLORS.gray400}
-            value={budget}
-            onChangeText={setBudget}
-            keyboardType="numeric"
-          />
+        <View style={styles.card}>
+          <Text style={styles.label}>Budget & timing</Text>
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Budget (Rs., optional)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. 3000"
+              placeholderTextColor={COLORS.gray400}
+              value={budget}
+              onChangeText={setBudget}
+              keyboardType="numeric"
+            />
+          </View>
 
-          <Text style={styles.label}>PREFERRED DATE (OPTIONAL)</Text>
+          <Text style={styles.fieldLabel}>Preferred date (optional)</Text>
           <TextInput
             style={styles.input}
             placeholder="YYYY-MM-DD (e.g. 2026-08-15)"
@@ -143,8 +150,10 @@ const PostRequestScreen: React.FC = () => {
             onChangeText={setPreferredDate}
             autoCapitalize="none"
           />
+        </View>
 
-          <Text style={styles.label}>URGENCY</Text>
+        <View style={styles.card}>
+          <Text style={styles.label}>Urgency</Text>
           <View style={styles.chipsRow}>
             {URGENCIES.map(u => {
               const active = urgency === u;
@@ -153,6 +162,7 @@ const PostRequestScreen: React.FC = () => {
                   key={u}
                   style={[styles.chip, active && styles.chipActive]}
                   onPress={() => setUrgency(u)}
+                  activeOpacity={0.8}
                 >
                   <Text style={[styles.chipText, active && styles.chipTextActive]}>
                     {u.replace('_', ' ')}
@@ -167,6 +177,7 @@ const PostRequestScreen: React.FC = () => {
           style={[styles.submitBtn, submitting && styles.btnDisabled]}
           onPress={submit}
           disabled={submitting}
+          activeOpacity={0.85}
         >
           {submitting ? (
             <ActivityIndicator color={COLORS.white} />
@@ -195,17 +206,30 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.gray200,
+    borderColor: COLORS.gray100,
     padding: SPACING.md,
+    marginBottom: SPACING.md,
     ...SHADOW.card,
   },
-  label: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: COLORS.gray600,
+  field: {
     marginTop: SPACING.md,
-    marginBottom: 6,
-    letterSpacing: 1,
+  },
+  label: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    color: COLORS.gray500,
+    marginBottom: SPACING.sm,
+  },
+  fieldLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    color: COLORS.gray500,
+    marginBottom: SPACING.sm,
+    marginTop: SPACING.md,
   },
   input: {
     borderWidth: 1,
@@ -213,12 +237,12 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
     backgroundColor: COLORS.gray50,
     paddingHorizontal: SPACING.md,
-    height: 44,
+    height: 50,
     fontSize: 14,
     color: COLORS.gray900,
   },
   inputMultiline: {
-    height: 96,
+    height: 100,
     textAlignVertical: 'top',
     paddingTop: SPACING.sm,
   },
@@ -229,14 +253,14 @@ const styles = StyleSheet.create({
   },
   chip: {
     paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingVertical: 8,
     borderRadius: RADIUS.pill,
     backgroundColor: COLORS.gray100,
     borderWidth: 1,
     borderColor: COLORS.gray200,
   },
   chipActive: {
-    backgroundColor: COLORS.primary100,
+    backgroundColor: COLORS.primary,
     borderColor: COLORS.primary,
   },
   chipText: {
@@ -245,16 +269,16 @@ const styles = StyleSheet.create({
     color: COLORS.gray600,
   },
   chipTextActive: {
-    color: COLORS.primary700,
+    color: COLORS.white,
   },
   submitBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    marginTop: SPACING.lg,
+    marginTop: SPACING.sm,
     backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.md,
+    borderRadius: RADIUS.pill,
     height: 50,
   },
   submitBtnText: {

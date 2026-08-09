@@ -18,7 +18,7 @@ import type { CompositeNavigationProp } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import api from '../../api/client';
-import { COLORS, SPACING, RADIUS } from '../../theme';
+import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../../theme';
 import ServiceCard, { Service } from '../../components/ServiceCard';
 import EmptyState from '../../components/EmptyState';
 import { ServiceGridSkeleton } from '../../components/Skeleton';
@@ -154,16 +154,19 @@ const MarketplaceScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
+      {/* Fixed header */}
       <View style={styles.header}>
+        <Text style={styles.kicker}>Find pros near you</Text>
         <View style={styles.headerRow}>
           <Text style={styles.headerTitle}>Browse Services</Text>
           {loading ? (
             <ActivityIndicator size="small" color={COLORS.primary} />
           ) : (
-            <Text style={styles.headerCount}>
-              {total > 0 ? `${total} service${total !== 1 ? 's' : ''}` : ''}
-            </Text>
+            <View style={styles.headerCountPill}>
+              <Text style={styles.headerCount}>
+                {total > 0 ? `${total} service${total !== 1 ? 's' : ''}` : ''}
+              </Text>
+            </View>
           )}
         </View>
         <Text style={styles.headerSub}>
@@ -175,7 +178,7 @@ const MarketplaceScreen: React.FC = () => {
 
       {/* Search */}
       <View style={styles.searchContainer}>
-        <MaterialIcons name="search" size={20} color={COLORS.slate500} />
+        <MaterialIcons name="search" size={20} color={COLORS.gray400} />
         <TextInput
           placeholder="Search services..."
           style={styles.searchInput}
@@ -183,11 +186,14 @@ const MarketplaceScreen: React.FC = () => {
           onChangeText={setSearch}
           returnKeyType="search"
           onSubmitEditing={() => submitSearch(search)}
-          placeholderTextColor={COLORS.slate400}
+          placeholderTextColor={COLORS.gray400}
         />
         {search.length > 0 ? (
-          <TouchableOpacity onPress={() => submitSearch('')}>
-            <MaterialIcons name="close" size={18} color={COLORS.slate500} />
+          <TouchableOpacity
+            style={styles.searchClear}
+            onPress={() => submitSearch('')}
+          >
+            <MaterialIcons name="close" size={18} color={COLORS.gray500} />
           </TouchableOpacity>
         ) : null}
       </View>
@@ -207,7 +213,7 @@ const MarketplaceScreen: React.FC = () => {
             <MaterialIcons
               name="apps"
               size={14}
-              color={categoryId === undefined ? COLORS.white : COLORS.slate500}
+              color={categoryId === undefined ? COLORS.white : COLORS.gray500}
             />
             <Text
               style={[
@@ -325,26 +331,44 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: SPACING.md,
     paddingTop: SPACING.sm,
+    paddingBottom: SPACING.xs,
+    backgroundColor: COLORS.light,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginTop: 2,
+  },
+  kicker: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '700',
+    color: COLORS.gray500,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: FONT_SIZE.xxl,
     fontWeight: '700',
-    color: COLORS.dark,
+    color: COLORS.gray900,
+  },
+  headerCountPill: {
+    backgroundColor: COLORS.primary50,
+    borderWidth: 1,
+    borderColor: COLORS.primary100,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: SPACING.sm + 2,
+    paddingVertical: 4,
   },
   headerCount: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.primary,
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '700',
+    color: COLORS.primary700,
   },
   headerSub: {
     marginTop: 2,
-    fontSize: 13,
-    color: COLORS.slate500,
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.gray500,
   },
   searchContainer: {
     flexDirection: 'row',
@@ -352,21 +376,26 @@ const styles = StyleSheet.create({
     marginHorizontal: SPACING.md,
     marginTop: SPACING.md,
     paddingHorizontal: SPACING.md,
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.lg,
-    height: 44,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
+    backgroundColor: COLORS.gray50,
+    borderWidth: 1,
+    borderColor: COLORS.gray200,
+    borderRadius: RADIUS.md,
+    height: 46,
   },
   searchInput: {
     flex: 1,
     marginLeft: SPACING.sm,
-    fontSize: 15,
-    color: COLORS.dark,
+    fontSize: FONT_SIZE.base,
+    color: COLORS.gray900,
     paddingVertical: 0,
+  },
+  searchClear: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: COLORS.gray100,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   chipsWrap: {
     marginTop: SPACING.md,
@@ -381,10 +410,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     paddingHorizontal: 14,
-    height: 34,
+    height: 36,
     borderRadius: RADIUS.pill,
     borderWidth: 1,
-    borderColor: COLORS.gray300,
+    borderColor: COLORS.gray200,
     backgroundColor: COLORS.white,
   },
   chipActive: {
@@ -392,8 +421,8 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primary,
   },
   chipText: {
-    fontSize: 13,
-    color: COLORS.slate600,
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.gray700,
     fontWeight: '600',
   },
   chipTextActive: {
@@ -409,17 +438,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
     paddingVertical: 6,
     backgroundColor: COLORS.primary50,
-    borderRadius: RADIUS.lg,
+    borderRadius: RADIUS.md,
     borderWidth: 1,
     borderColor: COLORS.primary100,
   },
   activeText: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     fontWeight: '600',
     color: COLORS.primaryDark,
   },
   clearText: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     fontWeight: '700',
     color: COLORS.primary,
     textDecorationLine: 'underline',
@@ -436,7 +465,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.sm,
   },
   offlineText: {
-    fontSize: 11,
+    fontSize: FONT_SIZE.xs,
     fontWeight: '600',
     color: COLORS.warningText,
   },
@@ -452,6 +481,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: SPACING.xl,
+    paddingTop: SPACING.sm,
   },
 });
 

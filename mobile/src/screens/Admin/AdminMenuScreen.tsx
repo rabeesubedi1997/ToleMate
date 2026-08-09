@@ -101,18 +101,17 @@ const AdminMenuScreen: React.FC = () => {
   };
 
   return (
-    <FlatList
-      style={styles.container}
-      data={groups}
-      keyExtractor={g => g.label}
-      contentContainerStyle={styles.content}
-      ListHeaderComponent={
-        <AdminHeader
-          title="Admin Menu"
-          subtitle="Everything you can manage on the platform"
-        />
-      }
-      renderItem={({ item: group }) => (
+    <View style={styles.container}>
+      <AdminHeader
+        title="Admin Menu"
+        subtitle="Everything you can manage on the platform"
+      />
+      <FlatList
+        style={styles.list}
+        data={groups}
+        keyExtractor={g => g.label}
+        contentContainerStyle={styles.content}
+        renderItem={({ item: group }) => (
         <View style={styles.group}>
           <Text style={styles.groupLabel}>{group.label}</Text>
           <View style={styles.grid}>
@@ -138,6 +137,7 @@ const AdminMenuScreen: React.FC = () => {
         </View>
       )}
     />
+    </View>
   );
 };
 
@@ -145,6 +145,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.light,
+  },
+  list: {
+    flex: 1,
   },
   content: {
     paddingHorizontal: SPACING.md,

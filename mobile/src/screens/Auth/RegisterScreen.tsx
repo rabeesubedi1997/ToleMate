@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, SPACING } from '../../theme';
+import { COLORS, SPACING, RADIUS } from '../../theme';
 import { useAuth } from '../../context/AuthContext';
 import { validateEmail, validatePhone, validatePasswordStrength } from '../../utils/security';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -317,7 +317,7 @@ const styles = StyleSheet.create({
   },
   registerButton: {
     marginTop: SPACING.sm,
-    borderRadius: 8,
+    borderRadius: RADIUS.pill,
     overflow: 'hidden',
   },
   buttonGradient: {

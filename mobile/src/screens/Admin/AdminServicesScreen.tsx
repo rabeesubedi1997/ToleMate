@@ -8,8 +8,6 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-  Alert,
-  Pressable,
   ScrollView,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -20,7 +18,9 @@ import FilterChips from '../../components/FilterChips';
 import StatusBadge from '../../components/StatusBadge';
 import EmptyState from '../../components/EmptyState';
 import Modal from '../../components/Modal';
-import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme';
+import ConfirmDialog from '../../components/ConfirmDialog';
+import { useToast } from '../../context/ToastContext';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from '../../theme';
 
 interface Service {
   id: number;
@@ -79,6 +79,15 @@ const AdminServicesScreen: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [vendors, setVendors] = useState<VendorOption[]>([]);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [confirm, setConfirm] = useState<{
+    title: string;
+    message: string;
+    tone?: 'danger' | 'primary' | 'warning';
+    confirmLabel?: string;
+    icon?: string;
+    fn?: () => void;
+  } | null>(null);
+  const toast = useToast();
 
   const load = useCallback(async () => {
     try {
@@ -146,27 +155,27 @@ const AdminServicesScreen: React.FC = () => {
 
   const createService = async () => {
     if (!form.name.trim() || !form.description.trim()) {
-      Alert.alert('Missing fields', 'Name and description are required.');
+      toast.error('Name and description are required.');
       return;
     }
     if (!form.category_id) {
-      Alert.alert('Missing fields', 'Please select a category.');
+      toast.error('Please select a category.');
       return;
     }
     if (!form.vendor_id) {
-      Alert.alert('Missing fields', 'Please select a vendor.');
+      toast.error('Please select a vendor.');
       return;
     }
     if (form.pricing_type !== 'quote' && !form.price) {
-      Alert.alert('Missing fields', 'Please enter a price.');
+      toast.error('Please enter a price.');
       return;
     }
     if (form.price && (isNaN(Number(form.price)) || Number(form.price) <= 0)) {
-      Alert.alert('Invalid price', 'Price must be a positive number.');
+      toast.error('Price must be a positive number.');
       return;
     }
     if (form.sale_price && (isNaN(Number(form.sale_price)) || Number(form.sale_price) <= 0)) {
-      Alert.alert('Invalid sale price', 'Sale price must be a positive number.');
+      toast.error('Sale price must be a positive number.');
       return;
     }
     if (
@@ -174,7 +183,7 @@ const AdminServicesScreen: React.FC = () => {
       form.sale_price &&
       Number(form.sale_price) >= Number(form.price)
     ) {
-      Alert.alert('Invalid prices', 'Sale price must be lower than the regular price.');
+      toast.error('Sale price must be lower than the regular price.');
       return;
     }
     setCreating(true);
@@ -192,16 +201,15 @@ const AdminServicesScreen: React.FC = () => {
       };
       if (editing) {
         await api.put(`/services/${editing.id}`, payload);
-        Alert.alert('Saved', 'Service updated.');
+        toast.success('Service updated.');
       } else {
         await api.post('/services', payload);
-        Alert.alert('Service created', 'The service is live and approved.');
+        toast.success('The service is live and approved.');
       }
       setShowCreate(false);
       load();
     } catch (e: any) {
-      Alert.alert(
-        'Failed',
+      toast.error(
         e?.response?.data?.message ??
           Object.values(e?.response?.data?.errors ?? {}).flat()[0] ??
           'Could not create service.',
@@ -212,68 +220,72 @@ const AdminServicesScreen: React.FC = () => {
   };
 
   const remove = (item: Service) => {
-    Alert.alert('Delete service', `Delete "${item.name}"? This cannot be undone.`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await api.delete(`/services/${item.id}`);
-            load();
-          } catch (e: any) {
-            Alert.alert(
-              'Failed',
-              e?.response?.data?.message ?? 'Could not delete service.',
-            );
-          }
-        },
+    setConfirm({
+      title: 'Delete service',
+      message: `Delete "${item.name}"? This cannot be undone.`,
+      tone: 'danger',
+      confirmLabel: 'Delete',
+      icon: 'delete-outline',
+      fn: async () => {
+        try {
+          await api.delete(`/services/${item.id}`);
+          load();
+        } catch (e: any) {
+          toast.error(e?.response?.data?.message ?? 'Could not delete service.');
+        }
       },
-    ]);
+    });
   };
 
-  const renderItem = ({ item }: { item: Service }) => (
-    <View style={styles.card}>
-      <View style={styles.topRow}>
-        <Text style={styles.title} numberOfLines={1}>
-          {item.name}
+  const renderItem = ({ item }: { item: Service }) => {
+    const isActive = item.is_active;
+    return (
+      <View style={styles.card}>
+        <View style={styles.topRow}>
+          <Text style={styles.title} numberOfLines={1}>
+            {item.name}
+          </Text>
+          <StatusBadge status={item.status} />
+        </View>
+        <Text style={styles.meta} numberOfLines={1}>
+          {item.vendor?.business_name ?? '—'} · {item.category?.name ?? '—'}
         </Text>
-        <StatusBadge status={item.status} />
-      </View>
-      <Text style={styles.meta} numberOfLines={1}>
-        {item.vendor?.business_name ?? '—'} · {item.category?.name ?? '—'}
-      </Text>
-      <View style={styles.bottomRow}>
-        <Text style={styles.price}>Rs {item.price}</Text>
-          <View style={styles.actions}>
+        <View style={styles.bottomRow}>
+          <View style={styles.priceCol}>
+            <Text style={styles.price}>Rs {item.price}</Text>
             <View style={styles.activeRow}>
               <View
                 style={[
                   styles.dot,
-                  { backgroundColor: item.is_active ? COLORS.successText : COLORS.gray400 },
+                  { backgroundColor: isActive ? COLORS.successText : COLORS.gray400 },
                 ]}
               />
               <Text style={styles.activeText}>
-                {item.is_active ? 'live' : 'hidden'}
+                {isActive ? 'live' : 'hidden'}
               </Text>
             </View>
-            <Pressable
+          </View>
+          <View style={styles.actions}>
+            <TouchableOpacity
+              style={styles.iconBtnEdit}
               onPress={() => openEdit(item)}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             >
               <MaterialIcons name="edit" size={18} color={COLORS.primary700} />
-            </Pressable>
-            <Pressable
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.iconBtnDelete}
               onPress={() => remove(item)}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             >
               <MaterialIcons name="delete-outline" size={18} color={COLORS.rose} />
-            </Pressable>
+            </TouchableOpacity>
           </View>
+        </View>
+        <Text style={styles.time}>{item.pricing_type}</Text>
       </View>
-      <Text style={styles.time}>{item.pricing_type}</Text>
-    </View>
-  );
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -296,6 +308,7 @@ const AdminServicesScreen: React.FC = () => {
         />
       ) : (
         <FlatList
+          style={styles.flatList}
           data={services}
           keyExtractor={item => String(item.id)}
           renderItem={renderItem}
@@ -319,6 +332,8 @@ const AdminServicesScreen: React.FC = () => {
       <Modal
         visible={showCreate}
         title={editing ? 'Edit Service' : 'Add New Service'}
+        subtitle="Service listing details"
+        icon="handyman"
         onClose={() => setShowCreate(false)}
       >
         <Text style={styles.fieldLabel}>Service title</Text>
@@ -471,6 +486,21 @@ const AdminServicesScreen: React.FC = () => {
           </Text>
         </TouchableOpacity>
       </Modal>
+
+      <ConfirmDialog
+        visible={!!confirm}
+        title={confirm?.title ?? ''}
+        message={confirm?.message ?? ''}
+        icon={confirm?.icon}
+        tone={confirm?.tone}
+        confirmLabel={confirm?.confirmLabel}
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => {
+          const c = confirm;
+          setConfirm(null);
+          c?.fn?.();
+        }}
+      />
     </View>
   );
 };
@@ -483,17 +513,20 @@ const styles = StyleSheet.create({
   loader: {
     marginTop: SPACING.xxl,
   },
+  flatList: {
+    flex: 1,
+  },
   list: {
     paddingHorizontal: SPACING.md,
-    paddingBottom: SPACING.xl,
+    paddingBottom: 40,
+    gap: 12,
   },
   card: {
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.gray200,
+    borderColor: COLORS.gray100,
     padding: SPACING.md,
-    marginBottom: SPACING.sm,
     ...SHADOW.card,
   },
   topRow: {
@@ -504,13 +537,13 @@ const styles = StyleSheet.create({
   },
   title: {
     flex: 1,
-    fontSize: 14,
+    fontSize: FONT_SIZE.base,
     fontWeight: '700',
     color: COLORS.gray900,
     marginRight: SPACING.sm,
   },
   meta: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     color: COLORS.gray500,
     marginTop: 2,
   },
@@ -520,8 +553,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: SPACING.sm,
   },
+  priceCol: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
   price: {
-    fontSize: 15,
+    fontSize: FONT_SIZE.md,
     fontWeight: '700',
     color: COLORS.primary700,
   },
@@ -532,7 +570,7 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.md,
+    gap: SPACING.sm,
   },
   dot: {
     width: 6,
@@ -547,8 +585,24 @@ const styles = StyleSheet.create({
   },
   time: {
     marginTop: SPACING.xs,
-    fontSize: 11,
+    fontSize: FONT_SIZE.xs,
     color: COLORS.gray400,
+  },
+  iconBtnEdit: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.primary100,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconBtnDelete: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.roseBg,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   addBtn: {
     flex: 1,
@@ -557,12 +611,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.md,
-    height: 40,
+    borderRadius: RADIUS.pill,
+    height: 46,
+    ...SHADOW.card,
   },
   addBtnText: {
     color: COLORS.white,
-    fontSize: 13,
+    fontSize: FONT_SIZE.base,
     fontWeight: '700',
   },
   chipsBar: {
@@ -571,23 +626,23 @@ const styles = StyleSheet.create({
   addBar: {
     flexDirection: 'row',
     paddingHorizontal: SPACING.md,
-    paddingBottom: SPACING.sm,
+    paddingBottom: 12,
   },
   fieldLabel: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     fontWeight: '700',
     color: COLORS.gray600,
-    marginTop: SPACING.sm,
+    marginTop: 16,
     marginBottom: 6,
   },
   input: {
+    backgroundColor: COLORS.gray50,
     borderWidth: 1,
     borderColor: COLORS.gray200,
     borderRadius: RADIUS.md,
-    backgroundColor: COLORS.gray50,
-    paddingHorizontal: SPACING.md,
-    height: 44,
-    fontSize: 14,
+    paddingHorizontal: 14,
+    height: 46,
+    fontSize: FONT_SIZE.base,
     color: COLORS.gray900,
   },
   inputMultiline: {
@@ -601,27 +656,27 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
   },
   chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.gray100,
+    backgroundColor: COLORS.gray50,
     borderWidth: 1,
     borderColor: COLORS.gray200,
   },
   chipActive: {
-    backgroundColor: COLORS.primary100,
+    backgroundColor: COLORS.primary,
     borderColor: COLORS.primary,
   },
   chipText: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     fontWeight: '700',
-    color: COLORS.gray600,
+    color: COLORS.gray700,
   },
   chipTextActive: {
-    color: COLORS.primary700,
+    color: COLORS.white,
   },
   warn: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     color: COLORS.roseText,
     backgroundColor: COLORS.roseBg,
     borderRadius: RADIUS.md,
@@ -638,24 +693,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.xs,
-    marginTop: SPACING.sm,
+    marginTop: 16,
   },
   activeLabel: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.base,
     fontWeight: '600',
     color: COLORS.gray800,
   },
   saveBtn: {
     marginTop: SPACING.md,
     backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.md,
+    borderRadius: RADIUS.pill,
     height: 46,
     alignItems: 'center',
     justifyContent: 'center',
   },
   saveBtnText: {
     color: COLORS.white,
-    fontSize: 15,
+    fontSize: FONT_SIZE.base,
     fontWeight: '700',
   },
   btnDisabled: {

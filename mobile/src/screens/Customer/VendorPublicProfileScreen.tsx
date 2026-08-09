@@ -13,7 +13,7 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import api from '../../api/client';
-import { COLORS, SPACING } from '../../theme';
+import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme';
 import AppImage from '../../components/AppImage';
 import ServiceCard, { Service } from '../../components/ServiceCard';
 import { MainStackParamList } from '../../navigation/types';
@@ -191,17 +191,22 @@ const VendorPublicProfileScreen: React.FC<Props> = ({ route, navigation }) => {
   const services = vendor.services ?? [];
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         {/* Hero */}
         <View style={styles.hero}>
           <TouchableOpacity
-            style={styles.backBtn}
+            style={styles.circleBtn}
             onPress={() => navigation.goBack()}
+            hitSlop={6}
           >
             <MaterialIcons name="arrow-back" size={22} color={COLORS.white} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.favBtn} onPress={toggleFav}>
+          <TouchableOpacity
+            style={[styles.circleBtn, styles.favBtn]}
+            onPress={toggleFav}
+            hitSlop={6}
+          >
             <MaterialIcons
               name={isFav ? 'favorite' : 'favorite-border'}
               size={22}
@@ -239,105 +244,109 @@ const VendorPublicProfileScreen: React.FC<Props> = ({ route, navigation }) => {
           ) : null}
         </View>
 
-        {/* Portfolio strip */}
-        {portfolio.length > 0 ? (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Portfolio</Text>
-            <FlatList
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              data={portfolio}
-              keyExtractor={item => String(item.id)}
-              renderItem={({ item }) => (
-                <AppImage uri={item.image_path} style={styles.portfolioImg} />
-              )}
-              contentContainerStyle={styles.portfolioList}
-              nestedScrollEnabled
-            />
-          </View>
-        ) : null}
+        {/* Body */}
+        <View style={styles.body}>
+          {/* Portfolio strip */}
+          {portfolio.length > 0 ? (
+            <View style={styles.cardBlock}>
+              <Text style={styles.sectionTitle}>Portfolio</Text>
+              <FlatList
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                data={portfolio}
+                keyExtractor={item => String(item.id)}
+                renderItem={({ item }) => (
+                  <AppImage uri={item.image_path} style={styles.portfolioImg} />
+                )}
+                contentContainerStyle={styles.portfolioList}
+                nestedScrollEnabled
+              />
+            </View>
+          ) : null}
 
-        {/* Bundles */}
-        {bundles.length > 0 ? (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Service Bundles</Text>
-            {bundles.map(b => (
-              <View key={b.id} style={styles.bundleCard}>
-                <View style={styles.bundleTop}>
-                  <Text style={styles.bundleName} numberOfLines={1}>
-                    {b.name}
-                  </Text>
-                  <Text style={styles.bundlePrice}>Rs {b.bundle_price}</Text>
-                </View>
-                {b.description ? (
-                  <Text style={styles.bundleDesc} numberOfLines={2}>
-                    {b.description}
-                  </Text>
-                ) : null}
-                {b.services && b.services.length > 0 ? (
-                  <View style={styles.bundleServices}>
-                    {b.services.map(s => (
-                      <View key={s.id} style={styles.bundleServiceChip}>
-                        <Text style={styles.bundleServiceText} numberOfLines={1}>
-                          {s.name}
-                        </Text>
-                      </View>
-                    ))}
+          {/* Bundles */}
+          {bundles.length > 0 ? (
+            <View style={styles.bundlesWrap}>
+              <Text style={styles.sectionTitle}>Service Bundles</Text>
+              {bundles.map(b => (
+                <View key={b.id} style={styles.bundleCard}>
+                  <View style={styles.bundleTop}>
+                    <Text style={styles.bundleName} numberOfLines={1}>
+                      {b.name}
+                    </Text>
+                    <Text style={styles.bundlePrice}>Rs {b.bundle_price}</Text>
                   </View>
-                ) : null}
-              </View>
-            ))}
-          </View>
-        ) : null}
-
-        {/* Tabs */}
-        <View style={styles.tabsRow}>
-          {(['services', 'reviews'] as const).map(t => (
-            <TouchableOpacity
-              key={t}
-              style={[styles.tab, tab === t && styles.tabActive]}
-              onPress={() => setTab(t)}
-            >
-              <Text
-                style={[styles.tabText, tab === t && styles.tabTextActive]}
-              >
-                {t === 'services' ? 'Services' : 'Reviews'}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {tab === 'services' ? (
-          services.length > 0 ? (
-            <View style={styles.grid}>
-              {services.map(service => (
-                <ServiceCard
-                  key={service.id}
-                  service={service}
-                  onPress={s =>
-                    navigation.navigate('ServiceDetail', { id: s.id })
-                  }
-                />
+                  {b.description ? (
+                    <Text style={styles.bundleDesc} numberOfLines={2}>
+                      {b.description}
+                    </Text>
+                  ) : null}
+                  {b.services && b.services.length > 0 ? (
+                    <View style={styles.bundleServices}>
+                      {b.services.map(s => (
+                        <View key={s.id} style={styles.bundleServiceChip}>
+                          <Text style={styles.bundleServiceText} numberOfLines={1}>
+                            {s.name}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  ) : null}
+                </View>
               ))}
             </View>
-          ) : (
-            <Text style={styles.emptyText}>No services listed yet.</Text>
-          )
-        ) : (
-          <View>
-            {reviews.map(item => (
-              <View key={item.id}>{renderReview({ item })}</View>
-            ))}
-            {hasMore ? (
-              <TouchableOpacity onPress={loadMoreReviews} style={styles.moreBtn}>
-                <Text style={styles.moreText}>Load more reviews</Text>
+          ) : null}
+
+          {/* Tabs */}
+          <View style={styles.tabsRow}>
+            {(['services', 'reviews'] as const).map(t => (
+              <TouchableOpacity
+                key={t}
+                style={[styles.tab, tab === t && styles.tabActive]}
+                onPress={() => setTab(t)}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={[styles.tabText, tab === t && styles.tabTextActive]}
+                >
+                  {t === 'services' ? 'Services' : 'Reviews'}
+                </Text>
               </TouchableOpacity>
-            ) : null}
-            {reviews.length === 0 ? (
-              <Text style={styles.emptyText}>No reviews yet.</Text>
-            ) : null}
+            ))}
           </View>
-        )}
+
+          {tab === 'services' ? (
+            services.length > 0 ? (
+              <View style={styles.grid}>
+                {services.map(service => (
+                  <ServiceCard
+                    key={service.id}
+                    service={service}
+                    onPress={s =>
+                      navigation.navigate('ServiceDetail', { id: s.id })
+                    }
+                  />
+                ))}
+              </View>
+            ) : (
+              <Text style={styles.emptyText}>No services listed yet.</Text>
+            )
+          ) : (
+            <View style={styles.reviewsWrap}>
+              {reviews.map(item => (
+                <View key={item.id}>{renderReview({ item })}</View>
+              ))}
+              {hasMore ? (
+                <TouchableOpacity onPress={loadMoreReviews} style={styles.moreBtn}>
+                  <Text style={styles.moreText}>Load more reviews</Text>
+                </TouchableOpacity>
+              ) : null}
+              {reviews.length === 0 ? (
+                <Text style={styles.emptyText}>No reviews yet.</Text>
+              ) : null}
+            </View>
+          )}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -358,34 +367,37 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.slate500,
   },
+  scroll: {
+    paddingBottom: SPACING.xl,
+  },
   hero: {
     backgroundColor: COLORS.dark,
-    paddingTop: SPACING.xl,
+    paddingTop: SPACING.lg,
     paddingBottom: SPACING.lg,
     alignItems: 'center',
     paddingHorizontal: SPACING.md,
   },
-  backBtn: {
+  bio: {
+    marginTop: SPACING.sm,
+    fontSize: 13,
+    color: '#cbd5e1',
+    textAlign: 'center',
+    lineHeight: 19,
+  },
+  circleBtn: {
     position: 'absolute',
     top: SPACING.md,
     left: SPACING.md,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   favBtn: {
-    position: 'absolute',
-    top: SPACING.md,
+    left: undefined,
     right: SPACING.md,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   coverAvatar: {
     width: 96,
@@ -397,7 +409,7 @@ const styles = StyleSheet.create({
   businessName: {
     marginTop: SPACING.sm,
     fontSize: 20,
-    fontWeight: '700',
+    fontWeight: '800',
     color: COLORS.white,
     textAlign: 'center',
   },
@@ -436,43 +448,45 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textTransform: 'capitalize',
   },
-  bio: {
-    marginTop: SPACING.sm,
-    fontSize: 13,
-    color: '#cbd5e1',
-    textAlign: 'center',
-    lineHeight: 19,
-  },
-  section: {
-    paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.md,
+  body: {
+    padding: SPACING.md,
   },
   sectionTitle: {
-    fontSize: 17,
+    fontSize: 12,
     fontWeight: '700',
-    color: COLORS.dark,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    color: COLORS.gray500,
+    marginBottom: SPACING.sm,
+  },
+  cardBlock: {
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.gray100,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
+    ...SHADOW.card,
   },
   portfolioList: {
-    paddingTop: SPACING.sm,
     gap: SPACING.sm,
   },
   portfolioImg: {
     width: 120,
     height: 90,
-    borderRadius: 10,
+    borderRadius: RADIUS.md,
+  },
+  bundlesWrap: {
+    marginBottom: SPACING.md,
   },
   bundleCard: {
     backgroundColor: COLORS.white,
-    borderRadius: 12,
+    borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.gray200,
+    borderColor: COLORS.gray100,
     padding: SPACING.md,
-    marginTop: SPACING.sm,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 1,
+    marginBottom: SPACING.sm,
+    ...SHADOW.card,
   },
   bundleTop: {
     flexDirection: 'row',
@@ -481,21 +495,21 @@ const styles = StyleSheet.create({
   },
   bundleName: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
-    color: COLORS.dark,
+    color: COLORS.gray900,
     marginRight: SPACING.sm,
   },
   bundlePrice: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
     color: COLORS.primary,
   },
   bundleDesc: {
     marginTop: 4,
     fontSize: 12,
-    color: COLORS.slate500,
-    lineHeight: 17,
+    color: COLORS.gray500,
+    lineHeight: 18,
   },
   bundleServices: {
     flexDirection: 'row',
@@ -511,59 +525,57 @@ const styles = StyleSheet.create({
   },
   bundleServiceText: {
     fontSize: 11,
-    color: COLORS.slate600,
+    color: COLORS.gray600,
     fontWeight: '600',
     maxWidth: 150,
   },
   tabsRow: {
     flexDirection: 'row',
-    marginHorizontal: SPACING.md,
-    marginTop: SPACING.lg,
-    backgroundColor: COLORS.gray200,
-    borderRadius: 10,
+    backgroundColor: COLORS.gray100,
+    borderRadius: RADIUS.pill,
     padding: 3,
+    marginBottom: SPACING.md,
   },
   tab: {
     flex: 1,
-    paddingVertical: 8,
-    borderRadius: 8,
+    height: 38,
+    borderRadius: RADIUS.pill,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   tabActive: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.primary,
   },
   tabText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.slate600,
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.gray600,
   },
   tabTextActive: {
-    color: COLORS.primary,
+    color: COLORS.white,
   },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.md,
+    gap: SPACING.sm,
   },
   emptyText: {
     textAlign: 'center',
-    color: COLORS.slate500,
+    color: COLORS.gray500,
     padding: SPACING.xl,
     fontSize: 14,
   },
+  reviewsWrap: {
+    gap: SPACING.sm,
+  },
   reviewCard: {
     backgroundColor: COLORS.white,
-    borderRadius: 12,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.gray100,
     padding: SPACING.md,
-    marginHorizontal: SPACING.md,
-    marginTop: SPACING.sm,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 1,
+    ...SHADOW.card,
   },
   reviewHeader: {
     flexDirection: 'row',
@@ -573,7 +585,7 @@ const styles = StyleSheet.create({
   reviewName: {
     fontSize: 14,
     fontWeight: '600',
-    color: COLORS.dark,
+    color: COLORS.gray900,
   },
   reviewRating: {
     fontSize: 13,
@@ -582,7 +594,7 @@ const styles = StyleSheet.create({
   reviewComment: {
     marginTop: 6,
     fontSize: 13,
-    color: COLORS.slate600,
+    color: COLORS.gray600,
     lineHeight: 19,
   },
   moreBtn: {

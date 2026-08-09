@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, SPACING } from '../../theme';
+import { COLORS, SPACING, RADIUS } from '../../theme';
 import api from '../../api/client';
 import { validateEmail } from '../../utils/security';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     marginTop: SPACING.sm,
-    borderRadius: 8,
+    borderRadius: RADIUS.pill,
     overflow: 'hidden',
   },
   buttonGradient: {

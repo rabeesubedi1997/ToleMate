@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
@@ -13,7 +12,9 @@ import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { useNavigation, CompositeNavigationProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../../context/AuthContext';
-import { COLORS, SPACING } from '../../theme';
+import { useToast } from '../../context/ToastContext';
+import ConfirmDialog from '../../components/ConfirmDialog';
+import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme';
 import { CustomerTabParamList, MainStackParamList } from '../../navigation/types';
 import CustomerEditModal from './CustomerEditModal';
 
@@ -24,17 +25,21 @@ type Nav = CompositeNavigationProp<
   NativeStackNavigationProp<MainStackParamList>
 >;
 
+interface MenuItem {
+  key: string;
+  icon: string;
+  label: string;
+  bg: string;
+  fg: string;
+  onPress: () => void;
+}
+
 const ProfileScreen: React.FC = () => {
   const { user, logout } = useAuth();
+  const toast = useToast();
   const navigation = useNavigation<Nav>();
   const [showEdit, setShowEdit] = useState(false);
-
-  const handleLogout = () => {
-    Alert.alert('Log out', 'Are you sure you want to log out?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Log out', style: 'destructive', onPress: () => logout() },
-    ]);
-  };
+  const [confirmLogout, setConfirmLogout] = useState(false);
 
   const initials = (user?.name ?? '?')
     .split(' ')
@@ -43,13 +48,57 @@ const ProfileScreen: React.FC = () => {
     .join('')
     .toUpperCase();
 
+  const menuItems: MenuItem[] = [
+    {
+      key: 'favorites',
+      icon: 'favorite',
+      label: 'My Favorites',
+      bg: COLORS.roseBg,
+      fg: COLORS.rose,
+      onPress: () => navigation.navigate('Favorites'),
+    },
+    {
+      key: 'bookings',
+      icon: 'receipt-long',
+      label: 'My Bookings',
+      bg: COLORS.primary100,
+      fg: COLORS.primary700,
+      onPress: () => navigation.navigate('MyBookings'),
+    },
+    {
+      key: 'notifications',
+      icon: 'notifications-none',
+      label: 'Notifications',
+      bg: COLORS.warningBg,
+      fg: COLORS.warningText,
+      onPress: () => navigation.navigate('Notifications'),
+    },
+    {
+      key: 'post',
+      icon: 'campaign',
+      label: 'Post a Request',
+      bg: COLORS.infoBg,
+      fg: COLORS.infoText,
+      onPress: () => navigation.navigate('PostRequest'),
+    },
+    {
+      key: 'help',
+      icon: 'help-outline',
+      label: 'Help & Support',
+      bg: COLORS.neutralBg,
+      fg: COLORS.gray600,
+      onPress: () =>
+        toast.info('Contact support at support@tolemate.com'),
+    },
+  ];
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Profile</Text>
-        </View>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Profile</Text>
+      </View>
 
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         {/* User card */}
         <View style={styles.userCard}>
           <View style={styles.avatar}>
@@ -58,68 +107,65 @@ const ProfileScreen: React.FC = () => {
           <Text style={styles.name}>{user?.name}</Text>
           <Text style={styles.email}>{user?.email}</Text>
           {user?.phone ? <Text style={styles.phone}>{user.phone}</Text> : null}
-          <TouchableOpacity style={styles.editBtn} onPress={() => setShowEdit(true)}>
-            <MaterialIcons name="edit" size={16} color={COLORS.primary} />
+          <TouchableOpacity
+            style={styles.editBtn}
+            onPress={() => setShowEdit(true)}
+            activeOpacity={0.85}
+          >
+            <MaterialIcons name="edit" size={16} color={COLORS.white} />
             <Text style={styles.editBtnText}>Edit profile</Text>
           </TouchableOpacity>
         </View>
 
         {/* Menu */}
+        <Text style={styles.sectionLabel}>Account</Text>
         <View style={styles.menu}>
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => navigation.navigate('Favorites')}
-          >
-            <MaterialIcons name="favorite" size={20} color={COLORS.rose} />
-            <Text style={styles.menuLabel}>My Favorites</Text>
-            <MaterialIcons name="chevron-right" size={20} color={COLORS.slate400} />
-          </TouchableOpacity>
+          {menuItems.map(item => (
+            <TouchableOpacity
+              key={item.key}
+              style={styles.menuItem}
+              onPress={item.onPress}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.menuIcon, { backgroundColor: item.bg }]}>
+                <MaterialIcons name={item.icon as never} size={18} color={item.fg} />
+              </View>
+              <Text style={styles.menuLabel}>{item.label}</Text>
+              <MaterialIcons name="chevron-right" size={20} color={COLORS.gray400} />
+            </TouchableOpacity>
+          ))}
 
           <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => navigation.navigate('MyBookings')}
+            style={[styles.menuItem, styles.logoutItem]}
+            onPress={() => setConfirmLogout(true)}
+            activeOpacity={0.7}
           >
-            <MaterialIcons name="receipt-long" size={20} color={COLORS.primary} />
-            <Text style={styles.menuLabel}>My Bookings</Text>
-            <MaterialIcons name="chevron-right" size={20} color={COLORS.slate400} />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('Notifications')}>
-            <MaterialIcons name="notifications-none" size={20} color={COLORS.accent} />
-            <Text style={styles.menuLabel}>Notifications</Text>
-            <MaterialIcons name="chevron-right" size={20} color={COLORS.slate400} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() =>
-              navigation.navigate('PostRequest')
-            }
-          >
-            <MaterialIcons name="campaign" size={20} color={COLORS.primary} />
-            <Text style={styles.menuLabel}>Post a Request</Text>
-            <MaterialIcons name="chevron-right" size={20} color={COLORS.slate400} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() =>
-              Alert.alert('Help & Support', 'Contact support at support@tolemate.com')
-            }
-          >
-            <MaterialIcons name="help-outline" size={20} color={COLORS.slate500} />
-            <Text style={styles.menuLabel}>Help & Support</Text>
-            <MaterialIcons name="chevron-right" size={20} color={COLORS.slate400} />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={[styles.menuItem, styles.logoutItem]} onPress={handleLogout}>
-            <MaterialIcons name="logout" size={20} color={COLORS.rose} />
-            <Text style={[styles.menuLabel, { color: COLORS.rose }]}>Log out</Text>
+            <View style={[styles.menuIcon, { backgroundColor: COLORS.roseBg }]}>
+              <MaterialIcons name="logout" size={18} color={COLORS.rose} />
+            </View>
+            <Text style={[styles.menuLabel, styles.menuLabelRose, { color: COLORS.rose }]}>
+              Log out
+            </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
 
       <CustomerEditModal visible={showEdit} onClose={() => setShowEdit(false)} />
+
+      <ConfirmDialog
+        visible={confirmLogout}
+        title="Log out?"
+        message="Are you sure you want to log out?"
+        tone="danger"
+        icon="logout"
+        confirmLabel="Log out"
+        cancelLabel="Cancel"
+        onConfirm={() => {
+          setConfirmLogout(false);
+          logout();
+        }}
+        onCancel={() => setConfirmLogout(false)}
+      />
     </SafeAreaView>
   );
 };
@@ -132,21 +178,34 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: SPACING.md,
     paddingTop: SPACING.sm,
+    paddingBottom: SPACING.sm,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: COLORS.dark,
+    fontSize: 22,
+    fontWeight: '800',
+    color: COLORS.gray900,
+  },
+  scroll: {
+    paddingBottom: SPACING.xl,
   },
   userCard: {
     alignItems: 'center',
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.gray100,
     padding: SPACING.lg,
+    marginHorizontal: SPACING.md,
+    marginBottom: SPACING.lg,
+    ...SHADOW.card,
   },
   avatar: {
     width: 88,
     height: 88,
     borderRadius: 44,
     backgroundColor: COLORS.primary,
+    borderWidth: 2,
+    borderColor: COLORS.primary200,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -159,58 +218,76 @@ const styles = StyleSheet.create({
     marginTop: SPACING.sm,
     fontSize: 20,
     fontWeight: '700',
-    color: COLORS.dark,
+    color: COLORS.gray900,
   },
   email: {
-    marginTop: 2,
-    fontSize: 14,
-    color: COLORS.slate500,
+    marginTop: 4,
+    fontSize: 13,
+    color: COLORS.gray500,
   },
   phone: {
     marginTop: 2,
     fontSize: 13,
-    color: COLORS.slate500,
+    color: COLORS.gray500,
   },
   editBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
-    marginTop: SPACING.sm,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
+    marginTop: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    height: 46,
+    borderRadius: RADIUS.pill,
+    backgroundColor: COLORS.primary,
   },
   editBtnText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
-    color: COLORS.primary,
+    color: COLORS.white,
+  },
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    color: COLORS.gray500,
+    marginBottom: SPACING.sm,
+    marginHorizontal: SPACING.md,
   },
   menu: {
     marginHorizontal: SPACING.md,
     backgroundColor: COLORS.white,
-    borderRadius: 14,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.gray100,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
+    ...SHADOW.card,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: SPACING.md,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: COLORS.gray200,
-    gap: SPACING.sm,
+    borderBottomColor: COLORS.gray100,
+    gap: SPACING.md,
+  },
+  menuIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   menuLabel: {
     flex: 1,
-    fontSize: 15,
-    color: COLORS.dark,
+    fontSize: 14,
+    color: COLORS.gray700,
     fontWeight: '500',
+  },
+  menuLabelRose: {
+    flex: 1,
   },
   logoutItem: {
     borderBottomWidth: 0,

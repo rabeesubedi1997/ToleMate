@@ -6,17 +6,18 @@ import {
   FlatList,
   ActivityIndicator,
   RefreshControl,
-  Pressable,
+  TouchableOpacity,
   TextInput,
-  Modal,
-  Alert,
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../../api/client';
 import ScreenHeader from '../../components/ScreenHeader';
 import EmptyState from '../../components/EmptyState';
-import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme';
+import Modal from '../../components/Modal';
+import ConfirmDialog from '../../components/ConfirmDialog';
+import { useToast } from '../../context/ToastContext';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from '../../theme';
 
 interface Category {
   id: number;
@@ -33,6 +34,15 @@ const AdminCategoriesScreen: React.FC = () => {
   const [editing, setEditing] = useState<Category | null>(null);
   const [name, setName] = useState('');
   const [saving, setSaving] = useState(false);
+  const [confirm, setConfirm] = useState<{
+    title: string;
+    message: string;
+    tone?: 'danger' | 'primary' | 'warning';
+    confirmLabel?: string;
+    icon?: string;
+    fn?: () => void;
+  } | null>(null);
+  const toast = useToast();
 
   const load = useCallback(async () => {
     try {
@@ -77,31 +87,28 @@ const AdminCategoriesScreen: React.FC = () => {
       setModalOpen(false);
       load();
     } catch (e: any) {
-      Alert.alert('Failed', e?.response?.data?.message ?? 'Could not save category.');
+      toast.error(e?.response?.data?.message ?? 'Could not save category.');
     } finally {
       setSaving(false);
     }
   };
 
   const remove = (cat: Category) => {
-    Alert.alert('Delete category', `Delete "${cat.name}"?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await api.delete(`/admin/categories/${cat.id}`);
-            load();
-          } catch (e: any) {
-            Alert.alert(
-              'Failed',
-              e?.response?.data?.message ?? 'Could not delete category.',
-            );
-          }
-        },
+    setConfirm({
+      title: 'Delete category',
+      message: `Delete "${cat.name}"?`,
+      tone: 'danger',
+      confirmLabel: 'Delete',
+      icon: 'delete-outline',
+      fn: async () => {
+        try {
+          await api.delete(`/admin/categories/${cat.id}`);
+          load();
+        } catch (e: any) {
+          toast.error(e?.response?.data?.message ?? 'Could not delete category.');
+        }
       },
-    ]);
+    });
   };
 
   const renderItem = ({ item }: { item: Category }) => (
@@ -117,18 +124,20 @@ const AdminCategoriesScreen: React.FC = () => {
         <View style={styles.countPill}>
           <Text style={styles.countText}>{item.services_count}</Text>
         </View>
-        <Pressable
+        <TouchableOpacity
+          style={styles.iconBtnEdit}
           onPress={() => openEdit(item)}
           hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
         >
           <MaterialIcons name="edit" size={18} color={COLORS.primary700} />
-        </Pressable>
-        <Pressable
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.iconBtnDelete}
           onPress={() => remove(item)}
           hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
         >
           <MaterialIcons name="delete-outline" size={18} color={COLORS.rose} />
-        </Pressable>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -136,10 +145,11 @@ const AdminCategoriesScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <ScreenHeader title="Categories" subtitle="Manage service categories" />
-      <Pressable style={styles.addBtn} onPress={openCreate}>
+
+      <TouchableOpacity style={styles.addBtn} onPress={openCreate}>
         <MaterialIcons name="add" size={18} color={COLORS.white} />
-        <Text style={styles.addBtnText}>Add Category</Text>
-      </Pressable>
+        <Text style={styles.addBtnText}>Add category</Text>
+      </TouchableOpacity>
 
       {loading ? (
         <ActivityIndicator
@@ -149,6 +159,7 @@ const AdminCategoriesScreen: React.FC = () => {
         />
       ) : (
         <FlatList
+          style={styles.flatList}
           data={categories}
           keyExtractor={item => String(item.id)}
           renderItem={renderItem}
@@ -171,43 +182,52 @@ const AdminCategoriesScreen: React.FC = () => {
 
       <Modal
         visible={modalOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setModalOpen(false)}
+        title={editing ? 'Rename category' : 'New Category'}
+        icon="category"
+        onClose={() => setModalOpen(false)}
       >
-        <View style={styles.modalWrap}>
-          <View style={styles.modal}>
-            <Text style={styles.modalTitle}>
-              {editing ? 'Rename category' : 'New Category'}
+        <Text style={styles.fieldLabel}>Category name</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="e.g. Home Cleaning"
+          placeholderTextColor={COLORS.gray400}
+          value={name}
+          onChangeText={setName}
+          autoCapitalize="words"
+        />
+        <View style={styles.modalRow}>
+          <TouchableOpacity
+            style={[styles.modalBtn, styles.cancelBtn]}
+            onPress={() => setModalOpen(false)}
+          >
+            <Text style={styles.cancelText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.modalBtn, styles.saveBtn, saving && styles.btnDisabled]}
+            onPress={save}
+            disabled={saving}
+          >
+            <Text style={styles.saveText}>
+              {saving ? 'Saving...' : editing ? 'Save' : 'Add'}
             </Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Category name"
-              placeholderTextColor={COLORS.gray400}
-              value={name}
-              onChangeText={setName}
-              autoCapitalize="words"
-            />
-            <View style={styles.modalRow}>
-              <Pressable
-                style={[styles.modalBtn, styles.cancelBtn]}
-                onPress={() => setModalOpen(false)}
-              >
-                <Text style={styles.cancelText}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.modalBtn, styles.saveBtn]}
-                onPress={save}
-                disabled={saving}
-              >
-                <Text style={styles.saveText}>
-                  {saving ? 'Saving...' : editing ? 'Save' : 'Add'}
-                </Text>
-              </Pressable>
-            </View>
-          </View>
+          </TouchableOpacity>
         </View>
       </Modal>
+
+      <ConfirmDialog
+        visible={!!confirm}
+        title={confirm?.title ?? ''}
+        message={confirm?.message ?? ''}
+        icon={confirm?.icon}
+        tone={confirm?.tone}
+        confirmLabel={confirm?.confirmLabel}
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => {
+          const c = confirm;
+          setConfirm(null);
+          c?.fn?.();
+        }}
+      />
     </View>
   );
 };
@@ -221,24 +241,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 6,
     backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.md,
-    paddingVertical: 10,
+    borderRadius: RADIUS.pill,
+    height: 46,
     marginHorizontal: SPACING.md,
-    marginBottom: SPACING.sm,
+    marginBottom: 12,
+    ...SHADOW.card,
   },
   addBtnText: {
     color: COLORS.white,
-    fontSize: 13,
+    fontSize: FONT_SIZE.base,
     fontWeight: '700',
-    marginLeft: 4,
   },
   loader: {
     marginTop: SPACING.xxl,
   },
+  flatList: {
+    flex: 1,
+  },
   list: {
     paddingHorizontal: SPACING.md,
-    paddingBottom: SPACING.xl,
+    paddingBottom: 40,
+    gap: 12,
   },
   card: {
     flexDirection: 'row',
@@ -246,16 +271,15 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.gray200,
-    padding: SPACING.sm,
-    marginBottom: SPACING.sm,
+    borderColor: COLORS.gray100,
+    padding: SPACING.md,
     ...SHADOW.card,
   },
   icon: {
-    width: 36,
-    height: 36,
+    width: 40,
+    height: 40,
     borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.primary50,
+    backgroundColor: COLORS.primary100,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: SPACING.sm,
@@ -264,84 +288,95 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   name: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.base,
     fontWeight: '600',
     color: COLORS.gray900,
   },
   meta: {
-    fontSize: 11,
+    fontSize: FONT_SIZE.xs,
     color: COLORS.gray400,
   },
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.md,
+    gap: SPACING.sm,
   },
   countPill: {
     backgroundColor: COLORS.neutralBg,
     borderRadius: RADIUS.pill,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
   countText: {
-    fontSize: 10,
-    fontWeight: '600',
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '700',
     color: COLORS.neutralText,
   },
-  modalWrap: {
-    flex: 1,
-    backgroundColor: 'rgba(17,24,39,0.5)',
+  iconBtnEdit: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.primary100,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: SPACING.xl,
   },
-  modal: {
-    width: '100%',
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.lg,
+  iconBtnDelete: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.roseBg,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  modalTitle: {
-    fontSize: 16,
+  fieldLabel: {
+    fontSize: FONT_SIZE.sm,
     fontWeight: '700',
-    color: COLORS.gray900,
-    marginBottom: SPACING.sm,
+    color: COLORS.gray600,
+    marginTop: 16,
+    marginBottom: 6,
   },
   input: {
+    backgroundColor: COLORS.gray50,
     borderWidth: 1,
-    borderColor: COLORS.gray300,
+    borderColor: COLORS.gray200,
     borderRadius: RADIUS.md,
-    paddingHorizontal: SPACING.sm,
-    height: 42,
-    fontSize: 14,
+    paddingHorizontal: 14,
+    height: 46,
+    fontSize: FONT_SIZE.base,
     color: COLORS.gray900,
   },
   modalRow: {
     flexDirection: 'row',
     gap: SPACING.sm,
-    marginTop: SPACING.md,
+    marginTop: SPACING.lg,
   },
   modalBtn: {
     flex: 1,
-    borderRadius: RADIUS.md,
-    paddingVertical: 10,
+    height: 46,
+    borderRadius: RADIUS.pill,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   cancelBtn: {
-    backgroundColor: COLORS.gray100,
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.gray200,
   },
   saveBtn: {
     backgroundColor: COLORS.primary,
   },
   cancelText: {
     color: COLORS.gray700,
-    fontWeight: '600',
-    fontSize: 13,
+    fontWeight: '700',
+    fontSize: FONT_SIZE.base,
   },
   saveText: {
     color: COLORS.white,
     fontWeight: '700',
-    fontSize: 13,
+    fontSize: FONT_SIZE.base,
+  },
+  btnDisabled: {
+    opacity: 0.6,
   },
 });
 

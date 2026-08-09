@@ -6,8 +6,7 @@ import {
   FlatList,
   ActivityIndicator,
   RefreshControl,
-  Alert,
-  Pressable,
+  TouchableOpacity,
   TextInput,
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
@@ -16,7 +15,9 @@ import api from '../../api/client';
 import ScreenHeader from '../../components/ScreenHeader';
 import Modal from '../../components/Modal';
 import EmptyState from '../../components/EmptyState';
-import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme';
+import ConfirmDialog from '../../components/ConfirmDialog';
+import { useToast } from '../../context/ToastContext';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from '../../theme';
 
 interface Coupon {
   id: number;
@@ -48,6 +49,15 @@ const AdminCouponsScreen: React.FC = () => {
     expires_at: '',
     description: '',
   });
+  const [confirm, setConfirm] = useState<{
+    title: string;
+    message: string;
+    tone?: 'danger' | 'primary' | 'warning';
+    confirmLabel?: string;
+    icon?: string;
+    fn?: () => void;
+  } | null>(null);
+  const toast = useToast();
 
   const load = useCallback(async () => {
     try {
@@ -74,36 +84,36 @@ const AdminCouponsScreen: React.FC = () => {
       });
       load();
     } catch {
-      Alert.alert('Failed', 'Could not update coupon.');
+      toast.error('Could not update coupon.');
     }
   };
 
   const remove = (coupon: Coupon) => {
-    Alert.alert('Delete coupon', `Delete ${coupon.code}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await api.delete(`/admin/coupons/${coupon.id}`);
-            load();
-          } catch {
-            Alert.alert('Failed', 'Could not delete coupon.');
-          }
-        },
+    setConfirm({
+      title: 'Delete coupon',
+      message: `Delete ${coupon.code}?`,
+      tone: 'danger',
+      confirmLabel: 'Delete',
+      icon: 'delete-outline',
+      fn: async () => {
+        try {
+          await api.delete(`/admin/coupons/${coupon.id}`);
+          load();
+        } catch {
+          toast.error('Could not delete coupon.');
+        }
       },
-    ]);
+    });
   };
 
   const createCoupon = async () => {
     if (!form.code.trim()) {
-      Alert.alert('Missing code', 'Enter a coupon code.');
+      toast.error('Enter a coupon code.');
       return;
     }
     const value = parseFloat(form.discount_value);
     if (isNaN(value) || value <= 0) {
-      Alert.alert('Invalid value', 'Enter a valid discount value.');
+      toast.error('Enter a valid discount value.');
       return;
     }
     setSaving(true);
@@ -130,9 +140,9 @@ const AdminCouponsScreen: React.FC = () => {
         description: '',
       });
       load();
-      Alert.alert('Created', 'Coupon created.');
+      toast.success('Coupon created.');
     } catch (e: any) {
-      Alert.alert('Failed', e?.response?.data?.message ?? 'Could not create coupon.');
+      toast.error(e?.response?.data?.message ?? 'Could not create coupon.');
     } finally {
       setSaving(false);
     }
@@ -150,24 +160,24 @@ const AdminCouponsScreen: React.FC = () => {
         <View style={styles.topRow}>
           <Text style={styles.code}>{item.code}</Text>
           <View style={styles.actions}>
-            <Pressable
-              style={[styles.actionBtn, !item.is_active && styles.actionOn]}
+            <TouchableOpacity
+              style={[styles.iconBtnToggle, !item.is_active && styles.iconBtnToggleOff]}
               onPress={() => toggleActive(item)}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             >
               <MaterialIcons
                 name={item.is_active ? 'toggle-on' : 'toggle-off'}
-                size={22}
-                color={item.is_active ? COLORS.primary : COLORS.gray400}
+                size={18}
+                color={item.is_active ? COLORS.primary700 : COLORS.gray400}
               />
-            </Pressable>
-            <Pressable
-              style={styles.actionBtn}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.iconBtnDelete}
               onPress={() => remove(item)}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             >
-              <MaterialIcons name="delete-outline" size={20} color={COLORS.rose} />
-            </Pressable>
+              <MaterialIcons name="delete-outline" size={18} color={COLORS.rose} />
+            </TouchableOpacity>
           </View>
         </View>
         <Text style={styles.discount}>{discount}</Text>
@@ -200,10 +210,11 @@ const AdminCouponsScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <ScreenHeader title="Coupons" subtitle="Discount codes" />
-      <Pressable style={styles.addBtn} onPress={() => setShowCreate(true)}>
+
+      <TouchableOpacity style={styles.addBtn} onPress={() => setShowCreate(true)}>
         <MaterialIcons name="add" size={18} color={COLORS.white} />
-        <Text style={styles.addBtnText}>Create Coupon</Text>
-      </Pressable>
+        <Text style={styles.addBtnText}>Create coupon</Text>
+      </TouchableOpacity>
 
       {loading ? (
         <ActivityIndicator
@@ -213,6 +224,7 @@ const AdminCouponsScreen: React.FC = () => {
         />
       ) : (
         <FlatList
+          style={styles.flatList}
           data={coupons}
           keyExtractor={item => String(item.id)}
           renderItem={renderItem}
@@ -236,9 +248,11 @@ const AdminCouponsScreen: React.FC = () => {
       <Modal
         visible={showCreate}
         title="Create coupon"
+        subtitle="Discount codes for customers"
+        icon="local-offer"
         onClose={() => setShowCreate(false)}
       >
-        <Text style={styles.label}>Coupon code *</Text>
+        <Text style={styles.fieldLabel}>Coupon code *</Text>
         <TextInput
           style={styles.input}
           placeholder="e.g. WELCOME10"
@@ -247,12 +261,12 @@ const AdminCouponsScreen: React.FC = () => {
           onChangeText={t => setForm(f => ({ ...f, code: t }))}
           autoCapitalize="characters"
         />
-        <Text style={styles.label}>Discount type</Text>
+        <Text style={styles.fieldLabel}>Discount type</Text>
         <View style={styles.chipsRow}>
           {['percent', 'flat'].map(type => {
             const active = form.discount_type === type;
             return (
-              <Pressable
+              <TouchableOpacity
                 key={type}
                 style={[styles.chip, active && styles.chipActive]}
                 onPress={() => setForm(f => ({ ...f, discount_type: type }))}
@@ -260,11 +274,11 @@ const AdminCouponsScreen: React.FC = () => {
                 <Text style={[styles.chipText, active && styles.chipTextActive]}>
                   {type === 'percent' ? '% Percentage' : 'Rs Fixed'}
                 </Text>
-              </Pressable>
+              </TouchableOpacity>
             );
           })}
         </View>
-        <Text style={styles.label}>Discount value *</Text>
+        <Text style={styles.fieldLabel}>Discount value *</Text>
         <TextInput
           style={styles.input}
           placeholder={form.discount_type === 'percent' ? '10' : '500'}
@@ -273,7 +287,7 @@ const AdminCouponsScreen: React.FC = () => {
           onChangeText={t => setForm(f => ({ ...f, discount_value: t }))}
           keyboardType="numeric"
         />
-        <Text style={styles.label}>Min order (Rs)</Text>
+        <Text style={styles.fieldLabel}>Min order (Rs)</Text>
         <TextInput
           style={styles.input}
           placeholder="0"
@@ -282,7 +296,7 @@ const AdminCouponsScreen: React.FC = () => {
           onChangeText={t => setForm(f => ({ ...f, min_order: t }))}
           keyboardType="numeric"
         />
-        <Text style={styles.label}>Max discount (Rs, optional)</Text>
+        <Text style={styles.fieldLabel}>Max discount (Rs, optional)</Text>
         <TextInput
           style={styles.input}
           placeholder="e.g. 200"
@@ -291,7 +305,7 @@ const AdminCouponsScreen: React.FC = () => {
           onChangeText={t => setForm(f => ({ ...f, max_discount: t }))}
           keyboardType="numeric"
         />
-        <Text style={styles.label}>Max uses (optional)</Text>
+        <Text style={styles.fieldLabel}>Max uses (optional)</Text>
         <TextInput
           style={styles.input}
           placeholder="e.g. 100"
@@ -300,7 +314,7 @@ const AdminCouponsScreen: React.FC = () => {
           onChangeText={t => setForm(f => ({ ...f, max_uses: t }))}
           keyboardType="numeric"
         />
-        <Text style={styles.label}>Expiry date (YYYY-MM-DD, optional)</Text>
+        <Text style={styles.fieldLabel}>Expiry date (YYYY-MM-DD, optional)</Text>
         <TextInput
           style={styles.input}
           placeholder="2026-12-31"
@@ -309,7 +323,7 @@ const AdminCouponsScreen: React.FC = () => {
           onChangeText={t => setForm(f => ({ ...f, expires_at: t }))}
           autoCapitalize="none"
         />
-        <Text style={styles.label}>Description (optional)</Text>
+        <Text style={styles.fieldLabel}>Description (optional)</Text>
         <TextInput
           style={[styles.input, styles.inputBig]}
           placeholder="What is this coupon for?"
@@ -319,7 +333,7 @@ const AdminCouponsScreen: React.FC = () => {
           multiline
         />
 
-        <Pressable
+        <TouchableOpacity
           style={[styles.primaryBtn, saving && styles.btnDisabled]}
           onPress={createCoupon}
           disabled={saving}
@@ -327,8 +341,23 @@ const AdminCouponsScreen: React.FC = () => {
           <Text style={styles.primaryBtnText}>
             {saving ? 'Creating...' : 'Create coupon'}
           </Text>
-        </Pressable>
+        </TouchableOpacity>
       </Modal>
+
+      <ConfirmDialog
+        visible={!!confirm}
+        title={confirm?.title ?? ''}
+        message={confirm?.message ?? ''}
+        icon={confirm?.icon}
+        tone={confirm?.tone}
+        confirmLabel={confirm?.confirmLabel}
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => {
+          const c = confirm;
+          setConfirm(null);
+          c?.fn?.();
+        }}
+      />
     </View>
   );
 };
@@ -342,33 +371,34 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 6,
     backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.md,
-    paddingVertical: 10,
+    borderRadius: RADIUS.pill,
+    height: 46,
     marginHorizontal: SPACING.md,
-    marginBottom: SPACING.sm,
+    marginBottom: 12,
+    ...SHADOW.card,
   },
   addBtnText: {
     color: COLORS.white,
-    fontSize: 13,
+    fontSize: FONT_SIZE.base,
     fontWeight: '700',
-    marginLeft: 4,
   },
-  label: {
-    fontSize: 12,
+  fieldLabel: {
+    fontSize: FONT_SIZE.sm,
     fontWeight: '700',
     color: COLORS.gray600,
-    marginTop: SPACING.sm,
-    marginBottom: 4,
+    marginTop: 16,
+    marginBottom: 6,
   },
   input: {
     backgroundColor: COLORS.gray50,
     borderWidth: 1,
     borderColor: COLORS.gray200,
     borderRadius: RADIUS.md,
-    paddingHorizontal: SPACING.sm,
-    height: 42,
-    fontSize: 14,
+    paddingHorizontal: 14,
+    height: 46,
+    fontSize: FONT_SIZE.base,
     color: COLORS.gray900,
   },
   inputBig: {
@@ -380,36 +410,36 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
   },
   chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.gray100,
+    backgroundColor: COLORS.gray50,
     borderWidth: 1,
     borderColor: COLORS.gray200,
   },
   chipActive: {
-    backgroundColor: COLORS.primary100,
+    backgroundColor: COLORS.primary,
     borderColor: COLORS.primary,
   },
   chipText: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     fontWeight: '700',
-    color: COLORS.gray600,
+    color: COLORS.gray700,
   },
   chipTextActive: {
-    color: COLORS.primary700,
+    color: COLORS.white,
   },
   primaryBtn: {
     marginTop: SPACING.md,
     backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.md,
+    borderRadius: RADIUS.pill,
     height: 46,
     alignItems: 'center',
     justifyContent: 'center',
   },
   primaryBtnText: {
     color: COLORS.white,
-    fontSize: 15,
+    fontSize: FONT_SIZE.base,
     fontWeight: '700',
   },
   btnDisabled: {
@@ -418,17 +448,20 @@ const styles = StyleSheet.create({
   loader: {
     marginTop: SPACING.xxl,
   },
+  flatList: {
+    flex: 1,
+  },
   list: {
     paddingHorizontal: SPACING.md,
-    paddingBottom: SPACING.xl,
+    paddingBottom: 40,
+    gap: 12,
   },
   card: {
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.gray200,
+    borderColor: COLORS.gray100,
     padding: SPACING.md,
-    marginBottom: SPACING.sm,
     ...SHADOW.card,
   },
   topRow: {
@@ -437,7 +470,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   code: {
-    fontSize: 16,
+    fontSize: FONT_SIZE.md,
     fontWeight: '800',
     color: COLORS.primary700,
     letterSpacing: 0.5,
@@ -447,21 +480,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: SPACING.sm,
   },
-  actionBtn: {
-    padding: 2,
+  iconBtnToggle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.primary100,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  actionOn: {
-    backgroundColor: COLORS.neutralBg,
-    borderRadius: RADIUS.pill,
+  iconBtnToggleOff: {
+    backgroundColor: COLORS.gray100,
+  },
+  iconBtnDelete: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.roseBg,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   discount: {
-    fontSize: 20,
+    fontSize: FONT_SIZE.xl,
     fontWeight: '700',
     color: COLORS.gray900,
     marginTop: SPACING.xs,
   },
   meta: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     color: COLORS.gray500,
     marginTop: 3,
   },
@@ -474,11 +519,11 @@ const styles = StyleSheet.create({
   onPill: {
     backgroundColor: COLORS.successBg,
     borderRadius: RADIUS.pill,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
   onText: {
-    fontSize: 9,
+    fontSize: FONT_SIZE.xs,
     fontWeight: '700',
     color: COLORS.successText,
     textTransform: 'capitalize',
@@ -486,16 +531,16 @@ const styles = StyleSheet.create({
   expiredPill: {
     backgroundColor: COLORS.roseBg,
     borderRadius: RADIUS.pill,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
   expiredText: {
-    fontSize: 9,
+    fontSize: FONT_SIZE.xs,
     fontWeight: '700',
     color: COLORS.roseText,
   },
   date: {
-    fontSize: 11,
+    fontSize: FONT_SIZE.xs,
     color: COLORS.gray400,
   },
 });

@@ -9,11 +9,11 @@ import {
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useFocusEffect } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import EmptyState from '../../components/EmptyState';
-import { COLORS, SPACING, RADIUS, SHADOW, FONT_SIZE } from '../../theme';
+import AdminHeader from '../../components/AdminHeader';
+import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme';
 
 interface LogItem {
   id: number;
@@ -32,7 +32,6 @@ interface StatsActivity {
 
 const AdminActivityScreen: React.FC = () => {
   const { isSuperAdmin } = useAuth();
-  const insets = useSafeAreaInsets();
   const [logs, setLogs] = useState<(LogItem | StatsActivity)[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -73,7 +72,7 @@ const AdminActivityScreen: React.FC = () => {
       return (
         <View style={styles.card}>
           <View style={styles.icon}>
-            <MaterialIcons name="history" size={16} color={COLORS.primary} />
+            <MaterialIcons name="history" size={16} color={COLORS.primary700} />
           </View>
           <View style={styles.body}>
             <Text style={styles.text} numberOfLines={2}>
@@ -89,7 +88,7 @@ const AdminActivityScreen: React.FC = () => {
     return (
       <View style={styles.card}>
         <View style={styles.icon}>
-          <MaterialIcons name="event" size={16} color={COLORS.primary} />
+          <MaterialIcons name="event" size={16} color={COLORS.primary700} />
         </View>
         <View style={styles.body}>
           <Text style={styles.text} numberOfLines={2}>
@@ -103,14 +102,15 @@ const AdminActivityScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + SPACING.md }]}>
-        <Text style={styles.title}>Activity Log</Text>
-        {isSuperAdmin ? (
+      <AdminHeader title="Activity Log" subtitle="Actions across the platform" />
+
+      {isSuperAdmin ? (
+        <View style={styles.pillRow}>
           <View style={styles.pill}>
             <Text style={styles.pillText}>Super Admin</Text>
           </View>
-        ) : null}
-      </View>
+        </View>
+      ) : null}
 
       {loading ? (
         <ActivityIndicator
@@ -153,22 +153,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.light,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  pillRow: {
     paddingHorizontal: SPACING.md,
-  },
-  title: {
-    fontSize: FONT_SIZE.xl,
-    fontWeight: '700',
-    color: COLORS.gray900,
+    paddingTop: SPACING.xs,
   },
   pill: {
-    backgroundColor: COLORS.primary50,
+    backgroundColor: COLORS.primary100,
     borderRadius: RADIUS.pill,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.xs,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    alignSelf: 'flex-start',
   },
   pillText: {
     color: COLORS.primary700,
@@ -179,8 +173,10 @@ const styles = StyleSheet.create({
     marginTop: SPACING.xxl,
   },
   list: {
-    padding: SPACING.md,
-    paddingBottom: SPACING.xl,
+    paddingHorizontal: SPACING.md,
+    paddingTop: 4,
+    paddingBottom: 40,
+    gap: 12,
   },
   card: {
     flexDirection: 'row',
@@ -188,32 +184,34 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.gray200,
-    padding: SPACING.sm,
-    marginBottom: SPACING.sm,
+    borderColor: COLORS.gray100,
+    padding: SPACING.md,
+    marginBottom: 12,
     ...SHADOW.card,
   },
   icon: {
-    width: 30,
-    height: 30,
+    width: 36,
+    height: 36,
     borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.primary50,
+    backgroundColor: COLORS.primary100,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: SPACING.sm,
+    marginRight: 12,
   },
   body: {
     flex: 1,
   },
   text: {
     fontSize: 13,
-    color: COLORS.gray800,
+    color: COLORS.gray600,
     fontWeight: '500',
+    lineHeight: 18,
   },
   time: {
-    marginTop: 2,
+    marginTop: 4,
     fontSize: 11,
     color: COLORS.gray400,
+    fontWeight: '500',
   },
 });
 

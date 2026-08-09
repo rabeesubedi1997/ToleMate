@@ -1,5 +1,4 @@
 export const COLORS = {
-  // Brand — Tailwind green scale (web primary)
   primary: '#16a34a',
   primaryDark: '#15803d',
   primaryDeep: '#14532d',
@@ -14,7 +13,6 @@ export const COLORS = {
   primary800: '#166534',
   primary900: '#14532d',
 
-  // Neutral — Tailwind gray
   gray50: '#f9fafb',
   gray100: '#f3f4f6',
   gray200: '#e5e7eb',
@@ -26,7 +24,6 @@ export const COLORS = {
   gray800: '#1f2937',
   gray900: '#111827',
 
-  // Semantic
   accent: '#facc15',
   star: '#facc15',
   rose: '#dc2626',
@@ -43,18 +40,20 @@ export const COLORS = {
   neutralText: '#374151',
   purple: '#a855f7',
   teal: '#14b8a6',
+  indigo: '#6366f1',
 
-  // Base
   dark: '#111827',
-  light: '#f9fafb',
+  light: '#f6f7f9',
   white: '#ffffff',
-  slate400: '#9ca3af',
-  slate500: '#6b7280',
-  slate600: '#4b5563',
+  slate400: '#94a3b8',
+  slate500: '#64748b',
+  slate600: '#475569',
   glass: 'rgba(255, 255, 255, 0.8)',
+  overlay: 'rgba(15, 23, 42, 0.55)',
 };
 
 export const SPACING = {
+  xxs: 2,
   xs: 4,
   sm: 8,
   md: 16,
@@ -64,11 +63,11 @@ export const SPACING = {
 };
 
 export const RADIUS = {
-  sm: 6,
-  md: 8,
-  lg: 12,
-  xl: 16,
-  xxl: 24,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  xxl: 28,
   pill: 999,
 };
 
@@ -85,18 +84,18 @@ export const FONT_SIZE = {
 
 export const SHADOW = {
   card: {
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 1,
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
   },
   raised: {
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 3,
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.14,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
   },
 };
 

@@ -6,7 +6,6 @@ import {
   FlatList,
   ActivityIndicator,
   RefreshControl,
-  Alert,
   Pressable,
   TextInput,
   Image,
@@ -18,7 +17,9 @@ import api from '../../api/client';
 import ScreenHeader from '../../components/ScreenHeader';
 import Modal from '../../components/Modal';
 import EmptyState from '../../components/EmptyState';
-import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme';
+import ConfirmDialog from '../../components/ConfirmDialog';
+import { useToast } from '../../context/ToastContext';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from '../../theme';
 
 interface Slide {
   url: string;
@@ -83,7 +84,7 @@ const SlideThumb: React.FC<{ item: Slide }> = ({ item }) => {
   if (!item.url || failed) {
     return (
       <View style={[styles.thumb, styles.thumbFailed]}>
-        <MaterialIcons name="broken-image" size={18} color={COLORS.gray400} />
+        <MaterialIcons name="broken-image" size={24} color={COLORS.gray400} />
       </View>
     );
   }
@@ -97,6 +98,7 @@ const SlideThumb: React.FC<{ item: Slide }> = ({ item }) => {
 };
 
 const AdminSliderScreen: React.FC = () => {
+  const toast = useToast();
   const [slides, setSlides] = useState<Slide[]>([]);
   const [interval, setIntervalMs] = useState('');
   const [loading, setLoading] = useState(true);
@@ -104,6 +106,14 @@ const AdminSliderScreen: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<number | null>(null);
   const [form, setForm] = useState({ title: '', link: '', enabled: true });
+  const [confirm, setConfirm] = useState<{
+    title: string;
+    message: string;
+    tone?: 'danger' | 'primary' | 'warning';
+    confirmLabel?: string;
+    icon?: string;
+    fn: () => void;
+  } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -138,8 +148,9 @@ const AdminSliderScreen: React.FC = () => {
         ],
       });
       setSlides(next);
-    } catch {
-      Alert.alert('Failed', 'Could not save slider.');
+      toast.success('Slider saved.');
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message ?? 'Could not save slider.');
     } finally {
       setSaving(false);
     }
@@ -180,26 +191,28 @@ const AdminSliderScreen: React.FC = () => {
   };
 
   const remove = (idx: number) => {
-    Alert.alert('Remove slide', 'Remove this slide from the banner?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: () => saveSlides(slides.filter((_, i) => i !== idx)),
-      },
-    ]);
+    saveSlides(slides.filter((_, i) => i !== idx));
   };
 
-  const loadDefaults = () => {
-    Alert.alert(
-      'Load defaults',
-      'Replace the current slider with the 4 default images?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Load', onPress: () => saveSlides(DEFAULT_SLIDES) },
-      ],
-    );
-  };
+  const confirmRemove = (idx: number) =>
+    setConfirm({
+      title: 'Remove slide',
+      message: 'Remove this slide from the banner?',
+      confirmLabel: 'Remove',
+      icon: 'delete-outline',
+      tone: 'danger',
+      fn: () => remove(idx),
+    });
+
+  const confirmLoadDefaults = () =>
+    setConfirm({
+      title: 'Load defaults',
+      message: 'Replace the current slider with the 4 default images?',
+      confirmLabel: 'Load',
+      icon: 'bolt',
+      tone: 'primary',
+      fn: () => saveSlides(DEFAULT_SLIDES),
+    });
 
   const pickAndAdd = async () => {
     const result = await launchImageLibrary({
@@ -232,12 +245,12 @@ const AdminSliderScreen: React.FC = () => {
             enabled: true,
           },
         ]);
-        Alert.alert('Added', 'Slide added. Tap edit to set a title.');
+        toast.success('Slide added. Tap edit to set a title.');
       } else {
-        Alert.alert('Failed', 'Upload did not return an image.');
+        toast.error('Upload did not return an image.');
       }
     } catch (e: any) {
-      Alert.alert('Failed', e?.response?.data?.message ?? 'Could not upload image.');
+      toast.error(e?.response?.data?.message ?? 'Could not upload image.');
     } finally {
       setSaving(false);
     }
@@ -261,43 +274,43 @@ const AdminSliderScreen: React.FC = () => {
       </View>
       <View style={styles.actions}>
         <Pressable
-          style={styles.iconBtn}
+          style={[styles.iconBtn, styles.actionMuted]}
           onPress={() => move(index, -1)}
-          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
         >
-          <MaterialIcons name="arrow-upward" size={16} color={COLORS.gray600} />
+          <MaterialIcons name="arrow-upward" size={18} color={COLORS.gray600} />
         </Pressable>
         <Pressable
-          style={styles.iconBtn}
+          style={[styles.iconBtn, styles.actionMuted]}
           onPress={() => move(index, 1)}
-          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
         >
-          <MaterialIcons name="arrow-downward" size={16} color={COLORS.gray600} />
+          <MaterialIcons name="arrow-downward" size={18} color={COLORS.gray600} />
         </Pressable>
         <Pressable
-          style={styles.iconBtn}
+          style={[styles.iconBtn, item.enabled !== false ? styles.actionToggle : styles.actionMuted]}
           onPress={() => toggleEnabled(index)}
-          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
         >
           <MaterialIcons
             name={item.enabled !== false ? 'visibility' : 'visibility-off'}
-            size={16}
-            color={item.enabled !== false ? COLORS.primary : COLORS.gray400}
+            size={18}
+            color={item.enabled !== false ? COLORS.primary700 : COLORS.gray400}
           />
         </Pressable>
         <Pressable
-          style={styles.iconBtn}
+          style={[styles.iconBtn, styles.actionEdit]}
           onPress={() => openEdit(index)}
-          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
         >
-          <MaterialIcons name="edit" size={16} color={COLORS.primary700} />
+          <MaterialIcons name="edit" size={18} color={COLORS.primary700} />
         </Pressable>
         <Pressable
-          style={styles.iconBtn}
-          onPress={() => remove(index)}
-          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+          style={[styles.iconBtn, styles.actionDelete]}
+          onPress={() => confirmRemove(index)}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
         >
-          <MaterialIcons name="delete-outline" size={16} color={COLORS.rose} />
+          <MaterialIcons name="delete-outline" size={18} color={COLORS.rose} />
         </Pressable>
       </View>
     </View>
@@ -312,20 +325,20 @@ const AdminSliderScreen: React.FC = () => {
 
       <View style={styles.topRow}>
         <Pressable
-          style={[styles.defaultsBtn, saving && styles.btnDisabled]}
-          onPress={loadDefaults}
+          style={[styles.ghostBtn, saving && styles.btnDisabled]}
+          onPress={confirmLoadDefaults}
           disabled={saving}
         >
-          <MaterialIcons name="bolt" size={16} color={COLORS.primary700} />
-          <Text style={styles.defaultsBtnText}>Load defaults</Text>
+          <MaterialIcons name="bolt" size={16} color={COLORS.gray700} />
+          <Text style={styles.ghostBtnText}>Load defaults</Text>
         </Pressable>
         <Pressable
-          style={[styles.uploadBtn, saving && styles.btnDisabled]}
+          style={[styles.addBtn, saving && styles.btnDisabled]}
           onPress={pickAndAdd}
           disabled={saving}
         >
-          <MaterialIcons name="add-photo-alternate" size={16} color={COLORS.white} />
-          <Text style={styles.uploadBtnText}>Add slide</Text>
+          <MaterialIcons name="add-photo-alternate" size={18} color={COLORS.white} />
+          <Text style={styles.addBtnText}>Add slide</Text>
         </Pressable>
       </View>
 
@@ -363,6 +376,8 @@ const AdminSliderScreen: React.FC = () => {
       <Modal
         visible={editing !== null}
         title="Edit slide"
+        subtitle={editing !== null ? `Slide ${editing + 1}` : undefined}
+        icon="edit"
         onClose={() => setEditing(null)}
       >
         <Text style={styles.fieldLabel}>Title</Text>
@@ -403,6 +418,21 @@ const AdminSliderScreen: React.FC = () => {
           </Text>
         </Pressable>
       </Modal>
+
+      <ConfirmDialog
+        visible={!!confirm}
+        title={confirm?.title ?? ''}
+        message={confirm?.message ?? ''}
+        tone={confirm?.tone}
+        icon={confirm?.icon}
+        confirmLabel={confirm?.confirmLabel}
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => {
+          const c = confirm;
+          setConfirm(null);
+          c?.fn();
+        }}
+      />
     </View>
   );
 };
@@ -414,68 +444,71 @@ const styles = StyleSheet.create({
   },
   topRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: SPACING.sm,
     paddingHorizontal: SPACING.md,
     marginBottom: SPACING.sm,
   },
-  defaultsBtn: {
+  ghostBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: COLORS.primary100,
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.gray200,
     borderRadius: RADIUS.pill,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    height: 46,
   },
-  defaultsBtnText: {
-    fontSize: 12,
+  ghostBtnText: {
+    fontSize: FONT_SIZE.base,
     fontWeight: '700',
-    color: COLORS.primary700,
+    color: COLORS.gray700,
   },
-  uploadBtn: {
+  addBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    justifyContent: 'center',
+    gap: 6,
     backgroundColor: COLORS.primary,
     borderRadius: RADIUS.pill,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
+    height: 46,
+    ...SHADOW.card,
   },
-  uploadBtnText: {
-    fontSize: 12,
+  addBtnText: {
+    fontSize: FONT_SIZE.base,
     fontWeight: '700',
     color: COLORS.white,
   },
   loader: {
-    marginTop: SPACING.xxl,
+    marginTop: 60,
   },
   list: {
     paddingHorizontal: SPACING.md,
-    paddingBottom: SPACING.xl,
+    paddingVertical: 4,
+    paddingBottom: SPACING.xl + 8,
   },
   card: {
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
     borderColor: COLORS.gray200,
-    padding: SPACING.sm,
-    marginBottom: SPACING.sm,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
     ...SHADOW.card,
   },
   thumb: {
-    width: 56,
-    height: 42,
+    width: '100%',
+    height: 120,
     borderRadius: RADIUS.md,
-    marginRight: SPACING.sm,
+    marginBottom: SPACING.sm,
+    backgroundColor: COLORS.gray100,
   },
   thumbOff: {
     opacity: 0.4,
   },
   thumbFailed: {
-    backgroundColor: COLORS.gray100,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -483,49 +516,61 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: FONT_SIZE.base,
+    fontWeight: '700',
     color: COLORS.gray900,
   },
   url: {
     fontSize: 10,
     color: COLORS.gray500,
-    marginTop: 1,
+    marginTop: 2,
   },
   link: {
     fontSize: 10,
     color: COLORS.gray400,
-    marginTop: 1,
+    marginTop: 2,
   },
   actions: {
-    flexDirection: 'column',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 4,
-    marginLeft: SPACING.sm,
+    gap: SPACING.xs,
+    marginTop: SPACING.sm,
   },
   iconBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: RADIUS.md,
-    backgroundColor: COLORS.gray50,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  actionMuted: {
+    backgroundColor: COLORS.gray100,
+  },
+  actionToggle: {
+    backgroundColor: COLORS.primary100,
+  },
+  actionEdit: {
+    backgroundColor: COLORS.primary100,
+  },
+  actionDelete: {
+    backgroundColor: COLORS.roseBg,
+  },
   fieldLabel: {
-    fontSize: 12,
+    fontSize: FONT_SIZE.sm,
     fontWeight: '700',
     color: COLORS.gray600,
     marginTop: SPACING.sm,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   input: {
     backgroundColor: COLORS.gray50,
     borderWidth: 1,
     borderColor: COLORS.gray200,
     borderRadius: RADIUS.md,
-    paddingHorizontal: SPACING.sm,
-    height: 42,
-    fontSize: 14,
+    paddingHorizontal: SPACING.md,
+    height: 46,
+    fontSize: FONT_SIZE.base,
     color: COLORS.gray900,
   },
   enabledRow: {
@@ -534,7 +579,7 @@ const styles = StyleSheet.create({
     marginTop: SPACING.md,
   },
   enabledLabel: {
-    fontSize: 13,
+    fontSize: FONT_SIZE.base,
     color: COLORS.gray700,
     marginLeft: 6,
     fontWeight: '500',
@@ -542,14 +587,14 @@ const styles = StyleSheet.create({
   primaryBtn: {
     marginTop: SPACING.md,
     backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.md,
+    borderRadius: RADIUS.pill,
     height: 46,
     alignItems: 'center',
     justifyContent: 'center',
   },
   primaryBtnText: {
     color: COLORS.white,
-    fontSize: 15,
+    fontSize: FONT_SIZE.md,
     fontWeight: '700',
   },
   btnDisabled: {

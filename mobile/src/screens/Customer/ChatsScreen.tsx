@@ -15,6 +15,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import api from '../../api/client';
 import FilterChips from '../../components/FilterChips';
 import EmptyState from '../../components/EmptyState';
+import StatusBadge from '../../components/StatusBadge';
 import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme';
 import { MainStackParamList } from '../../navigation/types';
 
@@ -42,7 +43,33 @@ type Tab = 'all' | 'bookings' | 'direct';
 
 const CHAT_FILTERS = ['all', 'bookings', 'direct'];
 
+const AVATAR_COLORS = [
+  COLORS.primary600,
+  COLORS.indigo,
+  COLORS.purple,
+  COLORS.teal,
+  COLORS.warningText,
+  COLORS.infoText,
+];
+
 const isDirect = (c: Conv): c is DirectConv => 'other_user' in c;
+
+function avatarColor(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i += 1) {
+    hash = (hash * 31 + name.charCodeAt(i)) % 997;
+  }
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length];
+}
+
+function shortTime(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) {
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
 
 const ChatsScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
@@ -93,6 +120,7 @@ const ChatsScreen: React.FC = () => {
   };
 
   const renderBooking = (item: BookingConv) => {
+    const title = `${item.service?.name ?? 'Booking'} #${item.id}`;
     const last = item.messages?.[0];
     return (
       <TouchableOpacity
@@ -100,24 +128,29 @@ const ChatsScreen: React.FC = () => {
         activeOpacity={0.7}
         onPress={() => openBookingChat(item)}
       >
-        <View style={styles.icon}>
-          <MaterialIcons name="event" size={16} color={COLORS.primary} />
+        <View style={styles.avatarWrap}>
+          <View style={[styles.avatar, { backgroundColor: avatarColor(title) }]}>
+            <Text style={styles.avatarText}>{title.trim()[0]}</Text>
+          </View>
         </View>
         <View style={styles.body}>
           <View style={styles.topRow}>
             <Text style={styles.sender} numberOfLines={1}>
-              {item.service?.name ?? 'Booking'} #{item.id}
+              {title}
             </Text>
-            <View style={styles.statusPill}>
-              <Text style={styles.statusText}>{item.status}</Text>
-            </View>
+            {last?.created_at ? (
+              <Text style={styles.time}>{shortTime(last.created_at)}</Text>
+            ) : null}
           </View>
           <Text style={styles.meta} numberOfLines={1}>
             {item.customer?.name ?? 'Customer'} · {item.vendor?.user?.name ?? item.vendor?.business_name ?? 'Vendor'}
           </Text>
-          <Text style={styles.message} numberOfLines={1}>
-            {last?.message ?? 'No messages yet'}
-          </Text>
+          <View style={styles.bottomRow}>
+            <Text style={styles.message} numberOfLines={1}>
+              {last?.message ?? 'No messages yet'}
+            </Text>
+            <StatusBadge status={item.status} />
+          </View>
         </View>
         <MaterialIcons name="chevron-right" size={20} color={COLORS.gray300} />
       </TouchableOpacity>
@@ -130,28 +163,35 @@ const ChatsScreen: React.FC = () => {
       activeOpacity={0.7}
       onPress={() => openDirectChat(item)}
     >
-      <View style={styles.icon}>
-        <MaterialIcons name="chat" size={16} color={COLORS.infoText} />
+      <View style={styles.avatarWrap}>
+        <View
+          style={[styles.avatar, { backgroundColor: avatarColor(item.other_user.name) }]}
+        >
+          <Text style={styles.avatarText}>{item.other_user.name.trim()[0]?.toUpperCase()}</Text>
+        </View>
+        {item.unread_count > 0 ? (
+          <View style={styles.unreadBadge}>
+            <Text style={styles.unreadText}>{item.unread_count}</Text>
+          </View>
+        ) : null}
       </View>
       <View style={styles.body}>
         <View style={styles.topRow}>
           <Text style={styles.sender} numberOfLines={1}>
             {item.other_user.name}
           </Text>
-          <Text style={styles.role}>{item.other_user.role}</Text>
+          {item.last_at ? <Text style={styles.time}>{shortTime(item.last_at)}</Text> : null}
         </View>
-        <Text style={styles.message} numberOfLines={1}>
+        <Text style={styles.meta} numberOfLines={1}>
+          {item.other_user.role}
+        </Text>
+        <Text
+          style={[styles.message, item.unread_count > 0 && styles.messageUnread]}
+          numberOfLines={1}
+        >
           {item.last_message}
         </Text>
-        <Text style={styles.time}>
-          {new Date(item.last_at).toLocaleString()}
-        </Text>
       </View>
-      {item.unread_count > 0 ? (
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>{item.unread_count}</Text>
-        </View>
-      ) : null}
       <MaterialIcons name="chevron-right" size={20} color={COLORS.gray300} />
     </TouchableOpacity>
   );
@@ -252,11 +292,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: COLORS.gray100,
+    ...SHADOW.card,
   },
   loader: {
     marginTop: SPACING.xxl,
@@ -271,19 +309,47 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.gray200,
-    padding: SPACING.sm,
-    marginBottom: SPACING.sm,
+    borderColor: COLORS.gray100,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
+    gap: SPACING.sm,
     ...SHADOW.card,
   },
-  icon: {
-    width: 34,
-    height: 34,
-    borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.primary50,
+  avatarWrap: {
+    width: 44,
+    height: 44,
+  },
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: SPACING.sm,
+  },
+  avatarText: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: COLORS.white,
+    textTransform: 'uppercase',
+  },
+  unreadBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 5,
+    backgroundColor: COLORS.primary,
+    borderWidth: 2,
+    borderColor: COLORS.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unreadText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: COLORS.white,
   },
   body: {
     flex: 1,
@@ -295,58 +361,35 @@ const styles = StyleSheet.create({
   },
   sender: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
-    color: COLORS.gray800,
+    color: COLORS.gray900,
     marginRight: SPACING.sm,
   },
   meta: {
-    fontSize: 11,
+    fontSize: 12,
     color: COLORS.gray500,
     marginTop: 2,
   },
-  message: {
-    fontSize: 12,
-    color: COLORS.gray600,
+  bottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: SPACING.sm,
     marginTop: 3,
   },
+  message: {
+    flex: 1,
+    fontSize: 12,
+    color: COLORS.gray500,
+  },
+  messageUnread: {
+    color: COLORS.gray800,
+    fontWeight: '600',
+  },
   time: {
-    fontSize: 10,
+    fontSize: 12,
     color: COLORS.gray400,
-    marginTop: 2,
-  },
-  role: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: COLORS.infoText,
-    textTransform: 'capitalize',
-  },
-  statusPill: {
-    backgroundColor: COLORS.neutralBg,
-    borderRadius: RADIUS.pill,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  statusText: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: COLORS.neutralText,
-    textTransform: 'capitalize',
-  },
-  badge: {
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: COLORS.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 5,
-    marginLeft: SPACING.xs,
-  },
-  badgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: COLORS.white,
   },
 });
 

@@ -6,9 +6,7 @@ import {
   FlatList,
   ActivityIndicator,
   RefreshControl,
-  Alert,
   Pressable,
-  Image,
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { launchImageLibrary } from 'react-native-image-picker';
@@ -16,7 +14,10 @@ import { useFocusEffect } from '@react-navigation/native';
 import api from '../../api/client';
 import ScreenHeader from '../../components/ScreenHeader';
 import EmptyState from '../../components/EmptyState';
-import { COLORS, SPACING, RADIUS, SHADOW } from '../../theme';
+import AppImage from '../../components/AppImage';
+import ConfirmDialog from '../../components/ConfirmDialog';
+import { useToast } from '../../context/ToastContext';
+import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from '../../theme';
 
 interface MediaItem {
   id: number;
@@ -34,16 +35,20 @@ const fmtSize = (bytes: number) =>
       ? `${(bytes / 1024).toFixed(0)} KB`
       : `${bytes} B`;
 
-const mediaUrl = (path: string) => {
-  if (path.startsWith('http')) return path;
-  return `${api.defaults.baseURL?.replace(/\/api\/?$/, '')}${path}`;
-};
-
 const AdminMediaScreen: React.FC = () => {
+  const toast = useToast();
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [confirm, setConfirm] = useState<{
+    title: string;
+    message: string;
+    tone?: 'danger' | 'primary' | 'warning';
+    confirmLabel?: string;
+    icon?: string;
+    fn: () => void;
+  } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -84,38 +89,37 @@ const AdminMediaScreen: React.FC = () => {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       load();
-      Alert.alert('Uploaded', 'Image added to the media library.');
+      toast.success('Image added to the media library.');
     } catch (e: any) {
-      Alert.alert('Failed', e?.response?.data?.message ?? 'Could not upload image.');
+      toast.error(e?.response?.data?.message ?? 'Could not upload image.');
     } finally {
       setUploading(false);
     }
   };
 
-  const remove = (item: MediaItem) => {
-    Alert.alert('Delete asset', `Delete "${item.file_name}"? This cannot be undone.`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await api.delete(`/admin/media/${item.id}`);
-            load();
-          } catch (e: any) {
-            Alert.alert('Failed', e?.response?.data?.message ?? 'Could not delete asset.');
-          }
-        },
-      },
-    ]);
+  const remove = async (item: MediaItem) => {
+    try {
+      await api.delete(`/admin/media/${item.id}`);
+      load();
+      toast.success('Asset deleted.');
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message ?? 'Could not delete asset.');
+    }
   };
+
+  const confirmRemove = (item: MediaItem) =>
+    setConfirm({
+      title: 'Delete asset',
+      message: `Delete "${item.file_name}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      icon: 'delete-outline',
+      tone: 'danger',
+      fn: () => remove(item),
+    });
 
   const renderItem = ({ item }: { item: MediaItem }) => (
     <View style={styles.card}>
-      <Image
-        source={{ uri: mediaUrl(item.file_path) }}
-        style={styles.thumb}
-      />
+      <AppImage uri={item.file_path} style={styles.thumb} />
       <View style={styles.body}>
         <Text style={styles.name} numberOfLines={1}>
           {item.file_name}
@@ -125,7 +129,7 @@ const AdminMediaScreen: React.FC = () => {
         </Text>
       </View>
       <Pressable
-        onPress={() => remove(item)}
+        onPress={() => confirmRemove(item)}
         hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
         style={styles.deleteBtn}
       >
@@ -182,6 +186,21 @@ const AdminMediaScreen: React.FC = () => {
           }
         />
       )}
+
+      <ConfirmDialog
+        visible={!!confirm}
+        title={confirm?.title ?? ''}
+        message={confirm?.message ?? ''}
+        tone={confirm?.tone}
+        icon={confirm?.icon}
+        confirmLabel={confirm?.confirmLabel}
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => {
+          const c = confirm;
+          setConfirm(null);
+          c?.fn();
+        }}
+      />
     </View>
   );
 };
@@ -197,22 +216,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.md,
-    paddingVertical: 10,
+    borderRadius: RADIUS.pill,
+    height: 46,
     marginHorizontal: SPACING.md,
     marginBottom: SPACING.sm,
+    ...SHADOW.card,
   },
   addBtnText: {
     color: COLORS.white,
-    fontSize: 13,
+    fontSize: FONT_SIZE.md,
     fontWeight: '700',
   },
   loader: {
-    marginTop: SPACING.xxl,
+    marginTop: 60,
   },
   list: {
     paddingHorizontal: SPACING.md,
-    paddingBottom: SPACING.xl,
+    paddingVertical: 4,
+    paddingBottom: SPACING.xl + 8,
   },
   card: {
     flexDirection: 'row',
@@ -221,32 +242,37 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.lg,
     borderWidth: 1,
     borderColor: COLORS.gray200,
-    padding: SPACING.sm,
-    marginBottom: SPACING.sm,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
     ...SHADOW.card,
   },
   thumb: {
-    width: 52,
-    height: 52,
-    borderRadius: RADIUS.md,
-    marginRight: SPACING.sm,
+    width: 64,
+    height: 64,
+    borderRadius: 12,
+    marginRight: SPACING.md,
     backgroundColor: COLORS.gray100,
   },
   body: {
     flex: 1,
   },
   name: {
-    fontSize: 13,
+    fontSize: FONT_SIZE.base,
     fontWeight: '600',
     color: COLORS.gray900,
   },
   meta: {
-    fontSize: 11,
+    fontSize: FONT_SIZE.xs,
     color: COLORS.gray500,
-    marginTop: 1,
+    marginTop: 2,
   },
   deleteBtn: {
-    padding: 4,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.roseBg,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   btnDisabled: {
     opacity: 0.6,

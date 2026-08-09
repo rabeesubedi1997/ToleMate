@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, SPACING } from '../../theme';
+import { COLORS, SPACING, RADIUS } from '../../theme';
 import api from '../../api/client';
 import { validateEmail, validatePasswordStrength } from '../../utils/security';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -98,6 +98,8 @@ const ResetPasswordScreen = ({ navigation }: Props) => {
                 <TextInput
                   style={styles.input}
                   placeholder="john@example.com"
+                  placeholderTextColor={COLORS.gray400}
+                  selectionColor={COLORS.primary}
                   value={email}
                   onChangeText={setEmail}
                   autoCapitalize="none"
@@ -111,6 +113,8 @@ const ResetPasswordScreen = ({ navigation }: Props) => {
                 <TextInput
                   style={styles.input}
                   placeholder="Paste token from email"
+                  placeholderTextColor={COLORS.gray400}
+                  selectionColor={COLORS.primary}
                   value={token}
                   onChangeText={setToken}
                   autoCapitalize="none"
@@ -123,6 +127,8 @@ const ResetPasswordScreen = ({ navigation }: Props) => {
                 <TextInput
                   style={styles.input}
                   placeholder="8+ chars, upper/lower, number, symbol"
+                  placeholderTextColor={COLORS.gray400}
+                  selectionColor={COLORS.primary}
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry
@@ -135,6 +141,8 @@ const ResetPasswordScreen = ({ navigation }: Props) => {
                 <TextInput
                   style={styles.input}
                   placeholder="Repeat new password"
+                  placeholderTextColor={COLORS.gray400}
+                  selectionColor={COLORS.primary}
                   value={confirm}
                   onChangeText={setConfirm}
                   secureTextEntry
@@ -262,7 +270,7 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     marginTop: SPACING.sm,
-    borderRadius: 8,
+    borderRadius: RADIUS.pill,
     overflow: 'hidden',
   },
   buttonGradient: {

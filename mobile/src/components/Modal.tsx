@@ -17,17 +17,26 @@ import { COLORS, SPACING, RADIUS, SHADOW, FONT_SIZE } from '../theme';
 interface Props {
   visible: boolean;
   title: string;
+  subtitle?: string;
+  icon?: string;
   onClose: () => void;
   children: React.ReactNode;
 }
 
-const Modal: React.FC<Props> = ({ visible, title, onClose, children }) => {
+const Modal: React.FC<Props> = ({
+  visible,
+  title,
+  subtitle,
+  icon,
+  onClose,
+  children,
+}) => {
   const insets = useSafeAreaInsets();
   return (
     <RNModal
       visible={visible}
       transparent
-      animationType="fade"
+      animationType="slide"
       onRequestClose={onClose}
     >
       <KeyboardAvoidingView
@@ -35,15 +44,30 @@ const Modal: React.FC<Props> = ({ visible, title, onClose, children }) => {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <Pressable style={styles.backdrop} onPress={onClose} />
-        <View style={[styles.sheet, { paddingBottom: insets.bottom + SPACING.xl }]}>
+        <View style={[styles.sheet, { paddingBottom: insets.bottom + SPACING.md }]}>
           <View style={styles.handle} />
           <View style={styles.titleRow}>
-            <Text style={styles.title}>{title}</Text>
+            {icon ? (
+              <View style={styles.titleIcon}>
+                <MaterialIcons name={icon} size={18} color={COLORS.primary700} />
+              </View>
+            ) : null}
+            <View style={styles.titleBody}>
+              <Text style={styles.title} numberOfLines={1}>
+                {title}
+              </Text>
+              {subtitle ? (
+                <Text style={styles.subtitle} numberOfLines={1}>
+                  {subtitle}
+                </Text>
+              ) : null}
+            </View>
             <TouchableOpacity
+              style={styles.closeBtn}
               onPress={onClose}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <MaterialIcons name="close" size={22} color={COLORS.gray500} />
+              <MaterialIcons name="close" size={20} color={COLORS.gray400} />
             </TouchableOpacity>
           </View>
           <ScrollView
@@ -66,38 +90,64 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(17, 24, 39, 0.5)',
+    backgroundColor: COLORS.overlay,
   },
   sheet: {
     backgroundColor: COLORS.white,
     borderTopLeftRadius: RADIUS.xxl,
     borderTopRightRadius: RADIUS.xxl,
-    paddingHorizontal: SPACING.md,
+    paddingHorizontal: SPACING.lg,
     paddingTop: SPACING.sm,
-    maxHeight: '85%',
+    maxHeight: '88%',
     ...SHADOW.raised,
   },
   handle: {
     alignSelf: 'center',
-    width: 40,
-    height: 4,
-    borderRadius: 2,
+    width: 44,
+    height: 5,
+    borderRadius: 3,
     backgroundColor: COLORS.gray200,
-    marginBottom: SPACING.sm,
+    marginBottom: SPACING.md,
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     marginBottom: SPACING.md,
+    paddingRight: 4,
+  },
+  titleIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: COLORS.primary100,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: SPACING.sm,
+  },
+  titleBody: {
+    flex: 1,
   },
   title: {
     fontSize: FONT_SIZE.lg,
     fontWeight: '700',
     color: COLORS.gray900,
   },
+  subtitle: {
+    marginTop: 2,
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.gray500,
+  },
+  closeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: COLORS.gray100,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: SPACING.sm,
+  },
   content: {
-    paddingBottom: SPACING.md,
+    paddingBottom: SPACING.lg,
   },
 });
 
