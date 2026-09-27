@@ -18,13 +18,47 @@ cd "$(dirname "$0")"
 
 echo "==> ToleMate deploy started ($(date))"
 
+# ---------- 0. Find a real PHP CLI binary ----------
+# On some cPanel hosts the "php" in PATH resolves to the CGI/FastCGI SAPI,
+# not the CLI one - artisan then silently no-ops (prints the help screen
+# and CGI headers instead of running). Probe candidates and pick the first
+# one that actually reports "(cli)".
+find_php_cli() {
+    local candidates=(
+        "$HOME/bin/php"
+        /opt/cpanel/ea-php84/root/usr/bin/php
+        /opt/cpanel/ea-php83/root/usr/bin/php
+        /opt/cpanel/ea-php82/root/usr/bin/php
+        /opt/cpanel/ea-php81/root/usr/bin/php
+        /usr/local/bin/php
+        php
+    )
+    for c in "${candidates[@]}"; do
+        if command -v "$c" >/dev/null 2>&1 && "$c" -v 2>/dev/null | grep -qi '(cli)'; then
+            echo "$c"
+            return 0
+        fi
+    done
+    return 1
+}
+
+if PHP_BIN=$(find_php_cli); then
+    echo "==> Using PHP CLI: $PHP_BIN ($($PHP_BIN -v | head -n1))"
+else
+    echo "!! Could not find a PHP CLI binary (only found CGI/FastCGI php)."
+    echo "!! In cPanel, set up 'MultiPHP Manager' / a CLI PHP alias for this"
+    echo "!! account (usually /opt/cpanel/ea-phpXX/root/usr/bin/php), then"
+    echo "!! add its path to the candidates list at the top of this script."
+    exit 1
+fi
+
 # ---------- 1. Backend dependencies ----------
 echo "==> Installing backend dependencies..."
 cd backend
 if [ ! -f composer.phar ] && ! command -v composer >/dev/null 2>&1; then
     echo "    Downloading composer..."
-    curl -sS https://getcomposer.org/installer | php
-    COMPOSER="php composer.phar"
+    curl -sS https://getcomposer.org/installer | "$PHP_BIN"
+    COMPOSER="$PHP_BIN composer.phar"
 else
     COMPOSER="composer"
 fi
@@ -32,14 +66,14 @@ $COMPOSER install --no-dev --optimize-autoloader --no-interaction
 
 # ---------- 2. Storage + permissions ----------
 echo "==> Linking storage..."
-php artisan storage:link || true
+"$PHP_BIN" artisan storage:link || true
 chmod -R 775 storage bootstrap/cache
 chmod -R 775 storage/app/public 2>/dev/null || true
 
 # ---------- 3. Database ----------
 echo "==> Running migrations + seeders..."
-php artisan migrate --force
-php artisan db:seed --force
+"$PHP_BIN" artisan migrate --force
+"$PHP_BIN" artisan db:seed --force
 
 # ---------- 4. Web frontend ----------
 echo "==> Preparing web frontend..."
@@ -54,18 +88,41 @@ else
     echo "!! updated build/ folder, then re-run this script."
 fi
 
-# API proxy: build/backend -> backend/public, so /api and /storage work
-# when the subdomain document root is frontend/build
-echo "==> Linking backend into frontend build..."
-ln -sfn ../../backend/public build/backend
+# The live document root is backend/public (Laravel serves the SPA shell
+# dynamically via PrerenderController, which reads frontend/build/index.html
+# straight off disk for SEO injection, and serves /robots.txt dynamically
+# too via routes/web.php). Static assets referenced by that HTML (JS/CSS
+# bundles, manifest, icons) must physically exist under backend/public/ to
+# be servable. Sync them in, but:
+#   - never touch index.php/.htaccess/storage (Laravel's own front
+#     controller, rewrites, and the artisan storage:link symlink)
+#   - never leave index.html or robots.txt as static files here - CRA's
+#     defaults would shadow Laravel's dynamic routes for both (Apache
+#     serves a matching real file before ever reaching PHP)
+echo "==> Syncing frontend build into backend/public..."
+cd ../backend
+if command -v rsync >/dev/null 2>&1; then
+    rsync -a --delete \
+        --exclude 'index.php' \
+        --exclude '.htaccess' \
+        --exclude 'index.html' \
+        --exclude 'robots.txt' \
+        --exclude 'backend' \
+        --exclude 'storage' \
+        ../frontend/build/ ./public/
+else
+    find ../frontend/build -mindepth 1 -maxdepth 1 \
+        ! -name 'index.php' ! -name '.htaccess' ! -name 'index.html' ! -name 'robots.txt' ! -name 'backend' ! -name 'storage' \
+        -exec cp -r {} ./public/ \;
+fi
+rm -f ./public/index.html ./public/robots.txt
 
 # ---------- 5. Laravel caches ----------
 echo "==> Optimizing Laravel..."
-cd ../backend
-php artisan config:cache || true
-php artisan route:cache || true
-php artisan view:cache || true
-php artisan optimize || true
+"$PHP_BIN" artisan config:cache
+"$PHP_BIN" artisan route:cache
+"$PHP_BIN" artisan view:cache
+"$PHP_BIN" artisan optimize
 
 echo "==> Done! https://tolemate.kitetool.com should be live."
 echo "    Super admin: superadmin@tolemate.com / password"
