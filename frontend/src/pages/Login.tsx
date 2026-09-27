@@ -1,9 +1,10 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useRef, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
 import { Mail, Lock } from 'lucide-react';
 import SeoHead from '../components/SeoHead';
+import Captcha, { CaptchaHandle } from '../components/Captcha';
 import api from '../utils/api';
 
 const Login: React.FC = () => {
@@ -11,20 +12,29 @@ const Login: React.FC = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captchaRef = useRef<CaptchaHandle>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const { getSetting } = useSettings();
   const { login } = useAuth();
+  const captchaRequired = getSetting('captcha_enabled', '0') === '1' && !!getSetting('recaptcha_site_key', '');
 
   const siteName = getSetting('site_name', 'ToleMate');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (captchaRequired && !captchaToken) {
+      setError('Please complete the captcha challenge.');
+      return;
+    }
+
     setIsLoading(true);
     setError('');
 
     try {
-      const { data } = await api.post('/login', { email, password });
+      const { data } = await api.post('/login', { email, password, captcha_token: captchaToken });
 
       login(data.access_token, data.user);
 
@@ -43,6 +53,7 @@ const Login: React.FC = () => {
       }
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'An error occurred during login');
+      captchaRef.current?.reset();
     } finally {
       setIsLoading(false);
     }
@@ -101,6 +112,8 @@ const Login: React.FC = () => {
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
+
+            <Captcha ref={captchaRef} onChange={setCaptchaToken} />
 
             <button
               type="submit"

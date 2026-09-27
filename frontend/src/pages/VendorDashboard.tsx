@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { LayoutDashboard, Briefcase, Inbox, CalendarDays, ShoppingBag, Plus, DollarSign, Star, TrendingUp, Menu, X, Clock, MessageSquare, Lock, Camera, BarChart3 } from 'lucide-react';
 import { FALLBACK_IMAGE, assetUrl } from '../utils/config';
@@ -7,6 +7,9 @@ import api from '../utils/api';
 import { DashboardSkeleton } from '../components/Skeleton';
 import SeoHead from '../components/SeoHead';
 import VendorAnalytics from '../components/VendorAnalytics';
+
+const TAB_KEYS = ['overview', 'services', 'requests', 'bookings', 'availability', 'bundles', 'portfolio', 'reviews', 'analytics'] as const;
+type TabKey = typeof TAB_KEYS[number];
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0') + ':00');
@@ -21,13 +24,25 @@ interface Vendor { business_name: string; description: string; rating: number; s
 const VendorDashboard: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [user, setUser] = useState<any>(null);
   const [vendor, setVendor] = useState<Vendor | null>(null);
   const [services, setServices] = useState<Service[]>([]);
   const [bookingRequests, setBookingRequests] = useState<BookingRequest[]>([]);
   const [allBookings, setAllBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'services' | 'requests' | 'bookings' | 'availability' | 'bundles' | 'portfolio' | 'reviews' | 'analytics'>('overview');
+  const initialTab = (TAB_KEYS as readonly string[]).includes(searchParams.get('tab') || '')
+    ? (searchParams.get('tab') as TabKey)
+    : 'overview';
+  const [activeTab, setActiveTabState] = useState<TabKey>(initialTab);
+  const setActiveTab = (tab: TabKey) => {
+    setActiveTabState(tab);
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      if (tab === 'overview') next.delete('tab'); else next.set('tab', tab);
+      return next;
+    }, { replace: false });
+  };
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
 
@@ -35,6 +50,13 @@ const VendorDashboard: React.FC = () => {
     window.scrollTo(0, 0);
     if (mainRef.current) mainRef.current.scrollTop = 0;
   }, [activeTab]);
+
+  useEffect(() => {
+    const tabFromUrl = searchParams.get('tab');
+    const resolved = (TAB_KEYS as readonly string[]).includes(tabFromUrl || '') ? (tabFromUrl as TabKey) : 'overview';
+    setActiveTabState(prev => (prev === resolved ? prev : resolved));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
   const [bookingFilter, setBookingFilter] = useState<'all' | 'pending' | 'active' | 'completed' | 'cancelled'>('all');
 
   // Availability state

@@ -68,6 +68,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Settings & Media routes (admin/super_admin via middleware in controller)
     Route::middleware('role:admin,super_admin')->group(function () {
+        Route::get('/admin/settings', [SettingController::class, 'adminIndex']);
         Route::post('/admin/settings', [SettingController::class, 'updateBatch']);
         Route::get('/admin/media', [MediaController::class, 'index']);
         Route::post('/admin/media', [MediaController::class, 'store']);

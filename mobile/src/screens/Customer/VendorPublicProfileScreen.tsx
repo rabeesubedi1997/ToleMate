@@ -107,21 +107,24 @@ const VendorPublicProfileScreen: React.FC<Props> = ({ route, navigation }) => {
     let mounted = true;
     (async () => {
       try {
-        const [vendorRes, portfolioRes, bundleRes] = await Promise.all([
-          api.get(`/vendors/${id}`),
-          api.get(`/vendors/${id}/portfolio`),
-          api.get(`/vendors/${id}/bundles`).catch(() => null),
-        ]);
-        if (mounted) {
-          setData(vendorRes.data);
-          setPortfolio(portfolioRes.data.portfolio ?? []);
-          setBundles(bundleRes?.data?.bundles ?? bundleRes?.data ?? []);
-        }
+        const vendorRes = await api.get(`/vendors/${id}`);
+        if (mounted) setData(vendorRes.data);
       } catch (e) {
         console.warn('vendor load failed', e);
-      } finally {
-        if (mounted) setLoading(false);
       }
+      try {
+        const portfolioRes = await api.get(`/vendors/${id}/portfolio`);
+        if (mounted) setPortfolio(portfolioRes.data.portfolio ?? []);
+      } catch (e) {
+        console.warn('vendor portfolio load failed', e);
+      }
+      try {
+        const bundleRes = await api.get(`/vendors/${id}/bundles`);
+        if (mounted) setBundles(bundleRes?.data?.bundles ?? bundleRes?.data ?? []);
+      } catch (e) {
+        console.warn('vendor bundles load failed', e);
+      }
+      if (mounted) setLoading(false);
     })();
     return () => {
       mounted = false;

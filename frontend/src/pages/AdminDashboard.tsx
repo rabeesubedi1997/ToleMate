@@ -17,7 +17,7 @@ import PageSeoManager from '../components/PageSeoManager';
 
 type Tab = 'dashboard' | 'users' | 'vendors' | 'bookings' | 'services' |
            'categories' | 'media' | 'slider' | 'messages' | 'reviews' | 'settings' | 'coupons' | 'seo' | 'menus' | 'page-seo' |
-           'commissions' | 'kyc' | 'moderation' | 'activities';
+           'commissions' | 'kyc' | 'moderation' | 'activities' | 'captcha';
 
 const DEFAULT_SLIDES = [
   { url: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=1200&q=80', title: 'Professional Home Repair Services', link: '/services', enabled: true },
@@ -66,6 +66,13 @@ const AdminDashboard: React.FC = () => {
 
   const [sliderInterval, setSliderInterval] = useState('5000');
   const [savingSettings, setSavingSettings] = useState(false);
+
+  // Captcha
+  const [captchaEnabled, setCaptchaEnabled] = useState(false);
+  const [captchaProvider, setCaptchaProvider] = useState('recaptcha_v2');
+  const [recaptchaSiteKey, setRecaptchaSiteKey] = useState('');
+  const [recaptchaSecretKey, setRecaptchaSecretKey] = useState('');
+  const [savingCaptcha, setSavingCaptcha] = useState(false);
 
   // SEO
   const [seoHomeTitle, setSeoHomeTitle] = useState('');
@@ -213,6 +220,13 @@ const AdminDashboard: React.FC = () => {
         setSeoGtmId(find('seo_gtm_id'));
         setSeoSiteVerification(find('seo_site_verification'));
         setSeoSchemaOrg(find('seo_schema_org'));
+      } else if (activeTab === 'captcha') {
+        const { data } = await api.get('/admin/settings');
+        const find = (k: string) => data?.[k] || '';
+        setCaptchaEnabled(find('captcha_enabled') === '1');
+        setCaptchaProvider(find('captcha_provider') || 'recaptcha_v2');
+        setRecaptchaSiteKey(find('recaptcha_site_key'));
+        setRecaptchaSecretKey(find('recaptcha_secret_key'));
       } else if (activeTab === 'seo') {
         const { data } = await api.get('/settings');
         const find = (k: string) => data?.[k] || '';
@@ -494,6 +508,20 @@ const AdminDashboard: React.FC = () => {
     } catch (e) { console.error(e); } finally { setSavingSettings(false); }
   };
 
+  // ─── Captcha ───
+  const handleSaveCaptcha = async (e: React.FormEvent) => {
+    e.preventDefault(); setSavingCaptcha(true);
+    try {
+      await api.post('/admin/settings', { settings: [
+        { key: 'captcha_enabled', value: captchaEnabled ? '1' : '0' },
+        { key: 'captcha_provider', value: captchaProvider },
+        { key: 'recaptcha_site_key', value: recaptchaSiteKey },
+        { key: 'recaptcha_secret_key', value: recaptchaSecretKey },
+      ]});
+      toast('Captcha settings saved!');
+    } catch (e) { console.error(e); } finally { setSavingCaptcha(false); }
+  };
+
   // ─── SEO ───
   const handleSaveSeo = async (e: React.FormEvent) => {
     e.preventDefault(); setSavingSeo(true);
@@ -616,6 +644,7 @@ const AdminDashboard: React.FC = () => {
         { key: 'seo', label: 'SEO', icon: Globe },
         { key: 'page-seo', label: 'Page SEO', icon: FileText },
         { key: 'settings', label: 'Settings', icon: Settings },
+        { key: 'captcha', label: 'Captcha', icon: Shield },
       ]}
     ] : []),
   ] as const;
@@ -1922,6 +1951,43 @@ const AdminDashboard: React.FC = () => {
                     </div>
                   </div>
                   <button type="submit" disabled={savingSettings} className="btn-primary w-full py-2.5">{savingSettings ? 'Saving...' : 'Save settings'}</button>
+                </form>
+              </div>
+            )}
+
+            {activeTab === 'captcha' && (
+              <div className="card p-6 md:p-8 max-w-2xl">
+                <form onSubmit={handleSaveCaptcha} className="space-y-5">
+                  <div>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                      <input type="checkbox" checked={captchaEnabled} onChange={e => setCaptchaEnabled(e.target.checked)} />
+                      Enable captcha on public forms (login, register, forgot password)
+                    </label>
+                    <p className="text-xs text-gray-400 mt-1">When enabled, visitors must complete a captcha challenge before submitting these forms. Mobile app users are unaffected.</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Provider</label>
+                    <select className="input-field" value={captchaProvider} onChange={e => setCaptchaProvider(e.target.value)}>
+                      <option value="recaptcha_v2">Google reCAPTCHA v2 (checkbox)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Site key</label>
+                    <input type="text" className="input-field" value={recaptchaSiteKey} onChange={e => setRecaptchaSiteKey(e.target.value)} placeholder="6Lc..." />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Secret key</label>
+                    <input type="password" className="input-field" value={recaptchaSecretKey} onChange={e => setRecaptchaSecretKey(e.target.value)} placeholder="6Lc..." autoComplete="off" />
+                    <p className="text-xs text-gray-400 mt-1">Never exposed to visitors; used only server-side to verify submissions.</p>
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    Get your keys from the{' '}
+                    <a href="https://www.google.com/recaptcha/admin/create" target="_blank" rel="noreferrer" className="text-primary-600 hover:underline">
+                      Google reCAPTCHA admin console
+                    </a>{' '}
+                    (choose reCAPTCHA v2 "I'm not a robot" checkbox).
+                  </p>
+                  <button type="submit" disabled={savingCaptcha} className="btn-primary w-full py-2.5">{savingCaptcha ? 'Saving...' : 'Save captcha settings'}</button>
                 </form>
               </div>
             )}

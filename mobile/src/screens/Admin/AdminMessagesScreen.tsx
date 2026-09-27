@@ -55,14 +55,16 @@ const AdminMessagesScreen: React.FC = () => {
 
   const load = useCallback(async () => {
     try {
-      const [bRes, dRes] = await Promise.all([
-        api.get('/conversations'),
-        api.get('/direct-conversations'),
-      ]);
+      const bRes = await api.get('/conversations');
       setBookings(bRes.data ?? []);
+    } catch (e) {
+      console.warn('admin booking messages load failed', e);
+    }
+    try {
+      const dRes = await api.get('/direct-conversations');
       setDirect(dRes.data ?? []);
     } catch (e) {
-      console.warn('admin messages load failed', e);
+      console.warn('admin direct messages load failed', e);
     } finally {
       setLoading(false);
       setRefreshing(false);

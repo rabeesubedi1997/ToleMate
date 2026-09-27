@@ -24,6 +24,10 @@ class PasswordResetController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
+        if ($captchaError = $this->rejectIfCaptchaInvalid($request)) {
+            return $captchaError;
+        }
+
         $status = Password::sendResetLink($request->only('email'));
 
         // Always return success-looking message to avoid user enumeration

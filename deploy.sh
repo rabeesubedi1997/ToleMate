@@ -44,16 +44,14 @@ php artisan db:seed --force
 # ---------- 4. Web frontend ----------
 echo "==> Preparing web frontend..."
 cd ../frontend
-if [ ! -d build ]; then
-    if command -v node >/dev/null 2>&1; then
-        echo "    Building frontend with Node..."
-        npm install --no-audit --no-fund
-        npm run build
-    else
-        echo "!! No prebuilt frontend and no Node.js on this server."
-        echo "!! Build it locally (cd frontend && npm run build), commit,"
-        echo "!! then re-run this script."
-    fi
+if command -v node >/dev/null 2>&1; then
+    echo "    Building frontend with Node..."
+    npm install --no-audit --no-fund
+    npm run build
+else
+    echo "!! No Node.js on this server - cannot rebuild the frontend."
+    echo "!! Build it locally (cd frontend && npm run build), commit the"
+    echo "!! updated build/ folder, then re-run this script."
 fi
 
 # API proxy: build/backend -> backend/public, so /api and /storage work

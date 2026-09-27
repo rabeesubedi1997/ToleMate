@@ -81,18 +81,19 @@ const ChatsScreen: React.FC = () => {
 
   const load = useCallback(async () => {
     try {
-      const [bRes, dRes] = await Promise.all([
-        api.get('/conversations'),
-        api.get('/direct-conversations'),
-      ]);
+      const bRes = await api.get('/conversations');
       setBookings(bRes.data ?? []);
+    } catch (e) {
+      console.warn('booking chats load failed', e);
+    }
+    try {
+      const dRes = await api.get('/direct-conversations');
       setDirect(dRes.data ?? []);
     } catch (e) {
-      console.warn('chats load failed', e);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+      console.warn('direct chats load failed', e);
     }
+    setLoading(false);
+    setRefreshing(false);
   }, []);
 
   useFocusEffect(

@@ -28,6 +28,9 @@ class SettingController extends Controller
                 ['url' => 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200&q=80', 'title' => 'Expert Tech Support at Your Door', 'link' => '/services', 'enabled' => true],
                 ['url' => 'https://images.unsplash.com/photo-1527529482837-4698179dc6ce?w=1200&q=80', 'title' => 'Perfect Events, Every Time', 'link' => '/services', 'enabled' => true],
             ]),
+            'captcha_enabled' => '0',
+            'captcha_provider' => 'recaptcha_v2',
+            'recaptcha_site_key' => '',
         ];
 
         // Saved DB values take precedence over defaults; defaults only fill gaps.
@@ -36,7 +39,23 @@ class SettingController extends Controller
             $merged[$key] = $value;
         }
 
+        // Secret keys must never reach the public settings response.
+        unset($merged['recaptcha_secret_key']);
+
         return response()->json($merged);
+    }
+
+    /**
+     * Get all settings including sensitive values like the captcha secret key (Admin only).
+     */
+    public function adminIndex(Request $request)
+    {
+        $user = $request->user();
+        if (!in_array($user->role, ['admin', 'super_admin'])) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        return response()->json(Setting::all()->pluck('value', 'key'));
     }
 
     /**

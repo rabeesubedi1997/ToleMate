@@ -17,14 +17,12 @@ const CustomerProfile: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [userRes, bookingRes] = await Promise.all([
-          api.get('/user'),
-          api.get('/bookings'),
-        ]);
-        const u = userRes.data;
+        const { data: u } = await api.get('/user');
         setUser(u);
         setForm({ name: u.name || '', email: u.email || '', phone: u.phone || '', address: u.address || '' });
-        const d = bookingRes.data;
+      } catch (e) { console.error(e); }
+      try {
+        const { data: d } = await api.get('/bookings');
         const bookings = d.data || d;
         const completed = bookings.filter((b: any) => b.status === 'completed');
         const spent = completed.reduce((s: number, b: any) => s + (b.price || 0), 0);
@@ -34,7 +32,7 @@ const CustomerProfile: React.FC = () => {
           : 0;
         setStats({ total: bookings.length, completed: completed.length, spent, avgRating: Math.round(avgRating * 10) / 10 });
       } catch (e) { console.error(e); }
-      finally { setLoading(false); }
+      setLoading(false);
     };
     fetchData();
   }, []);

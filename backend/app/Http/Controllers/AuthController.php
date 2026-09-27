@@ -28,6 +28,10 @@ class AuthController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
+        if ($captchaError = $this->rejectIfCaptchaInvalid($request)) {
+            return $captchaError;
+        }
+
         // Generate unique referral code
         $referralCode = null;
         do {
@@ -84,6 +88,10 @@ class AuthController extends Controller
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        if ($captchaError = $this->rejectIfCaptchaInvalid($request)) {
+            return $captchaError;
         }
 
         if (!Auth::attempt($request->only('email', 'password'))) {

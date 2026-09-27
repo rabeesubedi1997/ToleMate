@@ -59,28 +59,29 @@ const HomeScreen: React.FC = () => {
   const [fromCache, setFromCache] = useState(false);
 
   const load = useCallback(async () => {
-    try {
-      const [catRes, vendorRes, serviceRes]: any[] = await Promise.all([
-        api.get('/categories'),
-        api.get('/featured-vendors'),
-        api.get('/services', { params: { per_page: 8 } }),
-      ]);
-      setCategories(catRes.data);
-      setVendors(vendorRes.data);
+    const results = await Promise.allSettled([
+      api.get('/categories'),
+      api.get('/featured-vendors'),
+      api.get('/services', { params: { per_page: 8 } }),
+    ]);
+    const [catRes, vendorRes, serviceRes]: any[] = results.map(r =>
+      r.status === 'fulfilled' ? r.value : null,
+    );
+    if (catRes) setCategories(catRes.data);
+    if (vendorRes) setVendors(vendorRes.data);
+    if (serviceRes) {
       const svc = Array.isArray(serviceRes.data)
         ? serviceRes.data
         : serviceRes.data.data ?? [];
       setServices(svc);
-      setFromCache(
-        catRes.source === 'cache' ||
-          vendorRes.source === 'cache' ||
-          serviceRes.source === 'cache',
-      );
-    } catch (e) {
-      console.warn('home load failed', e);
-    } finally {
-      setLoading(false);
     }
+    results.forEach(r => { if (r.status === 'rejected') console.warn('home load failed', r.reason); });
+    setFromCache(
+      catRes?.source === 'cache' ||
+        vendorRes?.source === 'cache' ||
+        serviceRes?.source === 'cache',
+    );
+    setLoading(false);
   }, []);
 
   useEffect(() => {

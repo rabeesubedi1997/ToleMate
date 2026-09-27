@@ -57,18 +57,19 @@ const VendorBundlesScreen: React.FC = () => {
 
   const load = useCallback(async () => {
     try {
-      const [bundleRes, serviceRes] = await Promise.all([
-        api.get('/vendor/bundles'),
-        api.get('/services', { params: { per_page: 100 } }),
-      ]);
+      const bundleRes = await api.get('/vendor/bundles');
       setBundles(bundleRes.data.bundles ?? bundleRes.data ?? []);
-      setMyServices(serviceRes.data.data ?? serviceRes.data ?? []);
     } catch (e) {
       console.warn('vendor bundles load failed', e);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
     }
+    try {
+      const serviceRes = await api.get('/services', { params: { per_page: 100 } });
+      setMyServices(serviceRes.data.data ?? serviceRes.data ?? []);
+    } catch (e) {
+      console.warn('vendor bundle services load failed', e);
+    }
+    setLoading(false);
+    setRefreshing(false);
   }, []);
 
   useFocusEffect(

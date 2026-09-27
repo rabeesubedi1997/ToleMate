@@ -1,14 +1,16 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSettings } from '../context/SettingsContext';
 import { User, Briefcase } from 'lucide-react';
 import SeoHead from '../components/SeoHead';
+import Captcha, { CaptchaHandle } from '../components/Captcha';
 import api from '../utils/api';
 
 const Register: React.FC = () => {
   const navigate = useNavigate();
   const { getSetting } = useSettings();
   const siteName = getSetting('site_name', 'ToleMate');
+  const captchaRequired = getSetting('captcha_enabled', '0') === '1' && !!getSetting('recaptcha_site_key', '');
 
   const [formData, setFormData] = useState({
     name: '',
@@ -20,6 +22,8 @@ const Register: React.FC = () => {
 
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captchaRef = useRef<CaptchaHandle>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -36,18 +40,25 @@ const Register: React.FC = () => {
       return;
     }
 
+    if (captchaRequired && !captchaToken) {
+      setError('Please complete the captcha challenge.');
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      const { data } = await api.post('/register', formData);
+      const { data } = await api.post('/register', { ...formData, captcha_token: captchaToken });
 
       localStorage.setItem('token', data.access_token);
       localStorage.setItem('user', JSON.stringify(data.user));
 
       if (data.user.role === 'vendor') navigate('/vendor-dashboard');
       else navigate('/dashboard');
-      
+
       window.dispatchEvent(new Event('storage'));
     } catch (err: any) {
-      setError(err.message || 'An error occurred during registration');
+      setError(err.response?.data?.message || err.message || 'An error occurred during registration');
+      captchaRef.current?.reset();
     } finally {
       setIsLoading(false);
     }
@@ -129,6 +140,8 @@ const Register: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Confirm password</label>
               <input type="password" name="password_confirmation" required className="input-field" placeholder="••••••••" value={formData.password_confirmation} onChange={handleChange} />
             </div>
+
+            <Captcha ref={captchaRef} onChange={setCaptchaToken} />
 
             <button type="submit" disabled={isLoading} className="btn-primary w-full py-2.5 mt-2">
               {isLoading ? 'Creating account...' : 'Create account'}

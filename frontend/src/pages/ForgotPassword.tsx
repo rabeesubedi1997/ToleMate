@@ -1,7 +1,9 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, ArrowLeft, CheckCircle2 } from 'lucide-react';
-import SeoHead from '../components/SeoHead';
+import SeoHead from '../components/SeoHead';
+import Captcha, { CaptchaHandle } from '../components/Captcha';
+import { useSettings } from '../context/SettingsContext';
 import api from '../utils/api';
 
 const ForgotPassword: React.FC = () => {
@@ -9,16 +11,27 @@ const ForgotPassword: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captchaRef = useRef<CaptchaHandle>(null);
+  const { getSetting } = useSettings();
+  const captchaRequired = getSetting('captcha_enabled', '0') === '1' && !!getSetting('recaptcha_site_key', '');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (captchaRequired && !captchaToken) {
+      setError('Please complete the captcha challenge.');
+      return;
+    }
+
     setLoading(true);
     setError('');
     try {
-      await api.post('/forgot-password', { email });
+      await api.post('/forgot-password', { email, captcha_token: captchaToken });
       setSent(true);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Could not connect to the server. Please try again.');
+      captchaRef.current?.reset();
     } finally {
       setLoading(false);
     }
@@ -88,6 +101,8 @@ const ForgotPassword: React.FC = () => {
                   />
                 </div>
               </div>
+
+              <Captcha ref={captchaRef} onChange={setCaptchaToken} />
 
               <button
                 type="submit"

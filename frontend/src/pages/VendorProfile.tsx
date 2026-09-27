@@ -42,16 +42,21 @@ const VendorProfile: React.FC = () => {
 
   const fetchAll = async () => {
     try {
-      const [profileRes, availRes, featRes] = await Promise.all([
-        api.get('/vendor/profile'),
-        api.get('/vendor/availability'),
-        api.get('/vendor/features'),
-      ]);
-      setProfile(profileRes.data);
-      setAvailability(availRes.data.availability || []);
-      setFeatures(prev => ({ ...prev, ...featRes.data.features }));
+      const { data } = await api.get('/vendor/profile');
+      setProfile(prev => ({ ...prev, ...data }));
+    } catch (error) {
+      console.error(error);
+      toast('Could not load your profile. Please refresh the page.', 'error');
+    }
+    try {
+      const { data } = await api.get('/vendor/availability');
+      setAvailability(data.availability || []);
     } catch (error) { console.error(error); }
-    finally { setLoading(false); }
+    try {
+      const { data } = await api.get('/vendor/features');
+      setFeatures(prev => ({ ...prev, ...data.features }));
+    } catch (error) { console.error(error); }
+    setLoading(false);
   };
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
