@@ -109,22 +109,27 @@ const AdminServicesScreen: React.FC = () => {
     }, [load]),
   );
 
+  const loadDropdownOptions = useCallback(async () => {
+    try {
+      const catRes = await api.get('/categories');
+      setCategories(catRes.data ?? []);
+    } catch {
+      setCategories([]);
+    }
+    try {
+      const vendorRes = await api.get('/admin/vendors', { params: { per_page: 100 } });
+      setVendors(vendorRes.data.data ?? vendorRes.data ?? []);
+    } catch {
+      setVendors([]);
+    }
+  }, []);
+
   const openCreate = useCallback(async () => {
     setEditing(null);
     setShowCreate(true);
     setForm(EMPTY_FORM);
-    try {
-      const [catRes, vendorRes] = await Promise.all([
-        api.get('/categories'),
-        api.get('/admin/vendors', { params: { per_page: 100 } }),
-      ]);
-      setCategories(catRes.data ?? []);
-      setVendors(vendorRes.data.data ?? vendorRes.data ?? []);
-    } catch {
-      setCategories([]);
-      setVendors([]);
-    }
-  }, []);
+    await loadDropdownOptions();
+  }, [loadDropdownOptions]);
 
   const openEdit = async (item: Service) => {
     setEditing(item);
@@ -140,17 +145,7 @@ const AdminServicesScreen: React.FC = () => {
       cancellation_policy: item.cancellation_policy ?? '',
       is_active: item.is_active,
     });
-    try {
-      const [catRes, vendorRes] = await Promise.all([
-        api.get('/categories'),
-        api.get('/admin/vendors', { params: { per_page: 100 } }),
-      ]);
-      setCategories(catRes.data ?? []);
-      setVendors(vendorRes.data.data ?? vendorRes.data ?? []);
-    } catch {
-      setCategories([]);
-      setVendors([]);
-    }
+    await loadDropdownOptions();
   };
 
   const createService = async () => {

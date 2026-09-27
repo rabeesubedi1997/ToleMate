@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { CalendarDays, Search, MessageCircle, CreditCard, Star, Plus, RefreshCw, XCircle, UserCog, ChevronDown, Lock } from 'lucide-react';
+import { CalendarDays, Search, MessageCircle, CreditCard, Star, Plus, RefreshCw, XCircle, UserCog, ChevronDown, Lock, Inbox } from 'lucide-react';
 import { DashboardSkeleton } from '../components/Skeleton';
 import { useToast } from '../context/ToastContext';
 import api from '../utils/api';
@@ -197,6 +197,9 @@ const Dashboard: React.FC = () => {
             </Link>
             <Link to="/post-request" className="btn-secondary text-sm">
               <Plus className="w-4 h-4" /> Post request
+            </Link>
+            <Link to="/my-requests" className="btn-ghost text-sm" title="My requests & quotes">
+              <Inbox className="w-4 h-4" />
             </Link>
             <button onClick={() => setProfileModalOpen(true)} className="btn-ghost text-sm" title="Edit profile">
               <UserCog className="w-4 h-4" />

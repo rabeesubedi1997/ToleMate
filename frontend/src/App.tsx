@@ -30,6 +30,7 @@ const UserEdit           = lazy(() => import('./pages/UserEdit'));
 const Notifications      = lazy(() => import('./pages/Notifications'));
 const Marketplace        = lazy(() => import('./pages/Marketplace'));
 const PostRequest        = lazy(() => import('./pages/PostRequest'));
+const MyRequests         = lazy(() => import('./pages/MyRequests'));
 const VendorProfile      = lazy(() => import('./pages/VendorProfile'));
 const VendorPublicProfile= lazy(() => import('./pages/VendorPublicProfile'));
 const Checkout           = lazy(() => import('./pages/Checkout'));
@@ -37,6 +38,11 @@ const Favorites          = lazy(() => import('./pages/Favorites'));
 const BookingDetail      = lazy(() => import('./pages/BookingDetail'));
 const CustomerProfile    = lazy(() => import('./pages/CustomerProfile'));
 const CategoryPage       = lazy(() => import('./pages/CategoryPage'));
+const About              = lazy(() => import('./pages/About'));
+const Contact            = lazy(() => import('./pages/Contact'));
+const Terms              = lazy(() => import('./pages/Terms'));
+const PrivacyPolicy      = lazy(() => import('./pages/PrivacyPolicy'));
+const NotFound           = lazy(() => import('./pages/NotFound'));
 
 const DefaultSeo: React.FC = () => {
   const { getSetting } = useSettings();
@@ -80,6 +86,10 @@ function AppLayout() {
                 <Route path="/services/:id/:slug?" element={<ServicesDetail />} />
                 <Route path="/categories/:id" element={<CategoryPage />} />
                 <Route path="/vendors/:id" element={<VendorPublicProfile />} />
+                <Route path="/about" element={<About />} />
+                <Route path="/contact" element={<Contact />} />
+                <Route path="/terms" element={<Terms />} />
+                <Route path="/privacy" element={<PrivacyPolicy />} />
 
                 {/* Customer routes */}
                 <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['customer']}><Dashboard /></ProtectedRoute>} />
@@ -88,6 +98,7 @@ function AppLayout() {
                 <Route path="/book/:id" element={<ProtectedRoute allowedRoles={['customer', 'admin', 'vendor']}><BookService /></ProtectedRoute>} />
                 <Route path="/checkout/:id" element={<ProtectedRoute allowedRoles={['customer', 'admin', 'vendor']}><Checkout /></ProtectedRoute>} />
                 <Route path="/post-request" element={<ProtectedRoute allowedRoles={['customer']}><PostRequest /></ProtectedRoute>} />
+                <Route path="/my-requests" element={<ProtectedRoute allowedRoles={['customer']}><MyRequests /></ProtectedRoute>} />
                 <Route path="/favorites" element={<ProtectedRoute allowedRoles={['customer']}><Favorites /></ProtectedRoute>} />
 
                 {/* Vendor routes */}
@@ -107,7 +118,7 @@ function AppLayout() {
                 <Route path="/marketplace" element={<ProtectedRoute><Marketplace /></ProtectedRoute>} />
 
                 {/* Fallback */}
-                <Route path="*" element={<Navigate to="/" replace />} />
+                <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
           </main>

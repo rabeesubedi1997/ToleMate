@@ -10,17 +10,28 @@ use Illuminate\Support\Facades\Validator;
 
 class BundleController extends Controller
 {
+    /** Batch-load the services referenced across a set of bundles in one query instead of one per bundle. */
+    private function attachServices($bundles)
+    {
+        $allServiceIds = $bundles->flatMap(fn($b) => $b->service_ids ?? [])->unique()->values();
+        $services = Service::whereIn('id', $allServiceIds)->select('id', 'name', 'price')->get()->keyBy('id');
+
+        return $bundles->map(function ($b) use ($services) {
+            $bundleServices = collect($b->service_ids ?? [])
+                ->map(fn($id) => $services->get($id))
+                ->filter()
+                ->values();
+            return array_merge($b->toArray(), ['services' => $bundleServices]);
+        });
+    }
+
     /** GET /api/vendors/{id}/bundles — public */
     public function index($vendor_id)
     {
         $bundles = ServiceBundle::where('vendor_id', $vendor_id)
             ->where('is_active', true)
-            ->get()
-            ->map(function ($b) {
-                $services = Service::whereIn('id', $b->service_ids)->select('id', 'name', 'price')->get();
-                return array_merge($b->toArray(), ['services' => $services]);
-            });
-        return response()->json(['bundles' => $bundles]);
+            ->get();
+        return response()->json(['bundles' => $this->attachServices($bundles)]);
     }
 
     /** GET /api/vendor/bundles — authenticated vendor */
@@ -29,11 +40,8 @@ class BundleController extends Controller
         $vendor = Vendor::where('user_id', $request->user()->id)->first();
         if (!$vendor) return response()->json(['message' => 'Vendor not found'], 404);
 
-        $bundles = ServiceBundle::where('vendor_id', $vendor->id)->get()->map(function ($b) {
-            $services = Service::whereIn('id', $b->service_ids)->select('id', 'name', 'price')->get();
-            return array_merge($b->toArray(), ['services' => $services]);
-        });
-        return response()->json(['bundles' => $bundles]);
+        $bundles = ServiceBundle::where('vendor_id', $vendor->id)->get();
+        return response()->json(['bundles' => $this->attachServices($bundles)]);
     }
 
     /** POST /api/vendor/bundles */
@@ -80,7 +88,8 @@ class BundleController extends Controller
     public function destroy(Request $request, $id)
     {
         $vendor = Vendor::where('user_id', $request->user()->id)->first();
-        $bundle = ServiceBundle::where('id', $id)->where('vendor_id', $vendor?->id)->first();
+        if (!$vendor) return response()->json(['message' => 'Vendor not found'], 404);
+        $bundle = ServiceBundle::where('id', $id)->where('vendor_id', $vendor->id)->first();
         if (!$bundle) return response()->json(['message' => 'Not found'], 404);
         $bundle->delete();
         return response()->json(['message' => 'Bundle deleted']);
@@ -90,7 +99,8 @@ class BundleController extends Controller
     public function toggle(Request $request, $id)
     {
         $vendor = Vendor::where('user_id', $request->user()->id)->first();
-        $bundle = ServiceBundle::where('id', $id)->where('vendor_id', $vendor?->id)->first();
+        if (!$vendor) return response()->json(['message' => 'Vendor not found'], 404);
+        $bundle = ServiceBundle::where('id', $id)->where('vendor_id', $vendor->id)->first();
         if (!$bundle) return response()->json(['message' => 'Not found'], 404);
         $bundle->update(['is_active' => !$bundle->is_active]);
         return response()->json(['bundle' => $bundle]);

@@ -22,6 +22,7 @@ use App\Http\Controllers\TranslationController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\KhaltiPaymentController;
 use App\Http\Controllers\PasswordResetController;
+use App\Http\Controllers\ContactController;
 
 Route::middleware('auth:sanctum')->group(function () {
     // Auth routes
@@ -64,7 +65,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/admin/conversations', [AdminController::class, 'getAllConversations']);
 
     // Admin password reset
-    Route::post('/admin/users/{id}/reset-password', [PasswordResetController::class, 'adminResetPassword']);
+    Route::post('/admin/users/{id}/reset-password', [PasswordResetController::class, 'adminResetPassword'])->middleware('throttle:auth');
 
     // Settings & Media routes (admin/super_admin via middleware in controller)
     Route::middleware('role:admin,super_admin')->group(function () {
@@ -94,6 +95,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/admin/page-seo', [PageSeoController::class, 'store']);
         Route::put('/admin/page-seo/{id}', [PageSeoController::class, 'update']);
         Route::delete('/admin/page-seo/{id}', [PageSeoController::class, 'destroy']);
+
+        // Contact message management
+        Route::get('/admin/contact-messages', [ContactController::class, 'index']);
+        Route::put('/admin/contact-messages/{id}/read', [ContactController::class, 'markRead']);
+        Route::delete('/admin/contact-messages/{id}', [ContactController::class, 'destroy']);
     });
 
     // ── Super Admin only routes ──────────────────────────────────────────────
@@ -159,7 +165,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/vendor/kyc-status', [VendorController::class, 'getKycStatus']);
 
     // Review routes (authenticated)
-    Route::post('/reviews', [ReviewController::class, 'store']);
+    Route::post('/reviews', [ReviewController::class, 'store'])->middleware('throttle:api');
     Route::put('/reviews/{id}/reply', [ReviewController::class, 'vendorReply']);
 
     // Referral
@@ -169,8 +175,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/loyalty', [\App\Http\Controllers\LoyaltyController::class, 'index']);
 
     // Payments
-    Route::post('/payments/mock', [PaymentController::class, 'processMockPayment']);
-    Route::post('/payments/khalti/verify', [KhaltiPaymentController::class, 'verify']);
+    Route::post('/payments/mock', [PaymentController::class, 'processMockPayment'])->middleware('throttle:auth');
+    Route::post('/payments/khalti/verify', [KhaltiPaymentController::class, 'verify'])->middleware('throttle:auth');
 
     Route::get('/my-reviews', [ReviewController::class, 'myReviews']);
 
@@ -199,12 +205,13 @@ Route::middleware('auth:sanctum')->group(function () {
     // Booking requests
     Route::post('/booking-requests', [BookingController::class, 'createRequest']);
     Route::get('/booking-requests', [BookingController::class, 'getRequests']);
+    Route::get('/booking-requests/mine', [BookingController::class, 'myRequests']);
     Route::post('/booking-requests/{id}/respond', [BookingController::class, 'respondToRequest']);
 
     // Message routes
     Route::get('/messages/unread-count', [MessageController::class, 'unreadCount']);
     Route::get('/messages', [MessageController::class, 'index']);
-    Route::post('/messages', [MessageController::class, 'store']);
+    Route::post('/messages', [MessageController::class, 'store'])->middleware('throttle:api');
     Route::get('/conversations', [MessageController::class, 'conversations']);
     Route::get('/direct-conversations', [MessageController::class, 'directConversations']);
     Route::put('/messages/{id}/read', [MessageController::class, 'markAsRead']);
@@ -240,7 +247,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Disputes
     Route::get('/disputes', [DisputeController::class, 'index']);
-    Route::post('/disputes', [DisputeController::class, 'store']);
+    Route::post('/disputes', [DisputeController::class, 'store'])->middleware('throttle:api');
     Route::get('/disputes/{id}', [DisputeController::class, 'show']);
     Route::post('/disputes/{id}/resolve', [DisputeController::class, 'resolve']);
 
@@ -270,6 +277,9 @@ Route::get('/events', [\App\Http\Controllers\EventStreamController::class, 'stre
 // Password reset (public — no auth required, rate limited)
 Route::post('/forgot-password', [PasswordResetController::class, 'sendResetLink'])->middleware('throttle:auth');
 Route::post('/reset-password',  [PasswordResetController::class, 'resetPassword'])->middleware('throttle:auth');
+
+// Contact form (public, rate limited + captcha-protected)
+Route::post('/contact', [ContactController::class, 'store'])->middleware('throttle:auth');
 
 // Category route (public — needed for service search filters)
 Route::get('/categories', function () {
@@ -303,4 +313,3 @@ Route::get('/menus', [MenuController::class, 'index']);
 Route::get('/page-seo/{page}', [PageSeoController::class, 'show']);
 
 Route::get('/translations', [TranslationController::class, 'index']);
-Route::post('/translations', [TranslationController::class, 'store'])->middleware('auth:sanctum');

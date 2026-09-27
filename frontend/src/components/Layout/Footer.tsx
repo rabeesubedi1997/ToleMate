@@ -78,7 +78,6 @@ const Footer: React.FC = () => {
               {[
                 { label: 'About Us',          to: '/about' },
                 { label: 'Contact',           to: '/contact' },
-                { label: 'Blog',              to: '/blog' },
                 { label: 'Terms & Conditions',to: '/terms' },
                 { label: 'Privacy Policy',    to: '/privacy' },
               ].map(item => (
@@ -109,10 +108,9 @@ const Footer: React.FC = () => {
             <div className="mt-6 space-y-2">
               <p className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-3">Download App</p>
               {[{ store: 'App Store', icon: '/app-store-badge.png' }, { store: 'Google Play', icon: '/google-play-badge.png' }].map(a => (
-                <a key={a.store} href="#"
-                  className="inline-block hover:opacity-80 transition-opacity">
+                <span key={a.store} className="inline-block opacity-60 cursor-not-allowed" title="Coming soon">
                   <img src={a.icon} alt={a.store} loading="lazy" className="h-[42px] w-auto" />
-                </a>
+                </span>
               ))}
             </div>
           </div>

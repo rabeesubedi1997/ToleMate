@@ -202,12 +202,37 @@ class BookingController extends Controller
                 return response()->json(['message' => 'Vendors can only accept, start, complete, or cancel bookings'], 403);
             }
         } elseif ($user->role === 'customer') {
-            if (!in_array($request->status, ['cancelled'])) {
-                return response()->json(['message' => 'Customers can only cancel bookings'], 403);
+            $canAcceptQuote = $booking->booking_type === 'quote' && $booking->status === 'pending' && $request->status === 'accepted';
+            if (!$canAcceptQuote && !in_array($request->status, ['cancelled'])) {
+                return response()->json(['message' => 'Customers can only cancel bookings, or accept a vendor quote'], 403);
             }
         }
 
         $booking->update($request->only(['status', 'price', 'scheduled_time']));
+
+        // Accepting one vendor's quote closes out the request: decline the other
+        // competing quotes and mark the original request closed so it stops
+        // showing up as "open" for more vendors to respond to.
+        if ($user->role === 'customer' && $booking->booking_type === 'quote' && $booking->status === 'accepted' && $booking->booking_request_id) {
+            Booking::with('service.vendor')
+                ->where('booking_request_id', $booking->booking_request_id)
+                ->where('id', '!=', $booking->id)
+                ->where('status', 'pending')
+                ->get()
+                ->each(function ($sibling) {
+                    $sibling->update(['status' => 'cancelled']);
+                    NotificationController::sendNotification(
+                        $sibling->service->vendor->user_id,
+                        'booking',
+                        'Quote Not Selected',
+                        'The customer accepted a different quote for this request.',
+                        ['booking_id' => $sibling->id]
+                    );
+                });
+
+            \App\Models\BookingRequest::where('id', $booking->booking_request_id)
+                ->update(['status' => 'closed', 'closed_at' => now()]);
+        }
 
         // Award loyalty points when booking is completed (1 point per Rs. 10)
         if ($oldStatus !== 'completed' && $booking->status === 'completed') {
@@ -372,6 +397,28 @@ class BookingController extends Controller
         ], 201);
     }
 
+    /**
+     * A customer's own posted requests, each with the competing vendor
+     * quotes submitted against it (so they can compare and accept one).
+     */
+    public function myRequests(Request $request)
+    {
+        $user = $request->user();
+        if ($user->role !== 'customer') {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $requests = BookingRequest::where('customer_id', $user->id)
+            ->with(['category', 'quotes' => function ($q) {
+                $q->with(['service:id,name,price', 'vendor:id,business_name,rating,avatar'])
+                    ->orderBy('price', 'asc');
+            }])
+            ->orderByDesc('created_at')
+            ->paginate(10);
+
+        return response()->json($requests);
+    }
+
     public function getRequests(Request $request)
     {
         $user = $request->user();
@@ -434,11 +481,19 @@ class BookingController extends Controller
             return response()->json(['message' => 'Invalid service for this vendor'], 403);
         }
 
+        $alreadyQuoted = Booking::where('booking_request_id', $bookingRequest->id)
+            ->where('vendor_id', $user->vendor->id)
+            ->exists();
+        if ($alreadyQuoted) {
+            return response()->json(['message' => 'You have already sent a quote for this request'], 422);
+        }
+
         // Create a booking of type 'quote'
         $booking = Booking::create([
             'customer_id' => $bookingRequest->customer_id,
             'vendor_id' => $user->vendor->id,
             'service_id' => $service->id,
+            'booking_request_id' => $bookingRequest->id,
             'booking_type' => 'quote',
             'status' => 'pending',
             'price' => $request->price,

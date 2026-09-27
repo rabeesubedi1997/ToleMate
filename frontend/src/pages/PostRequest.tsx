@@ -77,7 +77,7 @@ const PostRequest: React.FC = () => {
           {form.budget && <div className="flex items-center gap-2 text-sm text-primary-700"><FileText className="w-4 h-4 flex-shrink-0" /> Budget: Rs. {Number(form.budget).toLocaleString()}</div>}
         </div>
         <div className="flex flex-col gap-3">
-          <Link to="/marketplace" className="btn-primary flex items-center justify-center gap-2">View marketplace</Link>
+          <Link to="/my-requests" className="btn-primary flex items-center justify-center gap-2">View my requests & quotes</Link>
           <Link to="/dashboard" className="btn-ghost flex items-center justify-center gap-2 text-sm">My bookings <ArrowRight className="w-3.5 h-3.5" /></Link>
         </div>
       </div>

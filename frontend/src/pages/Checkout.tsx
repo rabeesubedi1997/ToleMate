@@ -3,27 +3,30 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Shield, Lock, CheckCircle, CalendarDays, ArrowRight, Wallet, CreditCard } from 'lucide-react';
 import api from '../utils/api';
 import SeoHead from '../components/SeoHead';
+import { useToast } from '../context/ToastContext';
 
 type PaymentMethod = 'khalti' | 'card';
 
 const Checkout: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const khaltiRef = useRef<any>(null);
   const [booking, setBooking] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [cardData, setCardData] = useState({ number: '', expiry: '', cvc: '', name: '' });
   const [paymentSuccess, setPaymentSuccess] = useState(false);
-  const [method, setMethod] = useState<PaymentMethod>('khalti');
+  const [method, setMethod] = useState<PaymentMethod>('card');
   const [khaltiPublicKey, setKhaltiPublicKey] = useState('');
 
   useEffect(() => {
     fetchBooking();
     api.get('/settings').then(({ data }) => {
-      const settings = Array.isArray(data) ? data : [];
-      const key = settings.find((s: any) => s.key === 'khalti_public_key')?.value;
-      if (key) setKhaltiPublicKey(key);
+      if (data?.khalti_public_key) {
+        setKhaltiPublicKey(data.khalti_public_key);
+        setMethod('khalti');
+      }
     }).catch(() => {});
   }, [id]);
 
@@ -38,6 +41,11 @@ const Checkout: React.FC = () => {
   const totalPaisa = Math.round(parseFloat(totalAmount) * 100);
 
   const handleKhaltiPayment = async () => {
+    if (!khaltiPublicKey) {
+      toast('Khalti payment is not configured yet. Please try another payment method.', 'error');
+      return;
+    }
+
     if (typeof (window as any).KhaltiCheckout === 'undefined') {
       setProcessing(true);
       try {
@@ -184,8 +192,11 @@ const Checkout: React.FC = () => {
 
             {/* Payment method selector */}
             <div className="grid grid-cols-2 gap-2 mb-5">
-              <button onClick={() => setMethod('khalti')}
+              <button onClick={() => khaltiPublicKey && setMethod('khalti')}
+                disabled={!khaltiPublicKey}
+                title={khaltiPublicKey ? undefined : 'Khalti is not configured yet'}
                 className={`flex items-center justify-center gap-2 p-3 rounded-lg border-2 text-sm font-medium transition-colors ${
+                  !khaltiPublicKey ? 'border-gray-100 text-gray-300 cursor-not-allowed' :
                   method === 'khalti' ? 'border-primary-600 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'
                 }`}>
                 <Wallet className="w-4 h-4" /> Khalti

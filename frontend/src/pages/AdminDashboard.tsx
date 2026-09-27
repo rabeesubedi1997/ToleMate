@@ -9,7 +9,7 @@ import {
   ShoppingBag, RefreshCw, Plus, Trash2, Store, ChevronRight,
   Eye, X, Layers, Calendar, Tag, MessageSquare, ArrowUp,
   ArrowDown, ToggleLeft, ToggleRight, ExternalLink, Edit2, Check, CheckCircle2,
-  Ticket, Globe, Search, List, FileText, DollarSign, Shield, Activity, Clock
+  Ticket, Globe, Search, List, FileText, DollarSign, Shield, Activity, Clock, Mail
 } from 'lucide-react';
 import SeoHead from '../components/SeoHead';
 import MenuManager from '../components/MenuManager';
@@ -17,7 +17,7 @@ import PageSeoManager from '../components/PageSeoManager';
 
 type Tab = 'dashboard' | 'users' | 'vendors' | 'bookings' | 'services' |
            'categories' | 'media' | 'slider' | 'messages' | 'reviews' | 'settings' | 'coupons' | 'seo' | 'menus' | 'page-seo' |
-           'commissions' | 'kyc' | 'moderation' | 'activities' | 'captcha';
+           'commissions' | 'kyc' | 'moderation' | 'activities' | 'captcha' | 'contact';
 
 const DEFAULT_SLIDES = [
   { url: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=1200&q=80', title: 'Professional Home Repair Services', link: '/services', enabled: true },
@@ -66,6 +66,9 @@ const AdminDashboard: React.FC = () => {
 
   const [sliderInterval, setSliderInterval] = useState('5000');
   const [savingSettings, setSavingSettings] = useState(false);
+
+  // Contact messages
+  const [contactMessages, setContactMessages] = useState<any[]>([]);
 
   // Captcha
   const [captchaEnabled, setCaptchaEnabled] = useState(false);
@@ -198,6 +201,9 @@ const AdminDashboard: React.FC = () => {
         if (directResult.status === 'fulfilled') {
           const d = directResult.value.data; setDirectConvs(d);
         }
+      } else if (activeTab === 'contact') {
+        const { data } = await api.get('/admin/contact-messages');
+        setContactMessages(data.data || data);
       } else if (activeTab === 'reviews') {
         const { data } = await api.get('/admin/reviews');
         setReviews(data.data || data);
@@ -508,6 +514,23 @@ const AdminDashboard: React.FC = () => {
     } catch (e) { console.error(e); } finally { setSavingSettings(false); }
   };
 
+  // ─── Contact messages ───
+  const markContactMessageRead = async (id: number) => {
+    try {
+      await api.put(`/admin/contact-messages/${id}/read`);
+      setContactMessages(prev => prev.map(m => m.id === id ? { ...m, is_read: true } : m));
+    } catch (e) { console.error(e); }
+  };
+
+  const deleteContactMessage = async (id: number) => {
+    if (!window.confirm('Delete this message?')) return;
+    try {
+      await api.delete(`/admin/contact-messages/${id}`);
+      setContactMessages(prev => prev.filter(m => m.id !== id));
+      toast('Message deleted');
+    } catch (e) { console.error(e); toast('Could not delete message', 'error'); }
+  };
+
   // ─── Captcha ───
   const handleSaveCaptcha = async (e: React.FormEvent) => {
     e.preventDefault(); setSavingCaptcha(true);
@@ -624,6 +647,7 @@ const AdminDashboard: React.FC = () => {
       { key: 'categories', label: 'Categories', icon: Tag },
       { key: 'reviews', label: 'Reviews', icon: Star },
       { key: 'messages', label: 'Messages', icon: MessageSquare },
+      { key: 'contact', label: 'Contact Messages', icon: Mail },
       { key: 'menus', label: 'Menus', icon: List },
     ]},
     { label: 'Media', items: [
@@ -1925,6 +1949,49 @@ const AdminDashboard: React.FC = () => {
             )}
 
             {/* ═══ SETTINGS ═══ */}
+            {activeTab === 'contact' && (
+              <div className="card p-5">
+                <div className="mb-4">
+                  <h3 className="font-semibold text-gray-900">Contact Messages</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">Submissions from the public contact form</p>
+                </div>
+                <div className="divide-y divide-gray-100">
+                  {contactMessages.map((m: any) => (
+                    <div key={m.id} className={`py-3 ${!m.is_read ? 'bg-primary-50/40 -mx-5 px-5' : ''}`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium text-gray-900">{m.name}</p>
+                            {!m.is_read && <span className="w-1.5 h-1.5 rounded-full bg-primary-600" />}
+                          </div>
+                          <p className="text-xs text-gray-400">{m.email}</p>
+                          {m.subject && <p className="text-xs font-medium text-gray-600 mt-1">{m.subject}</p>}
+                          <p className="text-sm text-gray-700 mt-1 whitespace-pre-wrap">{m.message}</p>
+                          <p className="text-xs text-gray-400 mt-1">{new Date(m.created_at).toLocaleString()}</p>
+                        </div>
+                        <div className="flex flex-col gap-1.5 flex-shrink-0">
+                          {!m.is_read && (
+                            <button onClick={() => markContactMessageRead(m.id)} className="text-xs border border-gray-200 hover:bg-gray-50 px-3 py-1.5 rounded-lg">
+                              Mark read
+                            </button>
+                          )}
+                          <button onClick={() => deleteContactMessage(m.id)} className="text-xs border border-red-200 text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg">
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {contactMessages.length === 0 && (
+                    <div className="py-10 text-center text-sm text-gray-400">
+                      <Mail className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+                      No messages yet.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {activeTab === 'settings' && (
               <div className="card p-6 md:p-8 max-w-2xl">
                 <form onSubmit={handleSaveSettings} className="space-y-5">

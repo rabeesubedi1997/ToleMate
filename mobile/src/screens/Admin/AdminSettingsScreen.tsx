@@ -7,6 +7,7 @@ import {
   TextInput,
   Pressable,
   ActivityIndicator,
+  Switch,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../../api/client';
@@ -22,27 +23,35 @@ const FIELDS: { key: string; label: string }[] = [
   { key: 'slider_interval', label: 'Slider interval (ms)' },
 ];
 
+const CAPTCHA_FIELDS: { key: string; label: string; secure?: boolean }[] = [
+  { key: 'recaptcha_site_key', label: 'reCAPTCHA site key' },
+  { key: 'recaptcha_secret_key', label: 'reCAPTCHA secret key', secure: true },
+];
+
 const AdminSettingsScreen: React.FC = () => {
   const toast = useToast();
   const [form, setForm] = useState<Record<string, string>>({});
+  const [captchaEnabled, setCaptchaEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const res = await api.get('/settings');
+      const res = await api.get('/admin/settings');
       const data = res.data ?? {};
       const next: Record<string, string> = {};
-      FIELDS.forEach(f => {
+      [...FIELDS, ...CAPTCHA_FIELDS].forEach(f => {
         next[f.key] = String(data[f.key] ?? '');
       });
       setForm(next);
+      setCaptchaEnabled(data.captcha_enabled === '1');
     } catch (e) {
       console.warn('settings load failed', e);
+      toast.error('Could not load settings.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useFocusEffect(
     useCallback(() => {
@@ -54,7 +63,12 @@ const AdminSettingsScreen: React.FC = () => {
     setSaving(true);
     try {
       await api.post('/admin/settings', {
-        settings: FIELDS.map(f => ({ key: f.key, value: form[f.key] ?? '' })),
+        settings: [
+          ...FIELDS.map(f => ({ key: f.key, value: form[f.key] ?? '' })),
+          ...CAPTCHA_FIELDS.map(f => ({ key: f.key, value: form[f.key] ?? '' })),
+          { key: 'captcha_enabled', value: captchaEnabled ? '1' : '0' },
+          { key: 'captcha_provider', value: 'recaptcha_v2' },
+        ],
       });
       toast.success('Settings updated.');
     } catch {
@@ -94,6 +108,36 @@ const AdminSettingsScreen: React.FC = () => {
             </View>
           ))}
         </View>
+
+        <View style={styles.card}>
+          <View style={styles.field}>
+            <View style={styles.switchRow}>
+              <Text style={styles.label}>Enable captcha on public forms</Text>
+              <Switch
+                value={captchaEnabled}
+                onValueChange={setCaptchaEnabled}
+                trackColor={{ true: COLORS.primary }}
+              />
+            </View>
+            <Text style={styles.hint}>
+              Protects login, register, and forgot-password. Mobile app users are unaffected.
+            </Text>
+          </View>
+          {CAPTCHA_FIELDS.map(f => (
+            <View key={f.key} style={styles.field}>
+              <Text style={styles.label}>{f.label}</Text>
+              <TextInput
+                style={styles.input}
+                value={form[f.key] ?? ''}
+                onChangeText={v => setForm(prev => ({ ...prev, [f.key]: v }))}
+                placeholderTextColor={COLORS.gray400}
+                autoCapitalize="none"
+                secureTextEntry={f.secure}
+              />
+            </View>
+          ))}
+        </View>
+
         <Pressable
           style={[styles.saveBtn, saving && styles.btnDisabled]}
           onPress={save}
@@ -136,6 +180,16 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.gray600,
     marginBottom: 6,
+  },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  hint: {
+    fontSize: 12,
+    color: COLORS.gray400,
+    marginTop: 4,
   },
   input: {
     backgroundColor: COLORS.gray50,

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class BookingRequest extends Model
 {
@@ -18,6 +19,7 @@ class BookingRequest extends Model
         'lat',
         'lng',
         'status',
+        'closed_at',
     ];
 
     protected $casts = [
@@ -25,6 +27,7 @@ class BookingRequest extends Model
         'lng' => 'decimal:8',
         'budget' => 'decimal:2',
         'preferred_date' => 'datetime',
+        'closed_at' => 'datetime',
     ];
 
     public function customer(): BelongsTo
@@ -35,5 +38,11 @@ class BookingRequest extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
+    }
+
+    /** Competing vendor quotes submitted against this request. */
+    public function quotes(): HasMany
+    {
+        return $this->hasMany(Booking::class, 'booking_request_id');
     }
 }

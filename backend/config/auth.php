@@ -16,7 +16,11 @@ return [
     */
 
     'defaults' => [
-        'guard' => env('AUTH_GUARD', 'web'),
+        // Hardcoded, not env-driven: AuthController::login() calls Auth::attempt(),
+        // which only exists on the session-based 'web' guard. API routes protect
+        // themselves independently via explicit 'auth:sanctum' middleware, so this
+        // default must never become 'sanctum' - that broke login in production once.
+        'guard' => 'web',
         'passwords' => env('AUTH_PASSWORD_BROKER', 'users'),
     ],
 
