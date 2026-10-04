@@ -306,6 +306,12 @@ Route::get('/vendors', [VendorController::class, 'index']);
 // Settings route (public)
 Route::get('/settings', [SettingController::class, 'index']);
 
+// AI Agent chat widget (public — proxies to whatever agent is connected in
+// Admin > AI Agent; the connection's API key stays server-side and is never
+// sent to the browser)
+Route::get('/ai-agent/status', [\App\Http\Controllers\AiAgentController::class, 'status']);
+Route::post('/ai-agent/chat', [\App\Http\Controllers\AiAgentController::class, 'chat'])->middleware('throttle:ai_chat');
+
 // Menus (public — returns active menus for current role)
 Route::get('/menus', [MenuController::class, 'index']);
 

@@ -10,6 +10,7 @@ import Header from './components/Layout/Header';
 import Footer from './components/Layout/Footer';
 import MobileBottomNav from './components/Layout/MobileBottomNav';
 import ScrollToTop from './components/ScrollToTop';
+import AiChatWidget from './components/AiChatWidget';
 import './index.css';
 
 const Home               = lazy(() => import('./pages/Home'));
@@ -124,6 +125,7 @@ function AppLayout() {
           </main>
           {!isDashboardRoute && <Footer />}
           <MobileBottomNav />
+          {!isDashboardRoute && <AiChatWidget />}
         </div>
   );
 }

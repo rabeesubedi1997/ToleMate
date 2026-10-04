@@ -31,6 +31,11 @@ class AppServiceProvider extends ServiceProvider
                 ->by($request->ip());
         });
 
+        RateLimiter::for('ai_chat', function (Request $request) {
+            return Limit::perMinute(20)
+                ->by($request->ip());
+        });
+
         // Register policies
         Gate::policy(Vendor::class, VendorPolicy::class);
         Gate::policy(Service::class, ServicePolicy::class);

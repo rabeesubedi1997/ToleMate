@@ -9,7 +9,7 @@ import {
   ShoppingBag, RefreshCw, Plus, Trash2, Store, ChevronRight,
   Eye, X, Layers, Calendar, Tag, MessageSquare, ArrowUp,
   ArrowDown, ToggleLeft, ToggleRight, ExternalLink, Edit2, Check, CheckCircle2,
-  Ticket, Globe, Search, List, FileText, DollarSign, Shield, Activity, Clock, Mail
+  Ticket, Globe, Search, List, FileText, DollarSign, Shield, Activity, Clock, Mail, Bot
 } from 'lucide-react';
 import SeoHead from '../components/SeoHead';
 import MenuManager from '../components/MenuManager';
@@ -17,7 +17,7 @@ import PageSeoManager from '../components/PageSeoManager';
 
 type Tab = 'dashboard' | 'users' | 'vendors' | 'bookings' | 'services' |
            'categories' | 'media' | 'slider' | 'messages' | 'reviews' | 'settings' | 'coupons' | 'seo' | 'menus' | 'page-seo' |
-           'commissions' | 'kyc' | 'moderation' | 'activities' | 'captcha' | 'contact';
+           'commissions' | 'kyc' | 'moderation' | 'activities' | 'captcha' | 'contact' | 'ai-agent';
 
 const DEFAULT_SLIDES = [
   { url: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=1200&q=80', title: 'Professional Home Repair Services', link: '/services', enabled: true },
@@ -76,6 +76,14 @@ const AdminDashboard: React.FC = () => {
   const [recaptchaSiteKey, setRecaptchaSiteKey] = useState('');
   const [recaptchaSecretKey, setRecaptchaSecretKey] = useState('');
   const [savingCaptcha, setSavingCaptcha] = useState(false);
+
+  // AI Agent (Connect AI Agent — e.g. PersonalOps AI)
+  const [aiAgentEnabled, setAiAgentEnabled] = useState(false);
+  const [aiAgentApiUrl, setAiAgentApiUrl] = useState('');
+  const [aiAgentApiKey, setAiAgentApiKey] = useState('');
+  const [savingAiAgent, setSavingAiAgent] = useState(false);
+  const [testingAiAgent, setTestingAiAgent] = useState(false);
+  const [aiAgentTestResult, setAiAgentTestResult] = useState<{ ok: boolean; message: string } | null>(null);
 
   // SEO
   const [seoHomeTitle, setSeoHomeTitle] = useState('');
@@ -233,6 +241,13 @@ const AdminDashboard: React.FC = () => {
         setCaptchaProvider(find('captcha_provider') || 'recaptcha_v2');
         setRecaptchaSiteKey(find('recaptcha_site_key'));
         setRecaptchaSecretKey(find('recaptcha_secret_key'));
+      } else if (activeTab === 'ai-agent') {
+        const { data } = await api.get('/admin/settings');
+        const find = (k: string) => data?.[k] || '';
+        setAiAgentEnabled(find('ai_agent_enabled') === '1');
+        setAiAgentApiUrl(find('ai_agent_api_url'));
+        setAiAgentApiKey(find('ai_agent_api_key'));
+        setAiAgentTestResult(null);
       } else if (activeTab === 'seo') {
         const { data } = await api.get('/settings');
         const find = (k: string) => data?.[k] || '';
@@ -545,6 +560,29 @@ const AdminDashboard: React.FC = () => {
     } catch (e) { console.error(e); } finally { setSavingCaptcha(false); }
   };
 
+  // ─── AI Agent (Connect AI Agent) ───
+  const handleSaveAiAgent = async (e: React.FormEvent) => {
+    e.preventDefault(); setSavingAiAgent(true); setAiAgentTestResult(null);
+    try {
+      await api.post('/admin/settings', { settings: [
+        { key: 'ai_agent_enabled', value: aiAgentEnabled ? '1' : '0' },
+        { key: 'ai_agent_api_url', value: aiAgentApiUrl.trim() },
+        { key: 'ai_agent_api_key', value: aiAgentApiKey.trim() },
+      ]});
+      toast('AI agent settings saved!');
+    } catch (e) { console.error(e); toast('Could not save AI agent settings', 'error'); } finally { setSavingAiAgent(false); }
+  };
+
+  const handleTestAiAgent = async () => {
+    setTestingAiAgent(true); setAiAgentTestResult(null);
+    try {
+      const { data } = await api.post('/ai-agent/chat', { message: 'Say hello in one short sentence.' }, { timeout: 150000 });
+      setAiAgentTestResult({ ok: true, message: data.reply || '(empty response)' });
+    } catch (e: any) {
+      setAiAgentTestResult({ ok: false, message: e?.response?.data?.message || 'Could not reach the AI agent.' });
+    } finally { setTestingAiAgent(false); }
+  };
+
   // ─── SEO ───
   const handleSaveSeo = async (e: React.FormEvent) => {
     e.preventDefault(); setSavingSeo(true);
@@ -669,12 +707,13 @@ const AdminDashboard: React.FC = () => {
         { key: 'page-seo', label: 'Page SEO', icon: FileText },
         { key: 'settings', label: 'Settings', icon: Settings },
         { key: 'captcha', label: 'Captcha', icon: Shield },
+        { key: 'ai-agent', label: 'AI Agent', icon: Bot },
       ]}
     ] : []),
   ] as const;
 
   const tabLabel = (t: Tab) => {
-    const map: Partial<Record<Tab, string>> = { dashboard: 'Overview', slider: 'Hero Slider', media: 'Media Library', categories: 'Categories', messages: 'Messages', moderation: 'Moderation', activities: 'Activity Log' };
+    const map: Partial<Record<Tab, string>> = { dashboard: 'Overview', slider: 'Hero Slider', media: 'Media Library', categories: 'Categories', messages: 'Messages', moderation: 'Moderation', activities: 'Activity Log', 'ai-agent': 'AI Agent' };
     return map[t] || t.charAt(0).toUpperCase() + t.slice(1);
   };
 
@@ -2056,6 +2095,47 @@ const AdminDashboard: React.FC = () => {
                   </p>
                   <button type="submit" disabled={savingCaptcha} className="btn-primary w-full py-2.5">{savingCaptcha ? 'Saving...' : 'Save captcha settings'}</button>
                 </form>
+              </div>
+            )}
+
+            {activeTab === 'ai-agent' && (
+              <div className="card p-6 md:p-8 max-w-2xl">
+                <form onSubmit={handleSaveAiAgent} className="space-y-5">
+                  <div>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                      <input type="checkbox" checked={aiAgentEnabled} onChange={e => setAiAgentEnabled(e.target.checked)} />
+                      Enable AI chat widget on the site
+                    </label>
+                    <p className="text-xs text-gray-400 mt-1">When enabled, a chat bubble appears for visitors so they can ask about services and bookings without waiting for a human. Disable any time to remove it immediately.</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Agent API URL</label>
+                    <input type="url" className="input-field" value={aiAgentApiUrl} onChange={e => setAiAgentApiUrl(e.target.value)} placeholder="http://localhost:8000" />
+                    <p className="text-xs text-gray-400 mt-1">The base URL of the AI agent platform (e.g. your PersonalOps AI instance) — no trailing slash needed.</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Agent API key</label>
+                    <input type="password" className="input-field" value={aiAgentApiKey} onChange={e => setAiAgentApiKey(e.target.value)} placeholder="pak_..." autoComplete="off" />
+                    <p className="text-xs text-gray-400 mt-1">From that platform's Integrations / Connect AI Agent screen. Never exposed to visitors — this server forwards chat messages to the agent using this key.</p>
+                  </div>
+                  <button type="submit" disabled={savingAiAgent} className="btn-primary w-full py-2.5">{savingAiAgent ? 'Saving...' : 'Save AI agent settings'}</button>
+                </form>
+
+                <hr className="border-gray-200 my-6" />
+
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-1">Test the connection</h3>
+                  <p className="text-xs text-gray-400 mb-3">Save your settings above first, then send a test message using the currently saved key to confirm the agent responds.</p>
+                  <button type="button" onClick={handleTestAiAgent} disabled={testingAiAgent} className="text-sm border border-gray-200 hover:bg-gray-50 px-4 py-2 rounded-lg font-medium">
+                    {testingAiAgent ? 'Testing...' : 'Send test message'}
+                  </button>
+                  {aiAgentTestResult && (
+                    <div className={`mt-3 text-sm p-3 rounded-lg ${aiAgentTestResult.ok ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                      {aiAgentTestResult.ok ? <strong>Agent replied: </strong> : <strong>Failed: </strong>}
+                      {aiAgentTestResult.message}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 

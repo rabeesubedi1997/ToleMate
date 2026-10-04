@@ -41,6 +41,7 @@ class SettingController extends Controller
 
         // Secret keys must never reach the public settings response.
         unset($merged['recaptcha_secret_key']);
+        unset($merged['ai_agent_api_key']);
 
         // Khalti's public key is safe to expose (like a Stripe publishable key) and
         // must stay paired with the secret key used server-side for verification,
