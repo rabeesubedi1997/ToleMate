@@ -18,6 +18,7 @@ const AiChatWidget: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [sendingStatus, setSendingStatus] = useState('Typing…');
   const conversationId = useRef<string | null>(sessionStorage.getItem(CONVERSATION_STORAGE_KEY));
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -43,14 +44,27 @@ const AiChatWidget: React.FC = () => {
     setMessages(prev => [...prev, { role: 'user', content: text }]);
     setInput('');
     setSending(true);
+    setSendingStatus('Typing…');
+    // Runs entirely locally with no GPU, so a reply can genuinely take a
+    // minute or two, especially mid-booking (checking availability,
+    // confirming, etc. can mean several model calls in one request). A
+    // progressively updating status reassures the visitor it's still
+    // working rather than looking frozen or broken.
+    const statusTimers = [
+      setTimeout(() => setSendingStatus('Still thinking…'), 12000),
+      setTimeout(() => setSendingStatus('Checking details, this can take a minute…'), 35000),
+      setTimeout(() => setSendingStatus('Almost there…'), 90000),
+    ];
 
     try {
       // Local CPU-only LLM inference can take well over the default 30s
-      // client timeout, so this call gets its own longer allowance.
+      // client timeout, and a multi-step booking turn can need several
+      // model calls in one request — matches the Laravel proxy's own
+      // 280s allowance (AiAgentController) rather than cutting it short.
       const { data } = await api.post('/ai-agent/chat', {
         message: text,
         conversation_id: conversationId.current,
-      }, { timeout: 150000 });
+      }, { timeout: 280000 });
       if (data.conversation_id) {
         conversationId.current = data.conversation_id;
         sessionStorage.setItem(CONVERSATION_STORAGE_KEY, data.conversation_id);
@@ -60,6 +74,7 @@ const AiChatWidget: React.FC = () => {
       const message = err?.response?.data?.message || 'Something went wrong reaching the AI assistant.';
       setMessages(prev => [...prev, { role: 'assistant', content: message }]);
     } finally {
+      statusTimers.forEach(clearTimeout);
       setSending(false);
     }
   };
@@ -97,7 +112,7 @@ const AiChatWidget: React.FC = () => {
             {sending && (
               <div className="flex justify-start">
                 <div className="bg-white border border-gray-200 rounded-xl rounded-bl-sm px-3 py-2 text-sm text-gray-400">
-                  Typing…
+                  {sendingStatus}
                 </div>
               </div>
             )}

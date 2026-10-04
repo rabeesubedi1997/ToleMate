@@ -68,11 +68,13 @@ class AiAgentController extends Controller
 
         try {
             // CPU-only local LLM inference can legitimately take over a
-            // minute per turn (the agent itself allows up to 120s per call
-            // — see PersonalOps AI's OLLAMA_REQUEST_TIMEOUT_SECONDS), so this
-            // must stay comfortably above that rather than the usual ~30s.
+            // minute per turn, and a multi-step booking conversation can
+            // need several such turns in one request (search, then check
+            // availability, then book) — each up to 120s (see PersonalOps
+            // AI's OLLAMA_REQUEST_TIMEOUT_SECONDS). This must stay well
+            // above the worst realistic case rather than the usual ~30s.
             $response = Http::withHeaders(['X-API-Key' => $config['api_key']])
-                ->timeout(150)
+                ->timeout(280)
                 ->post($config['api_url'] . '/api/v1/public/chat', [
                     'message' => $request->input('message'),
                     'conversation_id' => $request->input('conversation_id'),

@@ -576,7 +576,7 @@ const AdminDashboard: React.FC = () => {
   const handleTestAiAgent = async () => {
     setTestingAiAgent(true); setAiAgentTestResult(null);
     try {
-      const { data } = await api.post('/ai-agent/chat', { message: 'Say hello in one short sentence.' }, { timeout: 150000 });
+      const { data } = await api.post('/ai-agent/chat', { message: 'Say hello in one short sentence.' }, { timeout: 280000 });
       setAiAgentTestResult({ ok: true, message: data.reply || '(empty response)' });
     } catch (e: any) {
       setAiAgentTestResult({ ok: false, message: e?.response?.data?.message || 'Could not reach the AI agent.' });
