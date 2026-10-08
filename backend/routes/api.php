@@ -311,6 +311,7 @@ Route::get('/settings', [SettingController::class, 'index']);
 // sent to the browser)
 Route::get('/ai-agent/status', [\App\Http\Controllers\AiAgentController::class, 'status']);
 Route::post('/ai-agent/chat', [\App\Http\Controllers\AiAgentController::class, 'chat'])->middleware('throttle:ai_chat');
+Route::post('/ai-agent/chat/stream', [\App\Http\Controllers\AiAgentController::class, 'chatStream'])->middleware('throttle:ai_chat');
 
 // Menus (public — returns active menus for current role)
 Route::get('/menus', [MenuController::class, 'index']);

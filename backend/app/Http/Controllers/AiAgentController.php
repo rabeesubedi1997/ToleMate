@@ -105,4 +105,90 @@ class AiAgentController extends Controller
             'status' => $data['status'] ?? 'completed',
         ]);
     }
+
+    /**
+     * Public: same as chat(), but relays the agent's Server-Sent Events as
+     * they arrive instead of waiting for the whole reply. The visitor sees
+     * words appear within seconds rather than a spinner for the full
+     * generation time. Errors that happen BEFORE the stream starts (agent
+     * not connected, bad key, over quota) are ordinary JSON errors, exactly
+     * like chat(); once streaming has begun, failures arrive as an `error`
+     * event inside the stream.
+     */
+    public function chatStream(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'message' => 'required|string|max:2000',
+            'conversation_id' => 'nullable|string|max:100',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $config = $this->config();
+
+        if (!$config['enabled'] || $config['api_url'] === '' || $config['api_key'] === '') {
+            return response()->json([
+                'message' => 'The AI assistant is not connected yet. Please try again later.',
+            ], 503);
+        }
+
+        try {
+            $upstream = Http::withHeaders(['X-API-Key' => $config['api_key']])
+                ->withOptions(['stream' => true])
+                ->timeout(280)
+                ->post($config['api_url'] . '/api/v1/public/chat/stream', [
+                    'message' => $request->input('message'),
+                    'conversation_id' => $request->input('conversation_id'),
+                ]);
+        } catch (\Throwable $e) {
+            Log::warning('ai_agent.chat_stream_unreachable', ['error' => $e->getMessage()]);
+
+            return response()->json(['message' => 'Could not reach the AI assistant right now.'], 502);
+        }
+
+        if ($upstream->status() === 401) {
+            Log::warning('ai_agent.chat_stream_unauthorized');
+
+            return response()->json(['message' => 'The AI assistant connection is misconfigured.'], 502);
+        }
+
+        if ($upstream->failed()) {
+            Log::warning('ai_agent.chat_stream_failed', ['status' => $upstream->status()]);
+
+            return response()->json(['message' => 'The AI assistant could not answer that right now.'], 502);
+        }
+
+        $body = $upstream->toPsrResponse()->getBody();
+
+        return response()->stream(function () use ($body) {
+            // Without this, PHP/Apache hold the output until the script ends,
+            // which would turn the stream back into one big delayed reply.
+            while (ob_get_level() > 0) {
+                ob_end_flush();
+            }
+            while (!$body->eof()) {
+                // Read a LINE, not a fixed-size block: PHP's stream read(N)
+                // blocks until it has N bytes or the stream ends, so a small
+                // SSE response would arrive all at once at the very end
+                // (verified: 822 bytes, one chunk, only after generation
+                // finished). SSE frames end in newlines, so this releases
+                // each event the moment it arrives.
+                $chunk = \GuzzleHttp\Psr7\Utils::readLine($body);
+                if ($chunk === '') {
+                    continue;
+                }
+                echo $chunk;
+                flush();
+                if (connection_aborted()) {
+                    break;
+                }
+            }
+        }, 200, [
+            'Content-Type' => 'text/event-stream',
+            'Cache-Control' => 'no-cache',
+            'X-Accel-Buffering' => 'no',
+        ]);
+    }
 }

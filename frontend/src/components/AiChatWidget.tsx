@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { MessageCircle, X, Send, Bot } from 'lucide-react';
 import api from '../utils/api';
+import { API_BASE } from '../utils/config';
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string };
 
@@ -19,6 +20,9 @@ const AiChatWidget: React.FC = () => {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [sendingStatus, setSendingStatus] = useState('Typing…');
+  // True once reply text has started arriving — from then on the growing
+  // reply bubble itself is the progress indicator, not the status bubble.
+  const [streaming, setStreaming] = useState(false);
   const conversationId = useRef<string | null>(sessionStorage.getItem(CONVERSATION_STORAGE_KEY));
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -41,41 +45,106 @@ const AiChatWidget: React.FC = () => {
     const text = input.trim();
     if (!text || sending) return;
 
+    // Messages before this send; the assistant's reply bubble is always
+    // "everything up to and including the user's message, then the reply so
+    // far". Rebuilding from this fixed base on every update keeps the state
+    // updater pure (safe under React StrictMode's double-invoke).
+    const baseCount = messages.length + 1;
     setMessages(prev => [...prev, { role: 'user', content: text }]);
     setInput('');
     setSending(true);
+    setStreaming(false);
     setSendingStatus('Typing…');
-    // Runs entirely locally with no GPU, so a reply can genuinely take a
-    // minute or two, especially mid-booking (checking availability,
-    // confirming, etc. can mean several model calls in one request). A
-    // progressively updating status reassures the visitor it's still
-    // working rather than looking frozen or broken.
+    // Replies stream in, so the first words normally appear within seconds.
+    // The status text only covers the wait before that (the model reading
+    // the question and the site content), and any tool step like a booking
+    // lookup.
     const statusTimers = [
       setTimeout(() => setSendingStatus('Still thinking…'), 12000),
       setTimeout(() => setSendingStatus('Checking details, this can take a minute…'), 35000),
       setTimeout(() => setSendingStatus('Almost there…'), 90000),
     ];
 
-    try {
-      // Local CPU-only LLM inference can take well over the default 30s
-      // client timeout, and a multi-step booking turn can need several
-      // model calls in one request — matches the Laravel proxy's own
-      // 280s allowance (AiAgentController) rather than cutting it short.
-      const { data } = await api.post('/ai-agent/chat', {
-        message: text,
-        conversation_id: conversationId.current,
-      }, { timeout: 280000 });
-      if (data.conversation_id) {
-        conversationId.current = data.conversation_id;
-        sessionStorage.setItem(CONVERSATION_STORAGE_KEY, data.conversation_id);
+    let replyText = '';
+    const showReply = (content: string) =>
+      setMessages(prev => [...prev.slice(0, baseCount), { role: 'assistant', content }]);
+
+    const handleEvent = (event: any) => {
+      switch (event.type) {
+        case 'start':
+          if (event.conversation_id) {
+            conversationId.current = event.conversation_id;
+            sessionStorage.setItem(CONVERSATION_STORAGE_KEY, event.conversation_id);
+          }
+          break;
+        case 'token':
+          replyText += event.text;
+          setStreaming(true);
+          showReply(replyText);
+          break;
+        case 'tool':
+          setSendingStatus('Checking details…');
+          break;
+        case 'done':
+          // The final response is authoritative: it drops any half-streamed
+          // text the agent discarded (e.g. a malformed tool call it retried).
+          replyText = event.data?.final_response || replyText;
+          showReply(replyText || "Sorry, I didn't catch that.");
+          break;
+        case 'error':
+          showReply(event.text || 'Something went wrong reaching the AI assistant.');
+          break;
       }
-      setMessages(prev => [...prev, { role: 'assistant', content: data.reply || "Sorry, I didn't catch that." }]);
+    };
+
+    const controller = new AbortController();
+    // Matches the Laravel proxy's own 280s allowance (AiAgentController).
+    const abortTimer = setTimeout(() => controller.abort(), 280000);
+
+    try {
+      const res = await fetch(`${API_BASE}/api/ai-agent/chat/stream`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+        body: JSON.stringify({ message: text, conversation_id: conversationId.current }),
+        signal: controller.signal,
+      });
+
+      if (!res.ok || !res.body) {
+        let message = 'Something went wrong reaching the AI assistant.';
+        try { message = (await res.json())?.message || message; } catch { /* non-JSON error body */ }
+        throw new Error(message);
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        // SSE frames are separated by a blank line.
+        let boundary: number;
+        while ((boundary = buffer.indexOf('\n\n')) !== -1) {
+          const frame = buffer.slice(0, boundary);
+          buffer = buffer.slice(boundary + 2);
+          for (const line of frame.split('\n')) {
+            if (!line.startsWith('data: ')) continue;
+            try { handleEvent(JSON.parse(line.slice(6))); } catch { /* ignore a malformed frame */ }
+          }
+        }
+      }
+      if (!replyText) showReply("Sorry, I didn't catch that.");
     } catch (err: any) {
-      const message = err?.response?.data?.message || 'Something went wrong reaching the AI assistant.';
-      setMessages(prev => [...prev, { role: 'assistant', content: message }]);
+      const message = err?.name === 'AbortError'
+        ? 'The assistant took too long to answer. Please try again.'
+        : err?.message || 'Something went wrong reaching the AI assistant.';
+      // Keep whatever was already streamed; only add the error if nothing was.
+      if (!replyText) showReply(message);
     } finally {
+      clearTimeout(abortTimer);
       statusTimers.forEach(clearTimeout);
       setSending(false);
+      setStreaming(false);
     }
   };
 
@@ -87,7 +156,7 @@ const AiChatWidget: React.FC = () => {
             <Bot className="w-5 h-5" />
             <div className="flex-1">
               <p className="text-sm font-semibold leading-tight">ToleMate Assistant</p>
-              <p className="text-xs text-primary-100 leading-tight">Usually replies instantly</p>
+              <p className="text-xs text-primary-100 leading-tight">Ask about ToleMate or book a service</p>
             </div>
             <button onClick={() => setOpen(false)} aria-label="Close chat" className="text-primary-100 hover:text-white">
               <X className="w-5 h-5" />
@@ -109,7 +178,7 @@ const AiChatWidget: React.FC = () => {
                 </div>
               </div>
             ))}
-            {sending && (
+            {sending && !streaming && (
               <div className="flex justify-start">
                 <div className="bg-white border border-gray-200 rounded-xl rounded-bl-sm px-3 py-2 text-sm text-gray-400">
                   {sendingStatus}
